@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .left { background: lightblue; padding: 20px; height: 300px; } /* short left */
+    .right { 
+      background: lightcoral; 
+      height: 0; 
+      min-height: max(100%, 500px); 
+      display: flex; 
+      flex-direction: column;
+    }
+    .right-content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: rgba(0,0,0,0.1);
+    }
+    .tall-content { height: 1000px; background: repeating-linear-gradient(45deg, #000, #000 10px, #fff 10px, #fff 20px); }
+  </style>
+</head>
+<body>
+  <div class="grid" style="margin-bottom: 50px;">
+    <div class="left">Left (300px)</div>
+    <div class="right">
+      Right (h-0, min-h: max(100%, 500px))
+      <div class="right-content">
+        <div class="tall-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="left" style="height: 800px;">Left (800px)</div>
+    <div class="right">
+      Right (h-0, min-h: max(100%, 500px))
+      <div class="right-content">
+        <div class="tall-content"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

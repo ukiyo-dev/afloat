@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-image: radial-gradient(#d1cdc3 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -10px -10px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .ledger-border {
+    @apply border border-ink;
+  }
+  .ledger-border-t {
+    @apply border-t border-ink;
+  }
+  .ledger-border-b {
+    @apply border-b border-ink;
+  }
+
+  .brutal-scrollbar::-webkit-scrollbar {
+    width: 14px;
+  }
+  .brutal-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg-paper, #f0ece1);
+    border-left: 2px solid #111111;
+  }
+  .brutal-scrollbar::-webkit-scrollbar-thumb {
+    background: #111111;
+    border-left: 2px solid #111111;
+    border-right: 2px solid #f0ece1;
+  }
+  .brutal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #d5ff00;
+  }
+  
+  /* Details marker hiding utility */
+  details > summary {
+    list-style: none;
+  }
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@layer components {
+  .shell {
+    @apply w-full max-w-7xl mx-auto px-4 py-12 md:py-24;
+  }
+  
+  .btn-brutal {
+    @apply px-4 py-2 font-mono font-bold text-ink border-2 border-ink bg-paper hover:bg-highlight hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-brutal transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+  
+  .btn-danger {
+    @apply px-4 py-2 font-mono font-bold text-ink border-2 border-ink bg-danger hover:bg-danger/80 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-brutal transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .input-brutal {
+    @apply px-3 py-2 font-mono border-2 border-ink bg-paper focus:bg-white focus:outline-none focus:ring-2 focus:ring-highlight;
+  }
+
+  .panel-brutal {
+    @apply border-2 border-ink bg-paper shadow-brutal-lg p-6 md:p-8;
+  }
+  
+  .metric-box {
+    @apply border-2 border-ink bg-white p-4 flex flex-col justify-between;
+  }
+}
