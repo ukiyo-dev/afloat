@@ -4,6 +4,10 @@ import type { PrivateDerivedView } from "@/server/views/derived-view";
 
 export type DashboardRange = "yesterday" | "day" | string; // e.g. "7d", "30d", "90d"
 export type DashboardRangeKey = DashboardRange | "custom";
+export interface DashboardDefaultRange {
+  startOffsetDays: number;
+  endOffsetDays: number;
+}
 
 export interface DashboardRangeRequest {
   range?: string;
@@ -38,13 +42,87 @@ export interface DashboardRangeView {
 const rangeLabels: Record<string, string> = {
   yesterday: "昨天",
   day: "今天",
-  tomorrow: "明天",
+  tomorrow: "明天"
 };
+
+const DEFAULT_DASHBOARD_RANGE: DashboardDefaultRange = {
+  startOffsetDays: 0,
+  endOffsetDays: 0
+};
+
+const DASHBOARD_OFFSET_LIMIT = 3650;
 
 export function isDashboardRange(value: unknown): value is DashboardRange {
   if (typeof value !== "string") return false;
   if (value === "yesterday" || value === "day" || value === "tomorrow") return true;
   return /^\d+d$/.test(value);
+}
+
+export function isDashboardDefaultRange(value: unknown): value is DashboardDefaultRange {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    isValidDashboardOffset(candidate.startOffsetDays) &&
+    isValidDashboardOffset(candidate.endOffsetDays)
+  );
+}
+
+export function normalizeDashboardDefaultRange(
+  value: DashboardDefaultRange
+): DashboardDefaultRange {
+  const startOffsetDays = Math.min(value.startOffsetDays, value.endOffsetDays);
+  const endOffsetDays = Math.max(value.startOffsetDays, value.endOffsetDays);
+
+  return {
+    startOffsetDays,
+    endOffsetDays
+  };
+}
+
+export function parseDashboardDefaultRange(value: unknown): DashboardDefaultRange | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  if (value === "yesterday") {
+    return { startOffsetDays: -1, endOffsetDays: -1 };
+  }
+  if (value === "day") {
+    return { startOffsetDays: 0, endOffsetDays: 0 };
+  }
+  if (value === "tomorrow") {
+    return { startOffsetDays: 1, endOffsetDays: 1 };
+  }
+  if (/^\d+d$/.test(value)) {
+    const days = Number.parseInt(value.slice(0, -1), 10);
+    return { startOffsetDays: -days, endOffsetDays: -1 };
+  }
+
+  const match = /^offset:(-?\d+):(-?\d+)$/.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  const startOffsetDays = Number.parseInt(match[1]!, 10);
+  const endOffsetDays = Number.parseInt(match[2]!, 10);
+  if (!isValidDashboardOffset(startOffsetDays) || !isValidDashboardOffset(endOffsetDays)) {
+    return null;
+  }
+
+  return normalizeDashboardDefaultRange({ startOffsetDays, endOffsetDays });
+}
+
+export function serializeDashboardDefaultRange(value: DashboardDefaultRange): string {
+  const normalized = normalizeDashboardDefaultRange(value);
+  return `offset:${normalized.startOffsetDays}:${normalized.endOffsetDays}`;
+}
+
+export function describeDashboardDefaultRange(value: DashboardDefaultRange): string {
+  const normalized = normalizeDashboardDefaultRange(value);
+  return `当前 ${signedOffsetLabel(normalized.startOffsetDays)}至当前 ${signedOffsetLabel(normalized.endOffsetDays)}`;
 }
 
 export function resolveDashboardRange(
@@ -280,8 +358,24 @@ export function resolveDashboardRangeSelection(input: {
     });
   }
 
-  const quickRange = resolveDashboardRange(requestedRange, input.fallbackRange ?? "yesterday");
-  
+  const quickRange = isDashboardRange(requestedRange)
+    ? requestedRange
+    : null;
+
+  if (quickRange) {
+    return selectionFromQuickRange(quickRange, today, input.timezone);
+  }
+
+  const fallbackRange =
+    parseDashboardDefaultRange(input.fallbackRange) ?? DEFAULT_DASHBOARD_RANGE;
+  return selectionFromDefaultRange(fallbackRange, today, input.timezone);
+}
+
+function selectionFromQuickRange(
+  quickRange: DashboardRange,
+  today: string,
+  timezone: string
+): DashboardRangeSelection {
   if (quickRange === "yesterday") {
     const yesterday = formatLocalDate(addLocalDays(localDateFromKey(today), -1));
     return selectionFromDates({
@@ -290,7 +384,7 @@ export function resolveDashboardRangeSelection(input: {
       label: rangeLabels.yesterday,
       startDate: yesterday,
       endDate: yesterday,
-      timezone: input.timezone
+      timezone
     });
   }
 
@@ -302,13 +396,13 @@ export function resolveDashboardRangeSelection(input: {
       label: rangeLabels.tomorrow,
       startDate: tomorrowStr,
       endDate: tomorrowStr,
-      timezone: input.timezone
+      timezone
     });
   }
 
   const range = quickRange === "day" ? 1 : quickRange.endsWith("d") ? parseInt(quickRange.slice(0, -1), 10) : 7;
   const todayParts = localDateFromKey(today);
-  
+
   if (quickRange === "day") {
     return selectionFromDates({
       key: quickRange,
@@ -316,7 +410,7 @@ export function resolveDashboardRangeSelection(input: {
       label: "今天",
       startDate: today,
       endDate: today,
-      timezone: input.timezone
+      timezone
     });
   }
 
@@ -329,7 +423,33 @@ export function resolveDashboardRangeSelection(input: {
     label: `最近 ${range} 天`,
     startDate,
     endDate: yesterdayStr,
-    timezone: input.timezone
+    timezone
+  });
+}
+
+function selectionFromDefaultRange(
+  defaultRange: DashboardDefaultRange,
+  today: string,
+  timezone: string
+): DashboardRangeSelection {
+  const normalized = normalizeDashboardDefaultRange(defaultRange);
+  const preset = dashboardQuickRangeFromOffsets(normalized);
+
+  if (preset) {
+    return selectionFromQuickRange(preset, today, timezone);
+  }
+
+  const todayParts = localDateFromKey(today);
+  const startDate = formatLocalDate(addLocalDays(todayParts, normalized.startOffsetDays));
+  const endDate = formatLocalDate(addLocalDays(todayParts, normalized.endOffsetDays));
+
+  return selectionFromDates({
+    key: "custom",
+    quickRange: null,
+    label: `${startDate} 至 ${endDate}`,
+    startDate,
+    endDate,
+    timezone
   });
 }
 
@@ -503,6 +623,47 @@ function timezoneOffsetMs(date: Date, timezone: string): number {
 
 function pad(value: number): string {
   return value.toString().padStart(2, "0");
+}
+
+function signedOffsetLabel(value: number): string {
+  if (value === 0) {
+    return "0 天";
+  }
+  return `${value > 0 ? "+" : ""}${value} 天`;
+}
+
+function isValidDashboardOffset(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= -DASHBOARD_OFFSET_LIMIT &&
+    value <= DASHBOARD_OFFSET_LIMIT
+  );
+}
+
+function dashboardQuickRangeFromOffsets(
+  value: DashboardDefaultRange
+): DashboardRange | null {
+  if (value.startOffsetDays === -1 && value.endOffsetDays === -1) {
+    return "yesterday";
+  }
+  if (value.startOffsetDays === 0 && value.endOffsetDays === 0) {
+    return "day";
+  }
+  if (value.startOffsetDays === 1 && value.endOffsetDays === 1) {
+    return "tomorrow";
+  }
+
+  const span = Math.abs(value.startOffsetDays);
+  if (
+    value.endOffsetDays === -1 &&
+    value.startOffsetDays < 0 &&
+    ["7", "30", "90"].includes(String(span))
+  ) {
+    return `${span}d`;
+  }
+
+  return null;
 }
 
 interface LocalDate {

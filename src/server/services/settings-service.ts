@@ -3,8 +3,9 @@ import { loadSettings, updateSettings } from "@/server/db/settings";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
 import { validateDashboardSettings } from "@/server/services/workbench-validation";
 import {
-  isDashboardRange,
-  type DashboardRange
+  parseDashboardDefaultRange,
+  serializeDashboardDefaultRange,
+  type DashboardDefaultRange
 } from "@/server/services/dashboard-range";
 
 export interface PublicSettingsInput {
@@ -12,14 +13,17 @@ export interface PublicSettingsInput {
 }
 
 export interface DashboardSettingsInput extends PublicSettingsInput {
-  defaultDashboardRange: DashboardRange;
+  defaultDashboardRange: DashboardDefaultRange;
   timezone: string;
 }
 
 export async function saveDashboardSettings(input: DashboardSettingsInput) {
   validateDashboardSettings(input);
   const ownerId = await getCurrentOwnerId();
-  return updateSettings(db, ownerId, input);
+  return updateSettings(db, ownerId, {
+    ...input,
+    defaultDashboardRange: serializeDashboardDefaultRange(input.defaultDashboardRange)
+  });
 }
 
 export async function loadDashboardSettings(): Promise<DashboardSettingsInput> {
@@ -27,9 +31,10 @@ export async function loadDashboardSettings(): Promise<DashboardSettingsInput> {
   const settings = await loadSettings(db, ownerId);
   return {
     publicPageEnabled: settings.publicPageEnabled,
-    defaultDashboardRange: isDashboardRange(settings.defaultDashboardRange)
-      ? settings.defaultDashboardRange
-      : "day",
+    defaultDashboardRange: parseDashboardDefaultRange(settings.defaultDashboardRange) ?? {
+      startOffsetDays: 0,
+      endOffsetDays: 0
+    },
     timezone: settings.timezone || "UTC"
   };
 }

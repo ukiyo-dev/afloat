@@ -26,17 +26,33 @@ describe("workbench validation", () => {
     expect(() =>
       validateDashboardSettings({
         publicPageEnabled: true,
-        defaultDashboardRange: "day",
+        defaultDashboardRange: {
+          startOffsetDays: -1,
+          endOffsetDays: -1
+        },
         timezone: "Asia/Shanghai"
       })
     ).not.toThrow();
     expect(() =>
       validateDashboardSettings({
         publicPageEnabled: true,
-        defaultDashboardRange: "7d",
+        defaultDashboardRange: {
+          startOffsetDays: -7,
+          endOffsetDays: -1
+        },
         timezone: "Bad/Zone"
       })
     ).toThrow("timezone is invalid");
+    expect(() =>
+      validateDashboardSettings({
+        publicPageEnabled: true,
+        defaultDashboardRange: {
+          startOffsetDays: 2,
+          endOffsetDays: -1
+        },
+        timezone: "UTC"
+      })
+    ).toThrow("defaultDashboardRange must be in ascending order");
   });
 
   it("validates thread declarations", () => {

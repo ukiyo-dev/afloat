@@ -253,7 +253,7 @@ export function DashboardWorkbench({
           </BrutalDialog>
         ) : null}
         <Metric 
-          label="活跃线程" 
+          label="待规划线程" 
           value={`${urgentThreads.length}`} 
           danger={urgentThreads.length > 0} 
         />

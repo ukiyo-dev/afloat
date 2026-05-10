@@ -1,6 +1,7 @@
 import type { NoteInput } from "@/server/services/note-service";
 import {
-  isDashboardRange,
+  isDashboardDefaultRange,
+  normalizeDashboardDefaultRange,
   isValidTimeZone
 } from "@/server/services/dashboard-range";
 import type { DashboardSettingsInput } from "@/server/services/settings-service";
@@ -23,8 +24,15 @@ export function validateNoteDate(date: string): void {
 }
 
 export function validateDashboardSettings(input: DashboardSettingsInput): void {
-  if (!isDashboardRange(input.defaultDashboardRange)) {
+  if (!isDashboardDefaultRange(input.defaultDashboardRange)) {
     throw new Error("defaultDashboardRange is invalid.");
+  }
+  const normalized = normalizeDashboardDefaultRange(input.defaultDashboardRange);
+  if (
+    normalized.startOffsetDays !== input.defaultDashboardRange.startOffsetDays ||
+    normalized.endOffsetDays !== input.defaultDashboardRange.endOffsetDays
+  ) {
+    throw new Error("defaultDashboardRange must be in ascending order.");
   }
   if (!isValidTimeZone(input.timezone)) {
     throw new Error("timezone is invalid.");

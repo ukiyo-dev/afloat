@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildDashboardRangeView,
   dashboardDateRange,
+  describeDashboardDefaultRange,
+  parseDashboardDefaultRange,
   resolveDashboardRange
 } from "./dashboard-range";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
@@ -14,11 +16,59 @@ describe("dashboard range", () => {
     expect(resolveDashboardRange("bad", "also-bad")).toBe("yesterday");
   });
 
+  it("parses default ranges as relative offsets from today", () => {
+    expect(parseDashboardDefaultRange("offset:-1:-1")).toEqual({
+      startOffsetDays: -1,
+      endOffsetDays: -1
+    });
+    expect(parseDashboardDefaultRange("day")).toEqual({
+      startOffsetDays: 0,
+      endOffsetDays: 0
+    });
+    expect(parseDashboardDefaultRange("7d")).toEqual({
+      startOffsetDays: -7,
+      endOffsetDays: -1
+    });
+    expect(describeDashboardDefaultRange({ startOffsetDays: -1, endOffsetDays: -1 })).toBe(
+      "当前 -1 天 到 当前 -1 天"
+    );
+  });
+
   it("builds day ranges at the configured timezone boundary", () => {
     const range = dashboardDateRange("day", "Asia/Shanghai", new Date("2026-05-07T12:00:00.000Z"));
 
     expect(range.startAt.toISOString()).toBe("2026-05-06T16:00:00.000Z");
     expect(range.endAt.toISOString()).toBe("2026-05-07T16:00:00.000Z");
+  });
+
+  it("uses relative offset defaults when no explicit range is requested", () => {
+    const view = samplePrivateView();
+    const rangeView = buildDashboardRangeView({
+      view,
+      fallbackRange: "offset:-1:-1",
+      timezone: "UTC",
+      now: new Date("2026-05-07T12:00:00.000Z")
+    });
+
+    expect(rangeView.label).toBe("昨天");
+    expect(rangeView.startDate).toBe("2026-05-06");
+    expect(rangeView.endDate).toBe("2026-05-06");
+  });
+
+  it("uses custom relative offset defaults for multi-day windows", () => {
+    const view = samplePrivateView();
+    const rangeView = buildDashboardRangeView({
+      view,
+      fallbackRange: "offset:-2:0",
+      timezone: "UTC",
+      now: new Date("2026-05-07T12:00:00.000Z")
+    });
+
+    expect(rangeView.key).toBe("custom");
+    expect(rangeView.quickRange).toBeNull();
+    expect(rangeView.label).toBe("2026-05-05 至 2026-05-07");
+    expect(rangeView.startDate).toBe("2026-05-05");
+    expect(rangeView.endDate).toBe("2026-05-07");
   });
 
   it("clips plan and fact minutes to the selected range", () => {

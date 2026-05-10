@@ -12,6 +12,7 @@ import { CalendarMappingForm } from "@/components/calendar-mapping-form";
 import { requirePageAuthentication } from "@/server/services/auth-service";
 import { loadCurrentCalDavCredentialSummary } from "@/server/services/caldav-credential-service";
 import { loadDashboardSettings } from "@/server/services/settings-service";
+import { describeDashboardDefaultRange } from "@/server/services/dashboard-range";
 import { listCalDavCalendars } from "@/server/services/sync-service";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function SettingsPage() {
              <div>
                 <span className="block font-mono text-xs text-ink-light mb-1">DEFAULT RANGE</span>
                 <strong className="font-mono text-lg block mb-1">
-                  {rangeLabel(settings.defaultDashboardRange)}
+                  {describeDashboardDefaultRange(settings.defaultDashboardRange)}
                 </strong>
              </div>
           </div>
@@ -71,22 +72,35 @@ export default async function SettingsPage() {
             </div>
             
             <ActionForm className="flex flex-col gap-4" action={saveSettingsAction}>
-              <label className="flex flex-col gap-1 relative">
-                <span className="font-mono text-xs font-bold uppercase">默认主视图</span>
-                <div className="relative w-full">
-                  <select className="input-brutal w-full appearance-none pr-8 cursor-pointer" name="defaultDashboardRange" defaultValue={settings.defaultDashboardRange}>
-                    <option value="yesterday">昨天 (Yesterday)</option>
-                    <option value="day">今天 (Today)</option>
-                    <option value="tomorrow">明天 (Tomorrow)</option>
-                    <option value="7d">最近 7 天 (7 Days)</option>
-                    <option value="30d">最近 30 天 (30 Days)</option>
-                    <option value="90d">最近 90 天 (90 Days)</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-ink">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                  </div>
+              <fieldset className="flex flex-col gap-3">
+                <legend className="font-mono text-xs font-bold uppercase mb-1">默认主视图</legend>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="font-mono text-xs font-bold uppercase">开始：当前 xday</span>
+                    <input
+                      className="input-brutal w-full"
+                      name="defaultDashboardStartOffset"
+                      type="number"
+                      step="1"
+                      defaultValue={settings.defaultDashboardRange.startOffsetDays}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="font-mono text-xs font-bold uppercase">结束：当前 xday</span>
+                    <input
+                      className="input-brutal w-full"
+                      name="defaultDashboardEndOffset"
+                      type="number"
+                      step="1"
+                      defaultValue={settings.defaultDashboardRange.endOffsetDays}
+                    />
+                  </label>
                 </div>
-              </label>
+                <p className="font-mono text-xs text-ink-light italic">
+                  昨天 = -1 / -1，今天 = 0 / 0，明天 = +1 / +1，最近 7 天 = -7 / -1。
+                </p>
+              </fieldset>
               
               <label className="flex flex-col gap-1 relative">
                 <span className="font-mono text-xs font-bold uppercase">视图时区</span>
@@ -198,18 +212,6 @@ export default async function SettingsPage() {
       </section>
     </main>
   );
-}
-
-function rangeLabel(range: string): string {
-  const labels: Record<string, string> = {
-    yesterday: "昨天",
-    day: "今天",
-    tomorrow: "明天",
-    "7d": "最近 7 天",
-    "30d": "最近 30 天",
-    "90d": "最近 90 天"
-  };
-  return labels[range] ?? range;
 }
 
 function calDavCredentialLabel(source: string): string {

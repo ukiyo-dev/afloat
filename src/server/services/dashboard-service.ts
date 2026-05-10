@@ -3,8 +3,9 @@ import { loadSettings } from "@/server/db/settings";
 import { loadLatestSyncRun } from "@/server/db/sync-runs";
 import {
   buildDashboardRangeView,
-  resolveDashboardRange,
-  type DashboardRange,
+  parseDashboardDefaultRange,
+  type DashboardDefaultRange,
+  type DashboardRangeKey,
   type DashboardRangeRequest,
   type DashboardRangeView
 } from "@/server/services/dashboard-range";
@@ -18,7 +19,7 @@ export type { DashboardRangeRequest } from "@/server/services/dashboard-range";
 
 export interface DashboardData {
   view: PrivateDerivedView;
-  range: DashboardRange;
+  range: DashboardRangeKey;
   rangeView: DashboardRangeView;
   latestSyncRun: {
     kind: string;
@@ -31,7 +32,7 @@ export interface DashboardData {
   } | null;
   settings: {
     publicPageEnabled: boolean;
-    defaultDashboardRange: DashboardRange;
+    defaultDashboardRange: DashboardDefaultRange;
     timezone: string;
   };
 }
@@ -43,18 +44,18 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
     loadLatestSyncRun(db, ownerId),
     loadSettings(db, ownerId)
   ]);
-  const range = resolveDashboardRange(request?.range, settings.defaultDashboardRange);
   const timezone = settings.timezone || "UTC";
+  const rangeView = buildDashboardRangeView({
+    view,
+    request,
+    fallbackRange: settings.defaultDashboardRange,
+    timezone
+  });
 
   return {
     view,
-    range,
-    rangeView: buildDashboardRangeView({
-      view,
-      request,
-      fallbackRange: settings.defaultDashboardRange,
-      timezone
-    }),
+    range: rangeView.key,
+    rangeView,
     latestSyncRun: latestSyncRun
       ? {
           kind: latestSyncRun.kind,
@@ -68,7 +69,10 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
       : null,
     settings: {
       publicPageEnabled: settings.publicPageEnabled,
-      defaultDashboardRange: resolveDashboardRange(undefined, settings.defaultDashboardRange),
+      defaultDashboardRange: parseDashboardDefaultRange(settings.defaultDashboardRange) ?? {
+        startOffsetDays: 0,
+        endOffsetDays: 0
+      },
       timezone
     }
   };
@@ -95,19 +99,19 @@ async function loadDashboardDataForOwner(
     loadLatestSyncRun(db, ownerId),
     loadSettings(db, ownerId)
   ]);
-  const range = resolveDashboardRange(request?.range, settings.defaultDashboardRange);
   const timezone = settings.timezone || "UTC";
   const visibleView = options.visitorMode ? visitorView(view) : view;
+  const rangeView = buildDashboardRangeView({
+    view: visibleView,
+    request,
+    fallbackRange: settings.defaultDashboardRange,
+    timezone
+  });
 
   return {
     view: visibleView,
-    range,
-    rangeView: buildDashboardRangeView({
-      view: visibleView,
-      request,
-      fallbackRange: settings.defaultDashboardRange,
-      timezone
-    }),
+    range: rangeView.key,
+    rangeView,
     latestSyncRun: latestSyncRun
       ? {
           kind: latestSyncRun.kind,
@@ -121,7 +125,10 @@ async function loadDashboardDataForOwner(
       : null,
     settings: {
       publicPageEnabled: settings.publicPageEnabled,
-      defaultDashboardRange: resolveDashboardRange(undefined, settings.defaultDashboardRange),
+      defaultDashboardRange: parseDashboardDefaultRange(settings.defaultDashboardRange) ?? {
+        startOffsetDays: 0,
+        endOffsetDays: 0
+      },
       timezone
     }
   };

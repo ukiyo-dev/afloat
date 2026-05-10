@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { isDashboardRange } from "@/server/services/dashboard-range";
+import { normalizeDashboardDefaultRange } from "@/server/services/dashboard-range";
 import { saveCurrentCalDavCredential } from "@/server/services/caldav-credential-service";
 import { saveCalendarSourceMapping } from "@/server/services/calendar-source-service";
 import { isCalendarMappingValue } from "@/server/services/calendar-source-validation";
@@ -12,11 +12,13 @@ import { recomputeCurrentOwnerViews } from "@/server/services/view-service";
 
 export async function saveSettingsAction(formData: FormData) {
   const publicPageEnabled = formData.get("publicPageEnabled") === "on";
-  const defaultDashboardRange = formData.get("defaultDashboardRange");
+  const defaultDashboardStartOffset = parseOffset(formData.get("defaultDashboardStartOffset"));
+  const defaultDashboardEndOffset = parseOffset(formData.get("defaultDashboardEndOffset"));
   const timezone = formData.get("timezone");
 
   if (
-    !isDashboardRange(defaultDashboardRange) ||
+    defaultDashboardStartOffset === null ||
+    defaultDashboardEndOffset === null ||
     typeof timezone !== "string"
   ) {
     throw new Error("Invalid settings form data.");
@@ -31,13 +33,24 @@ export async function saveSettingsAction(formData: FormData) {
 
   await saveDashboardSettings({
     publicPageEnabled,
-    defaultDashboardRange,
+    defaultDashboardRange: normalizeDashboardDefaultRange({
+      startOffsetDays: defaultDashboardStartOffset,
+      endOffsetDays: defaultDashboardEndOffset
+    }),
     timezone
   });
   await recomputeCurrentOwnerViews();
   revalidatePath("/dashboard");
   revalidatePath("/settings");
   redirect("/settings");
+}
+
+function parseOffset(value: FormDataEntryValue | null): number | null {
+  if (typeof value !== "string" || !/^-?\d+$/.test(value)) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 export async function saveSettingsCalendarMappingAction(formData: FormData) {
