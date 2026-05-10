@@ -13,15 +13,20 @@ export function JournalPanel({
   visitorMode?: boolean; 
 }) {
   return (
-    <section className="panel-brutal bg-[#fffdf5] flex flex-col flex-1 min-h-0">
-      <div className="flex justify-between items-start mb-6 border-b-2 border-ink pb-4 shrink-0">
+    <details 
+      className="panel-brutal group bg-[#fffdf5] min-h-0 transition-all [&[open]]:flex-1 [&:not([open])]:shrink-0 [&[open]]:grid [&[open]]:grid-rows-[max-content_minmax(0,1fr)]" 
+      open
+    >
+      <summary className="flex justify-between items-start mb-0 group-open:mb-6 group-open:border-b-2 group-open:border-ink group-open:pb-4 shrink-0 cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
         <div>
           <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Journal</p>
           <h2 className="font-serif text-3xl font-bold">每日笔记 <span className="text-xl text-ink-light font-mono ml-2">({rangeView.label})</span></h2>
         </div>
-      </div>
+        <span className="text-ink text-4xl leading-none font-normal shrink-0 group-open:rotate-45 transition-transform duration-200">+</span>
+      </summary>
       
-      {visitorMode ? null : (
+      <div className="h-full flex flex-col min-h-0 overflow-hidden">
+        {visitorMode ? null : (
         <div className="mb-8 shrink-0">
           <BrutalDialog
             title="New Journal Entry"
@@ -142,6 +147,7 @@ export function JournalPanel({
           </article>
         ))}
       </div>
-    </section>
+      </div>
+    </details>
   );
 }
