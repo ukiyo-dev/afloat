@@ -21,12 +21,14 @@ export function TimeTape({
   const startMs = new Date(startDate).getTime();
   const endMs = new Date(endDate).getTime();
   const totalMs = endMs - startMs;
+  const isSingleLocalDay =
+    localDayKey(startDate, timezone) === localDayKey(new Date(endMs - 1).toISOString(), timezone);
 
   return (
     <div>
       <div className="flex justify-between items-end mb-2">
          <h3 className="font-mono font-bold text-sm bg-ink text-white inline-block px-2 py-1 uppercase">
-            {startDate.slice(0, 10) === endDate.slice(0, 10) || startDate.slice(0, 10) === new Date(new Date(endDate).getTime() - 1000).toISOString().slice(0, 10) ? '日切片 (DAY TAPE)' : '宏观分布 (MACRO TAPE)'}
+            {isSingleLocalDay ? '日切片 (DAY TAPE)' : '宏观分布 (MACRO TAPE)'}
          </h3>
       </div>
       
@@ -70,7 +72,7 @@ export function TimeTape({
       </div>
       
       {/* Tape Scale / Axis */}
-      {startDate.slice(0, 10) === endDate.slice(0, 10) || startDate.slice(0, 10) === new Date(new Date(endDate).getTime() - 1000).toISOString().slice(0, 10) ? (
+      {isSingleLocalDay ? (
         <div className="flex justify-between font-mono text-[10px] text-ink-light mt-2 px-1 border-t-2 border-ink pt-1">
           <span>00:00</span>
           <span>06:00</span>
@@ -81,4 +83,26 @@ export function TimeTape({
       ) : null}
     </div>
   );
+}
+
+function localDayKey(value: string, timezone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date(value));
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch {
+    // Keep rendering with a UTC fallback if the timezone is invalid.
+  }
+
+  return value.slice(0, 10);
 }

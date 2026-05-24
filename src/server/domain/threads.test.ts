@@ -532,6 +532,47 @@ describe("buildThreadViews", () => {
     expect(groups[0]?.dailyRequiredMinutes).toBe(60);
   });
 
+  it("does not mark unfinished threads expired on the deadline date", () => {
+    const declarations: ThreadDeclaration[] = [
+      {
+        id: "t1",
+        group: "Afloat",
+        item: "同步",
+        expectedMinutes: 60,
+        deadline: new Date("2026-05-12T00:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, []);
+    const factLayer = buildFactLayer(parsedEvents);
+
+    const onDeadlineDate = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-12T12:00:00Z")
+    });
+    const afterDeadlineDate = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-13T00:00:00Z")
+    });
+    const afterDeadlineInConfiguredTimezone = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-12T16:00:00Z"),
+      timezone: "Asia/Shanghai"
+    });
+
+    expect(onDeadlineDate[0]?.status).toBe("needsScheduling");
+    expect(afterDeadlineDate[0]?.status).toBe("expired");
+    expect(afterDeadlineInConfiguredTimezone[0]?.status).toBe("expired");
+  });
+
   it("does not mark an item fulfilled only because done exceeds target", () => {
     const declarations: ThreadDeclaration[] = [
       {

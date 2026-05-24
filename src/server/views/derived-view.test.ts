@@ -16,6 +16,32 @@ describe("buildDerivedViews", () => {
       "older-public"
     ]);
   });
+
+  it("serializes protocol error dates in the configured timezone", () => {
+    const views = buildDerivedViews({
+      ...sampleInput(),
+      now: new Date("2026-05-08T12:00:00.000Z"),
+      timezone: "Asia/Shanghai",
+      rawEvents: [
+        {
+          id: "a",
+          calendarSourceId: "ideal",
+          title: "Afloat：镜像 1",
+          startAt: new Date("2026-05-07T16:30:00.000Z"),
+          endAt: new Date("2026-05-07T17:30:00.000Z")
+        },
+        {
+          id: "b",
+          calendarSourceId: "ideal",
+          title: "Afloat：镜像 2",
+          startAt: new Date("2026-05-07T17:00:00.000Z"),
+          endAt: new Date("2026-05-07T18:00:00.000Z")
+        }
+      ]
+    });
+
+    expect(views.private.protocolErrors[0]?.date).toBe("2026-05-08");
+  });
 });
 
 function sampleInput(): DerivedViewInput {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CalendarIcon, UpdateIcon, CheckIcon } from "@radix-ui/react-icons";
 
@@ -41,11 +42,24 @@ function getFactLayerTitle(startDate: string, endDate: string, timezone: string)
     return "岁月篇章";
   }
 
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+  const today = todayKey(timezone);
   
   if (endDate < today) return "往日重现";
   if (startDate > today) return "未雨绸缪";
   return "现在进行";
+}
+
+function LocalClock({ fallback, timezone }: { fallback: string; timezone: string }) {
+  const [now, setNow] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tick = () => setNow(new Date().toISOString());
+    tick();
+    const timer = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return <>{formatGeneratedAt(now ?? fallback, timezone)}</>;
 }
 
 export function DashboardWorkbench({
@@ -107,7 +121,7 @@ export function DashboardWorkbench({
               </p>
             )}
             <span className="font-mono text-ink-light text-sm">
-              {formatGeneratedAt(view.generatedAt, rangeView.timezone)}
+              <LocalClock fallback={view.generatedAt} timezone={rangeView.timezone} />
             </span>
           </div>
           

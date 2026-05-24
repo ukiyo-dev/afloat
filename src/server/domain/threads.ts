@@ -1,4 +1,4 @@
-import { daysBetween, minutesInRange } from "./time";
+import { dayKey, daysBetween, localDayKey, minutesInRange } from "./time";
 import type {
   FactSegment,
   FeasibilityStatus,
@@ -44,6 +44,7 @@ export function buildThreadViews(input: {
   cleanPlanSegments: TimeSegment[];
   parsedEvents: ParsedEvent[];
   now: Date;
+  timezone?: string;
 }): ThreadView[] {
   const threads = new Map<string, ThreadAccumulator>();
   const activeKeysByGroup = new Map<string, Set<string>>();
@@ -173,20 +174,25 @@ export function buildThreadViews(input: {
   }
 
   const recentDailyCapacity = recentFulfilledDailyCapacity(input.facts, input.now);
+  const timezone = input.timezone ?? "UTC";
 
   return [...threads.values()]
-    .map((thread) => toThreadView(thread, input.now, recentDailyCapacity))
+    .map((thread) => toThreadView(thread, input.now, recentDailyCapacity, timezone))
     .sort((a, b) => statusRank(a.status) - statusRank(b.status));
 }
 
-export function buildThreadGroupViews(threads: ThreadView[], now: Date): ThreadGroupView[] {
+export function buildThreadGroupViews(
+  threads: ThreadView[],
+  now: Date,
+  timezone = "UTC"
+): ThreadGroupView[] {
   const byGroup = new Map<string, ThreadView[]>();
   for (const thread of threads) {
     byGroup.set(thread.group, [...(byGroup.get(thread.group) ?? []), thread]);
   }
 
   return [...byGroup.entries()]
-    .map(([group, items]) => toThreadGroupView(group, items, now))
+    .map(([group, items]) => toThreadGroupView(group, items, now, timezone))
     .sort((a, b) => statusRank(a.status) - statusRank(b.status));
 }
 
@@ -278,7 +284,8 @@ function releaseClosedGroup(input: {
 function toThreadView(
   thread: ThreadAccumulator,
   now: Date,
-  recentDailyCapacity: number
+  recentDailyCapacity: number,
+  timezone: string
 ): ThreadView {
   const source: ThreadSource =
     thread.declared && thread.auto ? "both" : thread.declared ? "declared" : "auto";
@@ -328,6 +335,7 @@ function toThreadView(
       fulfilledByClosure: thread.fulfilledByClosure,
       deadline,
       now,
+      timezone,
       recentDailyCapacity
     }),
     canDelete:
@@ -358,6 +366,7 @@ function feasibilityStatus(input: {
   fulfilledByClosure?: boolean;
   deadline: Date | null;
   now: Date;
+  timezone: string;
   recentDailyCapacity: number;
 }): FeasibilityStatus {
   if (input.fulfilledByClosure) {
@@ -369,7 +378,7 @@ function feasibilityStatus(input: {
   if (input.factGapMinutes === 0) {
     return "scheduled";
   }
-  if (input.deadline && input.deadline < input.now) {
+  if (input.deadline && isPastDeadlineDate(input.deadline, input.now, input.timezone)) {
     return "expired";
   }
   if (input.unscheduledGapMinutes === 0) {
@@ -392,7 +401,16 @@ function feasibilityStatus(input: {
   return "needsScheduling";
 }
 
-function toThreadGroupView(group: string, items: ThreadView[], now: Date): ThreadGroupView {
+function isPastDeadlineDate(deadline: Date, now: Date, timezone: string): boolean {
+  return dayKey(deadline) < localDayKey(now, timezone);
+}
+
+function toThreadGroupView(
+  group: string,
+  items: ThreadView[],
+  now: Date,
+  timezone: string
+): ThreadGroupView {
   const expectedValues = items
     .map((item) => item.expectedMinutes)
     .filter((value): value is number => value !== null);
@@ -435,6 +453,7 @@ function toThreadGroupView(group: string, items: ThreadView[], now: Date): Threa
       fulfilledByClosure: items.every((item) => item.status === "fulfilled"),
       deadline: deadlineDate,
       now,
+      timezone,
       recentDailyCapacity: 0
     }),
     items: [...items].sort((a, b) => statusRank(a.status) - statusRank(b.status))

@@ -2,7 +2,7 @@ import { parseCalendarEvents } from "@/server/domain/calendar";
 import { buildFactLayer, commitmentStats, totalMinutesByKind } from "@/server/domain/facts";
 import { maintenanceRate } from "@/server/domain/maintenance";
 import { buildThreadGroupViews, buildThreadViews } from "@/server/domain/threads";
-import { dayKey, minutesInRange } from "@/server/domain/time";
+import { localDayKey, minutesInRange } from "@/server/domain/time";
 import type {
   CalendarSource,
   FactSegment,
@@ -89,9 +89,10 @@ export function buildDerivedViews(input: DerivedViewInput): DerivedViews {
     facts: factLayer.facts,
     cleanPlanSegments: factLayer.cleanPlanSegments,
     parsedEvents,
-    now: input.now
+    now: input.now,
+    timezone: input.timezone ?? "UTC"
   });
-  const threadGroups = buildThreadGroupViews(threads, input.now);
+  const threadGroups = buildThreadGroupViews(threads, input.now, input.timezone ?? "UTC");
   const observedSemantics = input.calendarSources.map((source) => source.semantic);
 
   return {
@@ -101,10 +102,10 @@ export function buildDerivedViews(input: DerivedViewInput): DerivedViews {
       plannedMinutes: stats.plannedMinutes,
       fulfilledPlanMinutes: stats.fulfilledPlanMinutes,
       fulfillmentRate: stats.fulfillmentRate,
-      maintenanceRate: maintenanceRate(parsedEvents, input.now),
+      maintenanceRate: maintenanceRate(parsedEvents, input.now, 30, input.timezone ?? "UTC"),
       maintenanceTimeline: parsedEvents.map(serializeMaintenanceSegment),
       factTotals: totalMinutesByKind(factLayer.facts),
-      protocolErrors: factLayer.errors.map(serializeError),
+      protocolErrors: factLayer.errors.map((error) => serializeError(error, input.timezone ?? "UTC")),
       planTimeline: factLayer.cleanPlanSegments.map(serializePlan),
       timeline: factLayer.facts.map(serializeFact),
       threadGroups,
@@ -146,10 +147,10 @@ function serializeFact(fact: FactSegment): SerializedFactSegment {
   };
 }
 
-function serializeError(error: ProtocolError): SerializedProtocolError {
+function serializeError(error: ProtocolError, timezone: string): SerializedProtocolError {
   return {
     type: error.type,
-    date: dayKey(error.startAt),
+    date: localDayKey(error.startAt, timezone),
     startAt: error.startAt.toISOString(),
     endAt: error.endAt.toISOString(),
     message: error.message,

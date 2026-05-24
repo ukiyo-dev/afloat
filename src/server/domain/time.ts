@@ -57,6 +57,28 @@ export function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+export function localDayKey(date: Date, timezone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch {
+    // Fall back to UTC if persisted settings contain an invalid timezone.
+  }
+
+  return dayKey(date);
+}
+
 export function daysBetween(startAt: Date, endAt: Date): number {
   return Math.max(0, Math.ceil((endAt.getTime() - startAt.getTime()) / MS_PER_DAY));
 }

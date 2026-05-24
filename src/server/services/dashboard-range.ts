@@ -145,7 +145,7 @@ export function buildDashboardRangeView(input: {
   timezone: string;
   now?: Date;
 }): DashboardRangeView {
-  const now = input.now ?? new Date(input.view.generatedAt);
+  const now = input.now ?? new Date();
   const selection = resolveDashboardRangeSelection({
     request: input.request,
     fallbackRange: input.fallbackRange,
