@@ -27,15 +27,23 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning className={`${serif.variable} ${mono.variable}`}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("afloat-theme-mode");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}else{document.documentElement.removeAttribute("data-theme")}}catch(e){}`
+          }}
+        />
+      </head>
       <body className="font-mono bg-paper text-ink selection:bg-highlight selection:text-ink min-h-screen border-t-8 border-ink">
         {children}
         <Toaster 
           position="bottom-right" 
           toastOptions={{
-            className: 'font-mono text-sm border-2 border-ink shadow-[4px_4px_0_0_#111] rounded-none',
+            className: 'font-mono text-sm border-2 border-ink shadow-brutal rounded-none',
             style: {
-              background: '#f0ece1',
-              color: '#111',
+              background: 'rgb(var(--color-paper))',
+              color: 'rgb(var(--color-ink))',
+              borderColor: 'rgb(var(--color-ink))',
             }
           }} 
         />

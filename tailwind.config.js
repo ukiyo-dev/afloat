@@ -13,22 +13,26 @@ export default {
         sans: ['var(--font-mono)'], // Force mono everywhere unless overridden
       },
       colors: {
-        paper: '#f0ece1', // raw, unbleached paper feel
-        ink: '#111111', // deep black
-        'ink-light': '#4a4a4a',
-        highlight: '#d5ff00', // stark highlighter yellow
-        danger: '#ff3333', // intense red
-        success: '#00e676', // stark green
-        faint: '#d1cdc3', // borders on paper
-        'semantic-work': '#039be5',      // 孔雀蓝 (Peacock Blue) - Google Calendar
-        'semantic-leisure': '#0b8043',   // 罗勒绿 (Basil Green) - Google Calendar
-        'semantic-rest': '#33b679',      // 鼠尾草绿 (Sage Green) - Google Calendar
-        'semantic-ext': '#facc15',       // 香蕉黄 (Banana Yellow / Amber-400)
-        'semantic-int': '#ff6347',       // 番茄红 (Tomato Red)
+        paper: 'rgb(var(--color-paper) / <alpha-value>)', // raw paper/surface token
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        'ink-fixed': 'rgb(var(--color-ink-fixed) / <alpha-value>)',
+        ledger: 'rgb(var(--color-ledger) / <alpha-value>)',
+        'ledger-foreground': 'rgb(var(--color-ledger-foreground) / <alpha-value>)',
+        'ink-light': 'rgb(var(--color-ink-light) / <alpha-value>)',
+        highlight: 'rgb(var(--color-highlight) / <alpha-value>)',
+        danger: 'rgb(var(--color-danger) / <alpha-value>)',
+        success: 'rgb(var(--color-success) / <alpha-value>)',
+        faint: 'rgb(var(--color-faint) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        'semantic-work': 'rgb(var(--color-semantic-work) / <alpha-value>)',
+        'semantic-leisure': 'rgb(var(--color-semantic-leisure) / <alpha-value>)',
+        'semantic-rest': 'rgb(var(--color-semantic-rest) / <alpha-value>)',
+        'semantic-ext': 'rgb(var(--color-semantic-ext) / <alpha-value>)',
+        'semantic-int': 'rgb(var(--color-semantic-int) / <alpha-value>)',
       },
       boxShadow: {
-        'brutal': '4px 4px 0px 0px rgba(17,17,17,1)',
-        'brutal-lg': '8px 8px 0px 0px rgba(17,17,17,1)',
+        'brutal': '4px 4px 0px 0px rgb(var(--color-shadow))',
+        'brutal-lg': '8px 8px 0px 0px rgb(var(--color-shadow))',
       }
     },
   },

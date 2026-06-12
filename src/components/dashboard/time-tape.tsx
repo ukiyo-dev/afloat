@@ -27,13 +27,13 @@ export function TimeTape({
   return (
     <div>
       <div className="flex justify-between items-end mb-2">
-         <h3 className="font-mono font-bold text-sm bg-ink text-white inline-block px-2 py-1 uppercase">
+         <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 uppercase">
             {isSingleLocalDay ? '日切片 (DAY TAPE)' : '宏观分布 (MACRO TAPE)'}
          </h3>
       </div>
       
       {/* The Brutalist Stacked Bar Container */}
-      <div className="w-full h-12 border-2 border-ink bg-paper relative flex shadow-[4px_4px_0_0_#111]">
+      <div className="w-full h-12 border-2 border-ink bg-paper relative flex shadow-brutal">
         {timeline.map((fact, idx) => {
           const factStartMs = new Date(fact.startAt).getTime();
           const factEndMs = new Date(fact.endAt).getTime();
@@ -58,7 +58,7 @@ export function TimeTape({
               }}
             >
               {/* Tooltip on hover */}
-              <div className="opacity-0 group-hover/tape:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ink text-white p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-[2px_2px_0_0_rgba(0,0,0,0.5)] border border-white transition-opacity text-center">
+              <div className="opacity-0 group-hover/tape:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-brutal border border-paper transition-opacity text-center">
                 {visitorMode ? (
                    <strong className="block">{kindLabel(fact.kind)}</strong>
                 ) : (

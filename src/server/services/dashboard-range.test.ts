@@ -196,7 +196,7 @@ describe("dashboard range", () => {
     expect(rangeView.maintenanceRate).toBe(1 / 3);
   });
 
-  it("normalizes inverted custom range inputs", () => {
+  it("collapses inverted custom range inputs to the end date", () => {
     const view = samplePrivateView();
     const rangeView = buildDashboardRangeView({
       view,
@@ -206,7 +206,7 @@ describe("dashboard range", () => {
     });
 
     expect(rangeView.startDate).toBe("2026-05-06");
-    expect(rangeView.endDate).toBe("2026-05-07");
+    expect(rangeView.endDate).toBe("2026-05-06");
   });
 });
 

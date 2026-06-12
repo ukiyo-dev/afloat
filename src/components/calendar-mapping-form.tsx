@@ -36,7 +36,7 @@ export function CalendarMappingForm({
           
           <div className="flex-1 min-w-[200px]">
             <strong className="font-serif text-xl block mb-1">{calendar.name}</strong>
-            <span className="font-mono text-xs px-2 py-0.5 bg-ink text-white uppercase inline-block">
+            <span className="font-mono text-xs px-2 py-0.5 bg-ledger text-ledger-foreground uppercase inline-block">
               {calendar.mapped && calendar.enabled
                 ? kindLabel(calendar.semantic ?? "")
                 : "UNMAPPED"}

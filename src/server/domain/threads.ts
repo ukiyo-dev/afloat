@@ -48,7 +48,6 @@ export function buildThreadViews(input: {
 }): ThreadView[] {
   const threads = new Map<string, ThreadAccumulator>();
   const activeKeysByGroup = new Map<string, Set<string>>();
-  const historicallyClosedKeysByGroup = new Map<string, Set<string>>();
   const timeline = buildThreadTimeline(input.declarations, input.parsedEvents);
 
   for (const entry of timeline) {
@@ -60,7 +59,6 @@ export function buildThreadViews(input: {
       thread.declaration = declaration;
       thread.generationStartAt ??= entry.at;
       ensureSet(activeKeysByGroup, declaration.group).add(key);
-      historicallyClosedKeysByGroup.get(declaration.group)?.delete(key);
       continue;
     }
 
@@ -73,13 +71,8 @@ export function buildThreadViews(input: {
         thread.closed = true;
         if (event.endAt <= input.now) {
           thread.fulfilledByClosure = true;
-          const closedKeys = ensureSet(historicallyClosedKeysByGroup, event.title.group);
-          closedKeys.add(key);
-          releaseClosedGroup({
-            threads,
-            activeKeys,
-            closedKeys
-          });
+          activeKeys.delete(key);
+          threads.delete(key);
         }
       }
       continue;
@@ -92,7 +85,6 @@ export function buildThreadViews(input: {
     thread.generationStartAt ??= event.startAt;
     thread.sequences.add(event.title.sequence);
     ensureSet(activeKeysByGroup, event.title.group).add(key);
-    historicallyClosedKeysByGroup.get(event.title.group)?.delete(key);
   }
 
   for (const fact of input.facts) {
@@ -259,26 +251,6 @@ function ensureSet<TKey, TValue>(map: Map<TKey, Set<TValue>>, key: TKey): Set<TV
   const created = new Set<TValue>();
   map.set(key, created);
   return created;
-}
-
-function releaseClosedGroup(input: {
-  threads: Map<string, ThreadAccumulator>;
-  activeKeys: Set<string>;
-  closedKeys: Set<string>;
-}): void {
-  if (input.activeKeys.size === 0) {
-    return;
-  }
-  for (const key of input.activeKeys) {
-    if (!input.closedKeys.has(key)) {
-      return;
-    }
-  }
-  for (const key of input.activeKeys) {
-    input.threads.delete(key);
-  }
-  input.activeKeys.clear();
-  input.closedKeys.clear();
 }
 
 function toThreadView(

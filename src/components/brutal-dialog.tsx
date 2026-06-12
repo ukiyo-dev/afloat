@@ -38,7 +38,7 @@ export function BrutalDialog({
         }}
       >
         <div className="panel-brutal !p-0 overflow-hidden w-full" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-ink text-white p-4 flex justify-between items-center border-b-2 border-ink">
+          <div className="bg-ledger text-ledger-foreground p-4 flex justify-between items-center border-b-2 border-ink">
              <h2 className="font-serif text-2xl font-bold uppercase">{title}</h2>
              <button 
                 type="button"
@@ -48,7 +48,7 @@ export function BrutalDialog({
                 <Cross2Icon className="w-6 h-6" />
              </button>
           </div>
-          <div className="p-6 bg-white">
+          <div className="p-6 bg-surface">
             {typeof children === 'function' ? children(closeDialog) : children}
           </div>
         </div>

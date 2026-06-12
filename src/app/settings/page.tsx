@@ -30,7 +30,7 @@ export default async function SettingsPage() {
       <section className="mb-12 border-b-4 border-ink pb-8 flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-3 mb-4">
-             <p className="font-mono text-highlight bg-ink inline-block px-2 py-1 font-bold tracking-widest text-xs border border-ink uppercase">
+             <p className="font-mono text-highlight bg-ledger inline-block px-2 py-1 font-bold tracking-widest text-xs border border-ink uppercase">
               Configuration
             </p>
           </div>
@@ -54,7 +54,7 @@ export default async function SettingsPage() {
           </div>
           
           <div className="ledger-border-t pt-3 mt-1 flex justify-between items-center">
-            <Link href="/dashboard" className="font-mono text-sm font-bold flex items-center gap-1 hover:text-highlight hover:bg-ink px-2 py-1 -ml-2 transition-colors">
+            <Link href="/dashboard" className="font-mono text-sm font-bold flex items-center gap-1 hover:text-highlight hover:bg-ledger px-2 py-1 -ml-2 transition-colors">
               <ArrowLeftIcon /> DASHBOARD
             </Link>
           </div>
@@ -122,7 +122,7 @@ export default async function SettingsPage() {
                 </div>
               </label>
               
-              <label className="flex items-center gap-3 p-3 bg-white border border-ink mt-2 cursor-pointer hover:bg-highlight/10 transition-colors">
+              <label className="flex items-center gap-3 p-3 bg-surface border border-ink mt-2 cursor-pointer hover:bg-highlight/10 transition-colors">
                 <input
                   className="w-5 h-5 accent-ink"
                   name="publicPageEnabled"
@@ -140,14 +140,14 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <section className="panel-brutal bg-white flex flex-col justify-between">
+        <section className="panel-brutal bg-surface flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-6 border-b-2 border-ink pb-4">
               <div>
                 <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Provider</p>
                 <h2 className="font-serif text-3xl font-bold">CalDAV 凭证</h2>
               </div>
-              <span className="font-mono text-xs px-2 py-1 bg-ink text-white">
+              <span className="font-mono text-xs px-2 py-1 bg-ledger text-ledger-foreground">
                 {calDavCredentialLabel(calDavCredential.source)}
               </span>
             </div>

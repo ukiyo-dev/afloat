@@ -66,7 +66,7 @@ export function FactDistribution({
                 <span className="font-bold truncate">{stat.label}</span>
                 
                 {/* Visual scale container acting as a pure flex row, just like TIME COMPOSITION */}
-                <div className={`h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-[4px_4px_0_0_#111] group-hover:opacity-80 transition-opacity`}>
+                <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal group-hover:opacity-80 transition-opacity">
                   {/* Fulfilled (Solid Core Color) */}
                   {stat.fulfilled > 0 && (
                     <div 
@@ -113,7 +113,7 @@ export function FactDistribution({
       <div className="pt-4 border-t-2 border-dashed border-ink/20">
         <p className="text-xs text-ink-light uppercase font-bold tracking-widest mb-2">TIME COMPOSITION</p>
         
-        <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-[4px_4px_0_0_#111]">
+        <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal">
           {/* Work */}
           {coreStats.find(s => s.key === 'ideal') && coreStats.find(s => s.key === 'ideal')!.fulfilled > 0 && (
             <div 

@@ -20,12 +20,12 @@ export default async function LoginPage() {
   return (
     <main className="shell flex flex-col justify-center min-h-[80vh]">
       <div className="max-w-md w-full mx-auto">
-        <Link href="/" className="font-mono text-sm font-bold flex items-center gap-2 mb-8 hover:text-highlight transition-colors inline-flex border-2 border-transparent hover:border-ink hover:bg-ink hover:px-2 -ml-2 py-1">
+        <Link href="/" className="font-mono text-sm font-bold flex items-center gap-2 mb-8 hover:text-highlight transition-colors inline-flex border-2 border-transparent hover:border-ink hover:bg-ledger hover:px-2 -ml-2 py-1">
           <ArrowLeftIcon /> BACK TO HOME
         </Link>
         
         <section className="mb-8">
-          <p className="font-mono text-highlight bg-ink inline-block px-2 py-1 mb-4 font-bold tracking-widest uppercase text-xs border border-ink">
+          <p className="font-mono text-highlight bg-ledger inline-block px-2 py-1 mb-4 font-bold tracking-widest uppercase text-xs border border-ink">
             OWNER MODE
           </p>
           <h1 className="font-serif text-5xl font-black text-ink leading-none tracking-tighter mb-4 uppercase">
@@ -36,7 +36,7 @@ export default async function LoginPage() {
           </p>
         </section>
 
-        <section className="panel-brutal !p-6 md:!p-8 bg-white relative">
+        <section className="panel-brutal !p-6 md:!p-8 bg-surface relative">
           {isAuthenticationConfigured() ? (
             <ActionForm action={loginAction} className="flex flex-col gap-6">
               <label className="flex flex-col gap-2">

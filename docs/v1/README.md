@@ -12,7 +12,7 @@ Afloat 是一个承诺观察系统。
 - [02-core-model.md](./02-core-model.md)：核心模型
 - [03-calendar-protocol.md](./03-calendar-protocol.md)：日历协议
 - [04-fact-layer-and-statistics.md](./04-fact-layer-and-statistics.md)：事实层与统计规则
-- [05-thread-commitments.md](./05-thread-commitments.md)：线程承诺与可行性
+- [05-thread-commitments.md](./05-thread-commitments.md)：线程追踪与可行性
 - [06-sync-and-derived-views.md](./06-sync-and-derived-views.md)：同步与派生视图
 - [07-private-and-public-pages.md](./07-private-and-public-pages.md)：镜像页与可见性
 - [08-mvp-scope.md](./08-mvp-scope.md)：v1 范围
@@ -22,7 +22,7 @@ Afloat 是一个承诺观察系统。
 
 ## 核心术语
 
-- **主题承诺**：用户希望某个主题持续存在于自己的时间中。线程是主题承诺。
+- **线程追踪**：用户希望某个主题、分类或事项持续可见。线程可以是承诺，也可以是 `To Do`、`Relax List`、`Explore List` 这类开放分类。
 - **时间承诺**：用户把某段未来时间承诺给某类活动。计划层是时间承诺。
 - **计划层**：理想、娱乐、休息三种计划时间，继承同一套计划事件结构。
 - **偏移层**：外部偏移、内部偏移两种偏移记录。

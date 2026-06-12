@@ -1,7 +1,10 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { BrutalDialog } from "../brutal-dialog";
 import { ActionForm } from "../action-form";
 import { SubmitButton } from "../submit-button";
-import { Cross2Icon } from "@radix-ui/react-icons";
+import { Cross2Icon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { saveThreadDeclarationAction, deleteThreadDeclarationAction } from "../../app/dashboard/actions";
 import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, formatGeneratedAt, percent, statusLabel, timeRange, kindLabel } from "../view-formatters";
@@ -20,6 +23,27 @@ export function ThreadPanel({
   rangeView: DashboardData["rangeView"];
   visitorMode?: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredThreadGroups = useMemo(() => {
+    if (!normalizedQuery) return threadGroups;
+
+    return threadGroups
+      .map((group) => {
+        const groupMatches = String(group.group).toLowerCase().includes(normalizedQuery);
+        const items = groupMatches
+          ? group.items
+          : group.items.filter((thread: any) =>
+              [thread.group, thread.item, thread.key]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(normalizedQuery))
+            );
+
+        return items.length > 0 ? { ...group, items } : null;
+      })
+      .filter(Boolean);
+  }, [normalizedQuery, threadGroups]);
+
   if (visitorMode) return null;
 
   return (
@@ -29,66 +53,80 @@ export function ThreadPanel({
           <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Plans</p>
           <h2 className="font-serif text-4xl md:text-5xl font-black uppercase">线程追踪</h2>
         </div>
-        <span className="font-mono text-sm bg-ink text-white px-2 py-1 mt-4 md:mt-0">
+        <span className="font-mono text-sm bg-ledger text-ledger-foreground px-2 py-1 mt-4 md:mt-0">
           {threadGroups.length} GROUPS / {view.threads.length} ITEMS
         </span>
       </div>
 
-      <BrutalDialog 
-        title="New Plan"
-        trigger={
-          <button type="button" className="btn-brutal inline-flex items-center gap-2 mb-8">
-            <span className="text-lg leading-none font-bold">+</span> NEW PLAN
-          </button>
-        }
-      >
-        {(close) => (
-          <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} resetOnSuccess onSuccess={close}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="flex flex-col gap-1">
-                <span className="font-mono text-xs font-bold uppercase">Group</span>
-                <input className="input-brutal w-full" name="group" placeholder="Group Name" required />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="font-mono text-xs font-bold uppercase">Item</span>
-                <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="font-mono text-xs font-bold uppercase">Target</span>
-                <input className="input-brutal w-full" name="expectedMinutes" inputMode="text" placeholder="120 / 2h30m" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="font-mono text-xs font-bold uppercase">Deadline</span>
-                <input className="input-brutal w-full" name="deadline" type="date" />
-              </label>
-            </div>
-            <div className="flex justify-end mt-4">
-              <SubmitButton className="btn-brutal h-[40px] whitespace-nowrap" pendingText="CREATING...">创建线程</SubmitButton>
-            </div>
-          </ActionForm>
-        )}
-      </BrutalDialog>
+      <div className="mb-8 flex items-center gap-3">
+        <BrutalDialog 
+          title="New Plan"
+          trigger={
+            <button type="button" className="btn-brutal inline-flex items-center justify-center gap-2 h-[42px] whitespace-nowrap px-3 sm:px-4">
+              <span className="text-lg leading-none font-bold">+</span> NEW PLAN
+            </button>
+          }
+        >
+          {(close) => (
+            <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} resetOnSuccess onSuccess={close}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1">
+                  <span className="font-mono text-xs font-bold uppercase">Group</span>
+                  <input className="input-brutal w-full" name="group" placeholder="Group Name" required />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-mono text-xs font-bold uppercase">Item</span>
+                  <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-mono text-xs font-bold uppercase">Target</span>
+                  <input className="input-brutal w-full" name="expectedMinutes" inputMode="text" placeholder="120 / 2h30m" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-mono text-xs font-bold uppercase">Deadline</span>
+                  <input className="input-brutal w-full" name="deadline" type="date" />
+                </label>
+              </div>
+              <div className="flex justify-end mt-4">
+                <SubmitButton className="btn-brutal h-[40px] whitespace-nowrap" pendingText="CREATING...">创建线程</SubmitButton>
+              </div>
+            </ActionForm>
+          )}
+        </BrutalDialog>
+
+        <label className="relative block min-w-0 flex-1 md:max-w-md">
+          <span className="sr-only">Search threads</span>
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-light" />
+          <input
+            className="input-brutal h-[42px] w-full pl-9 font-mono text-sm shadow-brutal transition-[box-shadow,transform] focus:translate-x-[2px] focus:translate-y-[2px] focus:shadow-[1px_1px_0_0_rgb(var(--color-shadow))]"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="SEARCH GROUP / ITEM"
+          />
+        </label>
+      </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {threadGroups.map((group) => {
+        {filteredThreadGroups.map((group: any) => {
           const dangerBorder = ['expired', 'imbalanced'].includes(group.status);
           const warnBorder = ['tightPace', 'needsScheduling'].includes(group.status);
           
           return (
             <details 
               className={`group panel-brutal !p-0 overflow-hidden ${
-                dangerBorder ? 'border-danger shadow-[8px_8px_0_0_#ff3333]' : 
-                warnBorder ? 'border-highlight shadow-[8px_8px_0_0_#d5ff00]' : ''
+                dangerBorder ? 'border-danger shadow-[8px_8px_0_0_rgb(var(--color-danger))]' : 
+                warnBorder ? 'border-highlight shadow-[8px_8px_0_0_rgb(var(--color-highlight))]' : ''
               }`} 
               key={group.key}
             >
-              <summary className="bg-ink text-white p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-ink-light transition-colors select-none">
+              <summary className="bg-ledger text-ledger-foreground p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-ink-light transition-colors select-none">
                 <div className="flex items-center gap-4">
-                  <span className="text-white opacity-50 group-open:rotate-90 transition-transform w-4 inline-block text-center font-mono">▶</span>
+                  <span className="text-ledger-foreground opacity-50 group-open:rotate-90 transition-transform w-4 inline-block text-center font-mono">▶</span>
                   <h3 className="font-serif text-2xl font-bold">{group.group}</h3>
                   <span className={`font-mono text-xs px-2 py-1 uppercase font-bold ${
-                    dangerBorder ? 'bg-danger text-white' : 
-                    warnBorder ? 'bg-highlight text-ink' : 'bg-white/20'
+                    dangerBorder ? 'bg-danger text-ink-fixed' : 
+                    warnBorder ? 'bg-highlight text-ink-fixed' : 'bg-paper/20'
                   }`}>
                     {statusLabel(group.status)}
                   </span>
@@ -142,7 +180,7 @@ export function ThreadPanel({
                    </BrutalDialog>
                 </div>
 
-                <div className="lg:col-span-8 p-0 bg-white">
+                <div className="lg:col-span-8 p-0 bg-surface">
                   {group.items.map((thread: any, idx: number) => (
                     <section className={`p-6 ${idx !== group.items.length - 1 ? 'border-b-2 border-ink' : ''}`} key={thread.key}>
                       <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
@@ -168,7 +206,7 @@ export function ThreadPanel({
                                 <dd
                                   className={`font-bold inline-block px-1 ${
                                     threadProgressKind(thread) === "underestimated"
-                                      ? "bg-highlight text-ink"
+                                      ? "bg-highlight text-ink-fixed"
                                       : ""
                                   }`}
                                 >

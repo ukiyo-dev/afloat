@@ -14,7 +14,7 @@ export function JournalPanel({
 }) {
   return (
     <details 
-      className="panel-brutal group bg-[#fffdf5] min-h-0 transition-all [&[open]]:flex-1 [&:not([open])]:shrink-0 [&[open]]:grid [&[open]]:grid-rows-[max-content_minmax(0,1fr)]" 
+      className="panel-brutal group bg-surface min-h-0 transition-all [&[open]]:flex-1 [&:not([open])]:shrink-0 [&[open]]:grid [&[open]]:grid-rows-[max-content_minmax(0,1fr)]" 
       open
     >
       <summary className="flex justify-between items-start mb-0 group-open:mb-6 group-open:border-b-2 group-open:border-ink group-open:pb-4 shrink-0 cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
@@ -81,7 +81,7 @@ export function JournalPanel({
             {visitorMode ? (
               <>
                 <div className="flex items-center gap-3 mb-2">
-                  <time className="font-mono text-sm font-bold bg-ink text-white px-2 py-0.5">{note.date}</time>
+                  <time className="font-mono text-sm font-bold bg-ledger text-ledger-foreground px-2 py-0.5">{note.date}</time>
                 </div>
                 <p className="font-serif text-lg leading-relaxed whitespace-pre-wrap">{note.body}</p>
               </>
@@ -92,7 +92,7 @@ export function JournalPanel({
                   trigger={
                     <div className="flex justify-between items-center group/note cursor-pointer">
                       <div className="flex items-center gap-3">
-                        <time className="font-mono text-sm font-bold bg-ink text-white px-2 py-0.5">{note.date}</time>
+                        <time className="font-mono text-sm font-bold bg-ledger text-ledger-foreground px-2 py-0.5">{note.date}</time>
                         <span className="font-mono text-xs px-2 py-0.5 bg-paper border border-ink">
                           {note.visibility === "public" ? "PUBLIC" : "PRIVATE"}
                         </span>

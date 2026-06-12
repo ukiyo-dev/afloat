@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CalendarIcon, UpdateIcon, CheckIcon } from "@radix-ui/react-icons";
+import { CalendarIcon, UpdateIcon, CheckIcon, DesktopIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons";
 
 import { BrutalDialog } from "@/components/brutal-dialog";
 import { ActionForm } from "@/components/action-form";
@@ -35,6 +35,52 @@ import {
   syncKindLabel,
   syncStatusLabel
 } from "./dashboard/utils";
+
+type ThemeMode = "system" | "light" | "dark";
+
+const themeModes: ThemeMode[] = ["system", "light", "dark"];
+
+function applyThemeMode(mode: ThemeMode) {
+  const root = document.documentElement;
+  if (mode === "system") {
+    root.removeAttribute("data-theme");
+    return;
+  }
+  root.setAttribute("data-theme", mode);
+}
+
+function ThemeModeButton() {
+  const [mode, setMode] = useState<ThemeMode>("system");
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("afloat-theme-mode");
+    const initialMode = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+    setMode(initialMode);
+    applyThemeMode(initialMode);
+  }, []);
+
+  const switchMode = () => {
+    const nextMode = themeModes[(themeModes.indexOf(mode) + 1) % themeModes.length];
+    setMode(nextMode);
+    applyThemeMode(nextMode);
+    window.localStorage.setItem("afloat-theme-mode", nextMode);
+  };
+
+  const title = `Display: ${mode.toUpperCase()}`;
+  const Icon = mode === "light" ? SunIcon : mode === "dark" ? MoonIcon : DesktopIcon;
+
+  return (
+    <button
+      type="button"
+      onClick={switchMode}
+      className="inline-flex w-7 shrink-0 items-center justify-center border-l border-highlight/50 bg-ledger text-ledger-foreground hover:bg-highlight hover:text-ink-fixed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight transition-colors"
+      title={title}
+      aria-label={title}
+    >
+      <Icon aria-hidden className="h-4 w-4" />
+    </button>
+  );
+}
 
 
 function getFactLayerTitle(startDate: string, endDate: string, timezone: string) {
@@ -107,19 +153,22 @@ export function DashboardWorkbench({
       <section className="mb-8 border-b-4 border-ink pb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-4">
-            {isOwner ? (
-              <Link
-                href={guestModeHref}
-                className="font-mono text-highlight bg-ink inline-block px-2 py-1 font-bold tracking-widest text-xs border border-ink hover:bg-highlight hover:text-ink transition-colors cursor-pointer"
-                title={visitorMode ? "Switch to Owner Mode" : "View as Guest"}
-              >
-                {visitorMode ? "GUEST MODE" : "OWNER MODE"}
-              </Link>
-            ) : (
-              <p className="font-mono text-highlight bg-ink inline-block px-2 py-1 font-bold tracking-widest text-xs border border-ink">
-                GUEST MODE
-              </p>
-            )}
+            <div className="inline-flex h-[26px] items-stretch border border-ink bg-ledger shadow-[2px_2px_0_0_rgb(var(--color-highlight))]">
+              {isOwner ? (
+                <Link
+                  href={guestModeHref}
+                  className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs hover:bg-highlight hover:text-ink-fixed transition-colors cursor-pointer"
+                  title={visitorMode ? "Switch to Owner Mode" : "View as Guest"}
+                >
+                  {visitorMode ? "GUEST MODE" : "OWNER MODE"}
+                </Link>
+              ) : (
+                <p className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs">
+                  GUEST MODE
+                </p>
+              )}
+              <ThemeModeButton />
+            </div>
             <span className="font-mono text-ink-light text-sm">
               <LocalClock fallback={view.generatedAt} timezone={rangeView.timezone} />
             </span>
@@ -129,7 +178,7 @@ export function DashboardWorkbench({
             浮生
           </h1>
           <p className="font-serif text-xl md:text-2xl font-normal text-ink-light max-w-2xl text-balance">
-            <span className="bg-highlight px-1 text-ink">{rangeView.label}</span> / {rangeView.timezone}
+            <span className="bg-highlight px-1 text-ink-fixed">{rangeView.label}</span> / {rangeView.timezone}
           </p>
         </div>
 
@@ -150,7 +199,7 @@ export function DashboardWorkbench({
           
           <div className="ledger-border-t pt-3 mt-1 flex justify-between items-center">
             {visitorMode ? (
-              <Link href="/login" className="font-mono text-sm font-bold hover:underline hover:text-highlight hover:bg-ink px-2 py-1 transition-colors">
+              <Link href="/login" className="font-mono text-sm font-bold hover:underline hover:text-highlight hover:bg-ledger px-2 py-1 transition-colors">
                 OWNER LOGIN →
               </Link>
             ) : (
@@ -170,7 +219,7 @@ export function DashboardWorkbench({
       </section>
 
       {/* Range Navigation */}
-      <div className="mb-8 flex flex-col xl:flex-row gap-6 xl:items-end justify-between bg-white border-2 border-ink p-4 shadow-[4px_4px_0_0_#111]">
+      <div className="mb-8 flex flex-col xl:flex-row gap-6 xl:items-end justify-between bg-surface border-2 border-ink p-4 shadow-brutal">
         <nav className="flex flex-wrap gap-2" aria-label="Dashboard range">
           <RangeLink
             active={false}
@@ -254,7 +303,7 @@ export function DashboardWorkbench({
                         <span className="font-mono text-sm text-ink-light bg-paper px-1 border border-ink">{error.date}</span>
                       </div>
                       <p className="font-serif text-base mb-2 font-bold leading-relaxed">{error.message}</p>
-                      <span className="font-mono text-sm text-ink-light bg-highlight px-1 border border-ink inline-block">{timeRange(error.startAt, error.endAt, rangeView.timezone)}</span>
+                      <span className="font-mono text-sm text-ink-fixed bg-highlight px-1 border border-ink inline-block">{timeRange(error.startAt, error.endAt, rangeView.timezone)}</span>
                     </div>
                   ))}
                 </div>
@@ -295,7 +344,7 @@ export function DashboardWorkbench({
 
               
               <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
-                <h3 className="font-mono font-bold text-sm bg-ink text-white inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
+                <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
                 <FactDistribution factTotals={rangeView.factTotals} planTotals={rangeView.planTotals} shiftComposition={rangeView.shiftComposition} factLayerTitle={factLayerTitle} />
               </div>
             </div>
@@ -348,7 +397,7 @@ function RangeLink({ active, href, label, title }: { active: boolean; href: stri
   return (
     <Link 
       className={`font-mono text-sm px-3 py-1.5 border-2 border-ink transition-colors ${
-        active ? "bg-ink text-highlight font-bold" : "bg-white text-ink hover:bg-highlight"
+        active ? "bg-ledger text-highlight font-bold" : "bg-surface text-ink hover:bg-highlight"
       }`} 
       href={href}
       title={title}

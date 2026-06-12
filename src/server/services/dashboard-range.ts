@@ -305,7 +305,7 @@ export function resolveDashboardRangeSelection(input: {
     const end = parseLocalDateKey(input.request?.end);
 
     if (start && end) {
-      const [startDate, endDate] = start <= end ? [start, end] : [end, start];
+      const [startDate, endDate] = start <= end ? [start, end] : [end, end];
       
       // If start and end are the same day, treat it exactly like a specific "day" query
       if (startDate === endDate) {

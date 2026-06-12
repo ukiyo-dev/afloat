@@ -272,7 +272,7 @@ describe("buildThreadViews", () => {
     ]);
   });
 
-  it("requires declared empty items to be closed before releasing their group", () => {
+  it("removes a historically closed item while keeping other group items active", () => {
     const declarations: ThreadDeclaration[] = [
       {
         id: "manual",
@@ -309,7 +309,7 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    expect(threads.map((thread) => thread.item).sort()).toEqual(["同步闭环", "手动项"]);
+    expect(threads.map((thread) => thread.item).sort()).toEqual(["手动项"]);
   });
 
   it("releases a group only after declared empty items also receive historical unnumbered plans", () => {
@@ -610,7 +610,7 @@ describe("buildThreadViews", () => {
     });
   });
 
-  it("marks an item fulfilled when its unnumbered closing plan is historical", () => {
+  it("removes an item from active threads when its unnumbered closing plan is historical", () => {
     const declarations: ThreadDeclaration[] = [
       {
         id: "t1",
@@ -654,12 +654,7 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    const thread = threads.find((item) => item.item === "同步");
-    expect(thread).toMatchObject({
-      fulfilledMinutes: 120,
-      factGapMinutes: 0,
-      unscheduledGapMinutes: 0,
-      status: "fulfilled"
-    });
+    expect(threads.find((item) => item.item === "同步")).toBeUndefined();
+    expect(threads.find((item) => item.item === "未关闭项")).toBeDefined();
   });
 });

@@ -29,9 +29,9 @@ export function SyncPanel({
             <div className="flex justify-between items-center">
               <span className="text-ink-light">Status</span>
               <span className={`font-bold px-2 py-0.5 text-xs border ${
-                latestSyncRun.status === 'failed' ? 'bg-danger text-white border-danger' : 
-                latestSyncRun.status === 'running' ? 'bg-highlight text-ink border-ink' : 
-                'bg-ink text-white border-ink'
+                latestSyncRun.status === 'failed' ? 'bg-danger text-ink-fixed border-danger' : 
+                latestSyncRun.status === 'running' ? 'bg-highlight text-ink-fixed border-ink' : 
+                'bg-ledger text-ledger-foreground border-ink'
               }`}>
                 {latestSyncRun.status.toUpperCase()}
               </span>

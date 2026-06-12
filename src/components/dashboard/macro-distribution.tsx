@@ -74,13 +74,13 @@ export function MacroDistribution({
   return (
     <div>
       <div className="flex justify-between items-end mb-2">
-         <h3 className="font-mono font-bold text-sm bg-ink text-white inline-block px-2 py-1 uppercase">
+         <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 uppercase">
             宏观分布 (MACRO DISTRIBUTION)
          </h3>
       </div>
       
       {/* Brutalist Chart Container */}
-      <div className="w-full h-48 border-2 border-ink bg-paper relative flex justify-center items-end gap-[2px] shadow-[4px_4px_0_0_#111] px-1 pb-1 pt-4">
+      <div className="w-full h-48 border-2 border-ink bg-paper relative flex justify-center items-end gap-[2px] shadow-brutal px-1 pb-1 pt-4">
         
         {days.map((day) => {
           const heightPercent = Math.min(100, (day.total / maxDailyMinutes) * 100);
@@ -93,7 +93,7 @@ export function MacroDistribution({
               {/* Stacked Segments container */}
               <div 
                 className={`w-full flex flex-col justify-end overflow-hidden bg-paper transition-shadow duration-200 ${
-                  heightPercent > 0 ? 'border border-ink shadow-[2px_2px_0_0_#111] group-hover/bar:shadow-[3px_3px_0_0_#111]' : ''
+                  heightPercent > 0 ? 'border border-ink shadow-[2px_2px_0_0_rgb(var(--color-shadow))] group-hover/bar:shadow-[3px_3px_0_0_rgb(var(--color-shadow))]' : ''
                 }`}
                 style={{ height: `${heightPercent}%` }}
               >
@@ -114,8 +114,8 @@ export function MacroDistribution({
               </div>
               
               {/* Tooltip (Hover) */}
-              <div className="opacity-0 group-hover/bar:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ink text-white p-3 shadow-[4px_4px_0_0_rgba(0,0,0,0.5)] border-2 border-white w-48 text-xs font-mono z-50 pointer-events-none transition-opacity">
-                <div className="mb-2 font-bold border-b border-white/20 pb-1 text-sm">{day.displayDate}</div>
+              <div className="opacity-0 group-hover/bar:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-3 shadow-brutal border-2 border-paper w-48 text-xs font-mono z-50 pointer-events-none transition-opacity">
+                <div className="mb-2 font-bold border-b border-paper/20 pb-1 text-sm">{day.displayDate}</div>
                 <div className="flex flex-col gap-1">
                   {kindOrder.map(kind => {
                     const mins = day.kinds[kind] || 0;
@@ -123,15 +123,15 @@ export function MacroDistribution({
                     return (
                       <div key={kind} className="flex justify-between items-center">
                         <span className="flex items-center gap-1.5">
-                           <span className={`w-2 h-2 inline-block ${semanticColorClass(kind)} border border-white/30`}></span>
+                           <span className={`w-2 h-2 inline-block ${semanticColorClass(kind)} border border-paper/30`}></span>
                            {kindLabel(kind)}
                         </span>
                         <span className="font-bold">{formatDuration(mins)}</span>
                       </div>
                     );
                   })}
-                  <div className="flex justify-between items-center mt-2 pt-1 border-t border-white/20">
-                    <span className="text-white/60">Total</span>
+                  <div className="flex justify-between items-center mt-2 pt-1 border-t border-paper/20">
+                    <span className="text-paper/60">Total</span>
                     <span className="font-bold">{formatDuration(day.total)}</span>
                   </div>
                 </div>

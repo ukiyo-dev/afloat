@@ -20,7 +20,7 @@ export function SubmitButton({
     <>
       {showMask && pending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-paper/80 backdrop-blur-sm">
-          <div className="panel-brutal !py-8 !px-12 flex flex-col items-center gap-6 border-4 border-ink shadow-[12px_12px_0_0_#111] bg-highlight">
+          <div className="panel-brutal !py-8 !px-12 flex flex-col items-center gap-6 border-4 border-ink shadow-[12px_12px_0_0_rgb(var(--color-shadow))] bg-highlight">
             <UpdateIcon className="w-12 h-12 text-ink animate-spin" />
             <p className="font-mono text-xl font-black text-ink tracking-widest uppercase animate-pulse">
               {pendingText}

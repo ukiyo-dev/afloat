@@ -23,9 +23,9 @@ export function showBackendErrorToast(error: unknown, fallback = "操作失败�
     id: BACKEND_ERROR_TOAST_ID,
     description,
     style: {
-      background: "#ff3333",
-      color: "#fff",
-      borderColor: "#111"
+      background: "rgb(var(--color-danger))",
+      color: "rgb(var(--color-ink))",
+      borderColor: "rgb(var(--color-ink))"
     }
   });
 }
