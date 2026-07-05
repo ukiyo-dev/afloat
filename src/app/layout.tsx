@@ -18,7 +18,7 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "浮生～时间的永恒镜像",
-  description: "Personal plan mirror",
+  description: "Personal Plan Mirror",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
