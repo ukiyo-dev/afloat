@@ -1,19 +1,21 @@
 import { DashboardData } from "@/server/services/dashboard-service";
 import { timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
-import { buildTimeTapeSlices } from "./time-tape-utils";
+import { buildTimeTapeSlices, nowMarkerPositionPercent } from "./time-tape-utils";
 
 export function TimeTape({ 
   timeline, 
   timezone, 
   startDate, 
   endDate,
+  now,
   visitorMode = false
 }: { 
   timeline: DashboardData["view"]["timeline"]; 
   timezone: string;
   startDate: string;
   endDate: string;
+  now?: string;
   visitorMode?: boolean;
 }) {
   if (timeline.length === 0) return null;
@@ -23,6 +25,9 @@ export function TimeTape({
   const isSingleLocalDay =
     localDayKey(startDate, timezone) === localDayKey(new Date(endMs - 1).toISOString(), timezone);
   const slices = buildTimeTapeSlices({ timeline, startDate, endDate });
+  const nowMarkerPercent = now
+    ? nowMarkerPositionPercent({ startDate, endDate, now, timezone })
+    : null;
 
   return (
     <div>
@@ -63,6 +68,13 @@ export function TimeTape({
             </div>
           );
         })}
+        {nowMarkerPercent !== null ? (
+          <div
+            className="pointer-events-none absolute -top-1 -bottom-1 z-40 w-[2px] -translate-x-1/2 bg-danger shadow-[0_0_0_0.5px_rgb(var(--color-paper))]"
+            style={{ left: `${nowMarkerPercent}%` }}
+            aria-hidden
+          />
+        ) : null}
       </div>
       
       {/* Tape Scale / Axis */}

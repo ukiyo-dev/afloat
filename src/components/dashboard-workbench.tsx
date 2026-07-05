@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CalendarIcon, UpdateIcon, CheckIcon, DesktopIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons";
 
@@ -28,13 +28,15 @@ import { MacroDistribution } from "./dashboard/macro-distribution";
 
 import { Metric } from "./dashboard/metric-card";
 import { 
-  groupThreads, 
+  groupThreads,
   protocolErrorLabel, 
   todayKey, 
   addLocalDaysKey,
   syncKindLabel,
   syncStatusLabel
 } from "./dashboard/utils";
+import { projectThreadsForNow } from "./dashboard/thread-now-projection";
+import { projectRangeViewForNow } from "./dashboard/range-now-projection";
 
 type ThemeMode = "system" | "light" | "dark";
 
@@ -108,6 +110,33 @@ function LocalClock({ fallback, timezone }: { fallback: string; timezone: string
   return <>{formatGeneratedAt(now ?? fallback, timezone)}</>;
 }
 
+function useMinuteNow(fallback: string) {
+  const [now, setNow] = useState(fallback);
+
+  useEffect(() => {
+    let intervalTimer: number | undefined;
+    const minuteIso = () => {
+      const date = new Date();
+      date.setUTCSeconds(0, 0);
+      return date.toISOString();
+    };
+    const tick = () => setNow(minuteIso());
+    tick();
+    const timeoutTimer = window.setTimeout(() => {
+      tick();
+      intervalTimer = window.setInterval(tick, 60_000);
+    }, 60_000 - (Date.now() % 60_000));
+    return () => {
+      window.clearTimeout(timeoutTimer);
+      if (intervalTimer !== undefined) {
+        window.clearInterval(intervalTimer);
+      }
+    };
+  }, []);
+
+  return now;
+}
+
 export function DashboardWorkbench({
   view,
   rangeView,
@@ -138,7 +167,27 @@ export function DashboardWorkbench({
 
   const guestModeHref = buildHref({ viewAs: visitorMode ? null : 'guest' });
 
-  const threadGroups = view.threadGroups ?? groupThreads(view.threads);
+  const runtimeNow = useMinuteNow(view.generatedAt);
+  const projectedRangeView = useMemo(
+    () => projectRangeViewForNow({ rangeView, view, runtimeNowIso: runtimeNow }),
+    [rangeView, runtimeNow, view]
+  );
+  const projectedThreads = useMemo(
+    () => projectThreadsForNow(view.threads, runtimeNow, rangeView.timezone, view.generatedAt),
+    [rangeView.timezone, runtimeNow, view.generatedAt, view.threads]
+  );
+  const threadGroups = useMemo(
+    () => groupThreads(projectedThreads),
+    [projectedThreads]
+  );
+  const projectedView = useMemo(
+    () => ({
+      ...view,
+      threads: projectedThreads,
+      threadGroups
+    }),
+    [projectedThreads, threadGroups, view]
+  );
   const urgentThreads = threadGroups.filter((thread) =>
     ["expired", "imbalanced", "tightPace", "needsScheduling"].includes(thread.status)
   );
@@ -146,10 +195,14 @@ export function DashboardWorkbench({
     ["expired", "imbalanced", "tightPace"].includes(thread.status)
   );
   
-  const factLayerTitle = getFactLayerTitle(rangeView.startDate, rangeView.endDate, rangeView.timezone);
+  const factLayerTitle = getFactLayerTitle(
+    projectedRangeView.startDate,
+    projectedRangeView.endDate,
+    projectedRangeView.timezone
+  );
 
-  const [startY, startM, startD] = rangeView.startDate.split('-').map(Number);
-  const [endY, endM, endD] = rangeView.endDate.split('-').map(Number);
+  const [startY, startM, startD] = projectedRangeView.startDate.split('-').map(Number);
+  const [endY, endM, endD] = projectedRangeView.endDate.split('-').map(Number);
   const startUtc = Date.UTC(startY, startM - 1, startD);
   const endUtc = Date.UTC(endY, endM - 1, endD);
   const daysCount = Math.round((endUtc - startUtc) / 86400000) + 1;
@@ -178,7 +231,7 @@ export function DashboardWorkbench({
               <ThemeModeButton />
             </div>
             <span className="font-mono text-ink-light text-sm">
-              <LocalClock fallback={view.generatedAt} timezone={rangeView.timezone} />
+              <LocalClock fallback={view.generatedAt} timezone={projectedRangeView.timezone} />
             </span>
           </div>
           
@@ -186,7 +239,7 @@ export function DashboardWorkbench({
             浮生
           </h1>
           <p className="font-serif text-xl md:text-2xl font-normal text-ink-light max-w-2xl text-balance">
-            <span className="bg-highlight px-1 text-ink-fixed">{rangeView.label}</span> / {rangeView.timezone}
+            <span className="bg-highlight px-1 text-ink-fixed">{projectedRangeView.label}</span> / {projectedRangeView.timezone}
           </p>
         </div>
 
@@ -280,21 +333,21 @@ export function DashboardWorkbench({
 
       {/* Metrics Grid */}
       <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <Metric label="平均计划时间" value={formatDuration(rangeView.averagePlannedMinutes)} />
+        <Metric label="平均计划时间" value={formatDuration(projectedRangeView.averagePlannedMinutes)} />
         <Metric
           label="兑现率"
-          value={rangeView.fulfillmentRate === null ? "---" : percent(rangeView.fulfillmentRate)}
-          highlight={rangeView.fulfillmentRate !== null && rangeView.fulfillmentRate < 0.5}
+          value={projectedRangeView.fulfillmentRate === null ? "---" : percent(projectedRangeView.fulfillmentRate)}
+          highlight={projectedRangeView.fulfillmentRate !== null && projectedRangeView.fulfillmentRate < 0.5}
         />
-        <Metric label="维护率" value={percent(rangeView.maintenanceRate)} />
-        {rangeView.protocolErrors.length > 0 ? (
+        <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
+        {projectedRangeView.protocolErrors.length > 0 ? (
           <BrutalDialog
             title="协议错误详情"
             trigger={
               <button type="button" className="text-left w-full h-full cursor-pointer hover:opacity-80 transition-opacity">
                 <Metric 
                   label="范围协议错误" 
-                  value={`${rangeView.protocolErrors.length}`} 
+                  value={`${projectedRangeView.protocolErrors.length}`} 
                   danger={true} 
                 />
               </button>
@@ -303,14 +356,14 @@ export function DashboardWorkbench({
             {(close) => (
               <div className="flex flex-col gap-6 max-h-[60vh] overflow-y-auto brutal-scrollbar pr-2">
                 <div className="flex flex-col gap-4">
-                  {rangeView.protocolErrors.map((error, idx) => (
+                  {projectedRangeView.protocolErrors.map((error, idx) => (
                     <div className="border-l-4 border-danger pl-4 py-2 bg-danger/5" key={`${error.type}-${error.startAt}-${error.endAt}-${idx}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <strong className="font-mono text-base text-danger">{protocolErrorLabel(error.type)}</strong>
                         <span className="font-mono text-sm text-ink-light bg-paper px-1 border border-ink">{error.date}</span>
                       </div>
                       <p className="font-serif text-base mb-2 font-bold leading-relaxed">{error.message}</p>
-                      <span className="font-mono text-sm text-ink-fixed bg-highlight px-1 border border-ink inline-block">{timeRange(error.startAt, error.endAt, rangeView.timezone)}</span>
+                      <span className="font-mono text-sm text-ink-fixed bg-highlight px-1 border border-ink inline-block">{timeRange(error.startAt, error.endAt, projectedRangeView.timezone)}</span>
                     </div>
                   ))}
                 </div>
@@ -343,21 +396,28 @@ export function DashboardWorkbench({
             
             <div className="grid grid-cols-1 gap-12">
               
-              {rangeView.startDate === rangeView.endDate ? (
-                <TimeTape timeline={rangeView.timeline} timezone={rangeView.timezone} startDate={rangeView.startAt} endDate={rangeView.endAt} visitorMode={visitorMode} />
+              {projectedRangeView.startDate === projectedRangeView.endDate ? (
+                <TimeTape
+                  timeline={projectedRangeView.timeline}
+                  timezone={projectedRangeView.timezone}
+                  startDate={projectedRangeView.startAt}
+                  endDate={projectedRangeView.endAt}
+                  now={runtimeNow}
+                  visitorMode={visitorMode}
+                />
               ) : !isUltraMacro ? (
-                <MacroDistribution timeline={rangeView.timeline} timezone={rangeView.timezone} startDate={rangeView.startDate} endDate={rangeView.endDate} />
+                <MacroDistribution timeline={projectedRangeView.timeline} timezone={projectedRangeView.timezone} startDate={projectedRangeView.startDate} endDate={projectedRangeView.endDate} />
               ) : null}
 
               
               <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
                 <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
-                <FactDistribution factTotals={rangeView.factTotals} planTotals={rangeView.planTotals} shiftComposition={rangeView.shiftComposition} />
+                <FactDistribution factTotals={projectedRangeView.factTotals} planTotals={projectedRangeView.planTotals} shiftComposition={projectedRangeView.shiftComposition} />
               </div>
             </div>
           </section>
 
-          {(rangeView.startDate === rangeView.endDate) && !visitorMode && (
+          {(projectedRangeView.startDate === projectedRangeView.endDate) && !visitorMode && (
             <section className="panel-brutal">
               <div className="flex justify-between items-start mb-6 border-b-2 border-ink pb-4">
                 <div>
@@ -366,11 +426,11 @@ export function DashboardWorkbench({
                   </p>
                   <h2 className="font-serif text-3xl font-bold">
                     {factLayerTitle}
-                    <span className="text-xl text-ink-light font-mono ml-2">({rangeView.label})</span>
+                    <span className="text-xl text-ink-light font-mono ml-2">({projectedRangeView.label})</span>
                   </h2>
                 </div>
               </div>
-              <Timeline timeline={rangeView.timeline} timezone={rangeView.timezone} />
+              <Timeline timeline={projectedRangeView.timeline} timezone={projectedRangeView.timezone} />
             </section>
           )}
         </div>
@@ -378,10 +438,10 @@ export function DashboardWorkbench({
         {/* Right Column: Sync & Protocol Errors */}
         <div className="lg:col-span-4 relative min-h-[760px]">
           <div className="lg:absolute lg:inset-0 flex flex-col gap-8">
-            <SyncPanel latestSyncRun={latestSyncRun} timezone={rangeView.timezone} readOnly={visitorMode} />
+            <SyncPanel latestSyncRun={latestSyncRun} timezone={projectedRangeView.timezone} readOnly={visitorMode} />
             
             {/* Notes Section */}
-            {!isUltraMacro && <JournalPanel rangeView={rangeView} visitorMode={visitorMode} />}
+            {!isUltraMacro && <JournalPanel rangeView={projectedRangeView} visitorMode={visitorMode} />}
           </div>
         </div>
       </div>
@@ -389,7 +449,7 @@ export function DashboardWorkbench({
       {/* Threads Section */}
       <ThreadPanel 
         threadGroups={threadGroups} 
-        view={view} 
+        view={projectedView} 
         rangeView={rangeView} 
         visitorMode={visitorMode} 
       />

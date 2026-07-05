@@ -78,3 +78,62 @@ export function buildTimeTapeSlices({
     ];
   });
 }
+
+export function nowMarkerPositionPercent({
+  startDate,
+  endDate,
+  now,
+  timezone
+}: {
+  startDate: string;
+  endDate: string;
+  now: string;
+  timezone: string;
+}): number | null {
+  const startMs = new Date(startDate).getTime();
+  const endMs = new Date(endDate).getTime();
+  const nowMs = new Date(now).getTime();
+
+  if (
+    !Number.isFinite(startMs) ||
+    !Number.isFinite(endMs) ||
+    !Number.isFinite(nowMs) ||
+    endMs <= startMs ||
+    nowMs < startMs ||
+    nowMs >= endMs
+  ) {
+    return null;
+  }
+
+  const endLocalDay = localDayKey(new Date(endMs - 1).toISOString(), timezone);
+  const isSingleLocalDay = localDayKey(startDate, timezone) === endLocalDay;
+  const isTodayTape = localDayKey(startDate, timezone) === localDayKey(now, timezone);
+
+  if (!isSingleLocalDay || !isTodayTape) {
+    return null;
+  }
+
+  return ((nowMs - startMs) / (endMs - startMs)) * 100;
+}
+
+function localDayKey(value: string, timezone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date(value));
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch {
+    // Keep rendering with a UTC fallback if the timezone is invalid.
+  }
+
+  return value.slice(0, 10);
+}

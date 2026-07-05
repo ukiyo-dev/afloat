@@ -55,7 +55,7 @@ export function SyncPanel({
             </SubmitButton>
           </ActionForm>
           
-          <details className="group/adv mt-2">
+          <details suppressHydrationWarning className="group/adv mt-2">
             <summary className="font-mono text-[10px] text-ink-light cursor-pointer hover:text-ink select-none text-center">
               ADVANCED OPTIONS <span className="inline-block group-open/adv:rotate-180">▼</span>
             </summary>

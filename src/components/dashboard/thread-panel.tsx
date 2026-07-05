@@ -114,6 +114,7 @@ export function ThreadPanel({
           
           return (
             <details 
+              suppressHydrationWarning
               className={`group panel-brutal !p-0 overflow-hidden ${
                 dangerBorder ? 'border-danger shadow-[8px_8px_0_0_rgb(var(--color-danger))]' : 
                 warnBorder ? 'border-highlight shadow-[8px_8px_0_0_rgb(var(--color-highlight))]' : ''
@@ -276,7 +277,7 @@ export function ThreadPanel({
                       </BrutalDialog>
 
                       {(thread.history ?? []).length > 0 ? (
-                        <details className="group/history mt-4 pt-4 border-t border-dashed border-ink/30">
+                        <details suppressHydrationWarning className="group/history mt-4 pt-4 border-t border-dashed border-ink/30">
                           <summary className="font-mono text-xs text-ink-light mb-2 cursor-pointer hover:text-ink inline-flex items-center gap-1 select-none">
                             <span className="group-open/history:rotate-90 transition-transform">▶</span> RECENT ACTIVITIES
                           </summary>

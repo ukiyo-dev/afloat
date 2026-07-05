@@ -14,6 +14,7 @@ export function JournalPanel({
 }) {
   return (
     <details 
+      suppressHydrationWarning
       className="panel-brutal group bg-surface min-h-0 transition-all [&[open]]:flex-1 [&:not([open])]:shrink-0 [&[open]]:grid [&[open]]:grid-rows-[max-content_minmax(0,1fr)]" 
       open
     >
