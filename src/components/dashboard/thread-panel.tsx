@@ -184,7 +184,7 @@ export function ThreadPanel({
                   {group.items.map((thread: any, idx: number) => (
                     <section className={`p-6 ${idx !== group.items.length - 1 ? 'border-b-2 border-ink' : ''}`} key={thread.key}>
                       <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
-                        <div>
+                        <div className="min-w-0">
                           <h4 className="font-serif text-xl font-bold mb-1">{thread.item}</h4>
                           <span className="font-mono text-xs text-ink-light inline-flex items-center gap-2">
                             <span className="bg-ink/10 px-1">{statusLabel(thread.status)}</span>
@@ -193,8 +193,8 @@ export function ThreadPanel({
                           </span>
                         </div>
                         
-                        <div className="flex gap-4">
-                          <dl className="flex gap-4 font-mono text-sm">
+                        <div className="min-w-0 max-w-full">
+                          <dl className="flex flex-wrap gap-x-4 gap-y-2 font-mono text-sm">
                             <div><dt className="text-ink-light text-xs">Target</dt><dd className="font-bold">{formatDuration(thread.expectedMinutes)}</dd></div>
                             <div><dt className="text-ink-light text-xs">Done</dt><dd className="font-bold">{formatDuration(thread.fulfilledMinutes)}</dd></div>
                             <div><dt className="text-ink-light text-xs">Future</dt><dd className="font-bold">{formatDuration(thread.futureMinutes)}</dd></div>

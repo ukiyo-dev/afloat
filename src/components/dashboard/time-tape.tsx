@@ -52,7 +52,7 @@ export function TimeTape({
               style={{ flexGrow: slice.durationMs, flexBasis: 0 }}
             >
               {/* Tooltip on hover */}
-              <div className="opacity-0 group-hover/tape:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-brutal border border-paper transition-opacity text-center">
+              <div className="hidden group-hover/tape:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-brutal border border-paper text-center">
                 {visitorMode ? (
                    <strong className="block">{kindLabel(slice.fact.kind)}</strong>
                 ) : (

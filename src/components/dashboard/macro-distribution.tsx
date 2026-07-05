@@ -74,7 +74,7 @@ export function MacroDistribution({
               </div>
               
               {/* Tooltip (Hover) */}
-              <div className="opacity-0 group-hover/bar:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-3 shadow-brutal border-2 border-paper w-48 text-xs font-mono z-50 pointer-events-none transition-opacity">
+              <div className="hidden group-hover/bar:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-3 shadow-brutal border-2 border-paper w-48 text-xs font-mono z-50 pointer-events-none">
                 <div className="mb-2 font-bold border-b border-paper/20 pb-1 text-sm">{day.displayDate}</div>
                 <div className="flex flex-col gap-1">
                   {kindOrder.map(kind => {
