@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Noto_Serif_SC, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { PwaServiceWorker } from "@/components/pwa-service-worker";
 
 const serif = Noto_Serif_SC({
   subsets: ["latin"],
@@ -18,8 +19,18 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "浮生～时间的永恒镜像",
   description: "Personal plan mirror",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Afloat",
+    statusBarStyle: "default"
+  },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", type: "image/x-icon" }
+    ],
+    apple: "/favicon.ico",
     shortcut: "/favicon.ico"
   }
 };
@@ -36,6 +47,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="font-mono bg-paper text-ink selection:bg-highlight selection:text-ink min-h-screen border-t-8 border-ink">
         {children}
+        <PwaServiceWorker />
         <Toaster 
           position="bottom-right" 
           toastOptions={{
