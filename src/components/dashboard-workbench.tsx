@@ -236,7 +236,7 @@ export function DashboardWorkbench({
             <RangeLink
               active={isDefaultView}
               href={buildHref({ range: null, date: null, start: null, end: null })}
-              label="默认"
+              label="Default"
               title="回到默认视图"
             />
             <RangeLink
@@ -246,7 +246,7 @@ export function DashboardWorkbench({
               title="下一天"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <RangeLink
               active={!isDefaultView && rangeView.startDate === todayKey(rangeView.timezone) && rangeView.endDate === todayKey(rangeView.timezone)}
               href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
