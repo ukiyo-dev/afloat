@@ -255,9 +255,9 @@ export function DashboardWorkbench({
               href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
               label="今天"
             />
-            <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="最近 7 天" />
-            <RangeLink active={!isDefaultView && rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="最近 30 天" />
-            <RangeLink active={!isDefaultView && rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="最近 90 天" />
+            <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="7 天" />
+            <RangeLink active={!isDefaultView && rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="30 天" />
+            <RangeLink active={!isDefaultView && rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="90 天" />
           </div>
         </nav>
 

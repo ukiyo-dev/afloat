@@ -98,7 +98,7 @@ export default async function SettingsPage() {
                   </label>
                 </div>
                 <p className="font-mono text-xs text-ink-light italic">
-                  昨天 = -1 / -1，今天 = 0 / 0，明天 = +1 / +1，最近 7 天 = -7 / -1。
+                  昨天 = -1 / -1，今天 = 0 / 0，明天 = +1 / +1，7 天 = -7 / -1。
                 </p>
               </fieldset>
               
