@@ -2,13 +2,13 @@
   <img src="public/favicon.ico" alt="Afloat logo" width="96" height="96">
 </p>
 
-<h1 align="center">Afloat: 浮生</h1>
-
-Afloat 是一个承诺观察系统：它读取日历中的计划与偏移记录，算出事实时间和派生视图，再用一个镜像页展示时间最终流向。
+<h1 align="center">Afloat</h1>
 
 <p align="center">
   <img src="docs/v1/assets/welcome_page.png" alt="Afloat welcome page" width="720">
 </p>
+
+> 一个承诺观察系统：它读取日历中的计划与偏移记录，算出事实时间和派生视图，再用一个镜像页展示时间最终流向。
 
 ## 运行
 
