@@ -85,7 +85,7 @@ function ThemeModeButton() {
 
 function getFactLayerTitle(startDate: string, endDate: string, timezone: string) {
   if (startDate !== endDate) {
-    return "岁月篇章";
+    return "岁月";
   }
 
   const today = todayKey(timezone);
