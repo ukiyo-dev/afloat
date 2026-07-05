@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/favicon.ico" alt="Afloat logo" width="96" height="96">
+  <img src="public/favicon.ico" alt="Afloat logo" width="128" height="128">
 </p>
 
 <h1 align="center">Afloat</h1>
