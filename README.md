@@ -1,8 +1,14 @@
-# 浮生～时间的永恒镜像
+<p align="center">
+  <img src="public/favicon.ico" alt="Afloat logo" width="96" height="96">
+</p>
+
+<h1 align="center">浮生～时间的永恒镜像</h1>
 
 Afloat 是一个承诺观察系统。它读取日历中的计划与偏移记录，重算事实层和派生视图，再用一个镜像页展示时间最终流向。
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fukiyo-dev%2Fafloat&project-name=afloat&repository-name=afloat&env=DATABASE_URL,AFLOAT_OWNER_PASSWORD,AFLOAT_INSTANCE_SECRET&envDescription=Afloat%20requires%20Postgres%20and%20owner%20login%20secrets.)
+<p align="center">
+  <img src="docs/v1/assets/welcome_page.png" alt="Afloat welcome page" width="720">
+</p>
 
 ## 运行
 
@@ -16,6 +22,8 @@ pnpm dev
 ## 部署到 Vercel
 
 Afloat 可以部署到 Vercel，但它不是纯静态应用。部署前需要准备 Postgres；Vercel 构建阶段会自动执行 Drizzle 迁移。
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fukiyo-dev%2Fafloat&project-name=afloat&repository-name=afloat&env=DATABASE_URL,AFLOAT_OWNER_PASSWORD,AFLOAT_INSTANCE_SECRET&envDescription=Afloat%20requires%20Postgres%20and%20owner%20login%20secrets.)
 
 ### 1. 准备数据库
 
@@ -54,7 +62,7 @@ CALDAV_PASSWORD=...
 
 ### 3. 一键部署
 
-点击 README 顶部的 **Deploy with Vercel** 按钮，按提示导入仓库并填写环境变量。
+点击本章节中的 **Deploy with Vercel** 按钮，按提示导入仓库并填写环境变量。
 
 如果使用 Vercel 数据库集成，也可以先创建数据库，再让 Vercel 自动注入 `DATABASE_URL`。
 
