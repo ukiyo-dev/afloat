@@ -1,4 +1,5 @@
-const CACHE_NAME = "afloat-pwa-v1";
+const APP_VERSION = "1.0.1";
+const CACHE_NAME = `afloat-pwa-v${APP_VERSION}`;
 const APP_SHELL = ["/offline.html", "/favicon.ico", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
