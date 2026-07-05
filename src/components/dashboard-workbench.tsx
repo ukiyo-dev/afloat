@@ -117,6 +117,11 @@ export function DashboardWorkbench({
   basePath = "/dashboard"
 }: DashboardData & { visitorMode?: boolean; isOwner?: boolean; basePath?: string }) {
   const searchParams = useSearchParams();
+  const isDefaultView =
+    !searchParams.has("range") &&
+    !searchParams.has("date") &&
+    !searchParams.has("start") &&
+    !searchParams.has("end");
   
   const buildHref = (newParams: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -220,38 +225,37 @@ export function DashboardWorkbench({
 
       {/* Range Navigation */}
       <div className="mb-8 flex flex-col xl:flex-row gap-6 xl:items-end justify-between bg-surface border-2 border-ink p-4 shadow-brutal">
-        <nav className="flex flex-wrap gap-2" aria-label="Dashboard range">
-          <RangeLink
-            active={false}
-            href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, -1), start: null, end: null })}
-            label="←"
-            title="上一天"
-          />
-          <RangeLink
-            active={rangeView.startDate === addLocalDaysKey(todayKey(rangeView.timezone), -1) && rangeView.endDate === addLocalDaysKey(todayKey(rangeView.timezone), -1)}
-            href={buildHref({ range: "day", date: addLocalDaysKey(todayKey(rangeView.timezone), -1), start: null, end: null })}
-            label="昨天"
-          />
-          <RangeLink
-            active={rangeView.startDate === todayKey(rangeView.timezone) && rangeView.endDate === todayKey(rangeView.timezone)}
-            href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
-            label="今天"
-          />
-          <RangeLink
-            active={rangeView.startDate === addLocalDaysKey(todayKey(rangeView.timezone), 1) && rangeView.endDate === addLocalDaysKey(todayKey(rangeView.timezone), 1)}
-            href={buildHref({ range: "day", date: addLocalDaysKey(todayKey(rangeView.timezone), 1), start: null, end: null })}
-            label="明天"
-          />
-          <RangeLink
-            active={false}
-            href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, 1), start: null, end: null })}
-            label="→"
-            title="下一天"
-          />
-          <span className="w-px bg-ink mx-2"></span>
-          <RangeLink active={rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="最近 7 天" />
-          <RangeLink active={rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="最近 30 天" />
-          <RangeLink active={rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="最近 90 天" />
+        <nav className="flex flex-col gap-2" aria-label="Dashboard range">
+          <div className="flex flex-wrap gap-2">
+            <RangeLink
+              active={false}
+              href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, -1), start: null, end: null })}
+              label="Prev"
+              title="上一天"
+            />
+            <RangeLink
+              active={isDefaultView}
+              href={buildHref({ range: null, date: null, start: null, end: null })}
+              label="默认"
+              title="回到默认视图"
+            />
+            <RangeLink
+              active={false}
+              href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, 1), start: null, end: null })}
+              label="Next"
+              title="下一天"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <RangeLink
+              active={!isDefaultView && rangeView.startDate === todayKey(rangeView.timezone) && rangeView.endDate === todayKey(rangeView.timezone)}
+              href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
+              label="今天"
+            />
+            <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="最近 7 天" />
+            <RangeLink active={!isDefaultView && rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="最近 30 天" />
+            <RangeLink active={!isDefaultView && rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="最近 90 天" />
+          </div>
         </nav>
 
         <form className="flex flex-wrap items-end gap-3" action={basePath}>

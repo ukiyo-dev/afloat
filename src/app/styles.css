@@ -22,6 +22,7 @@
     --color-semantic-rest: 51 182 121;
     --color-semantic-ext: 250 204 21;
     --color-semantic-int: 255 99 71;
+    --color-semantic-strong-foreground: 255 255 255;
     --grid-dot: rgb(var(--color-faint));
   }
 
@@ -45,6 +46,7 @@
       --color-semantic-rest: 90 190 132;
       --color-semantic-ext: 226 184 58;
       --color-semantic-int: 229 94 80;
+      --color-semantic-strong-foreground: 17 17 17;
       --grid-dot: rgba(var(--color-ink), 0.08);
     }
   }
@@ -68,6 +70,7 @@
     --color-semantic-rest: 51 182 121;
     --color-semantic-ext: 250 204 21;
     --color-semantic-int: 255 99 71;
+    --color-semantic-strong-foreground: 255 255 255;
     --grid-dot: rgb(var(--color-faint));
   }
 
@@ -90,6 +93,7 @@
     --color-semantic-rest: 90 190 132;
     --color-semantic-ext: 226 184 58;
     --color-semantic-int: 229 94 80;
+    --color-semantic-strong-foreground: 17 17 17;
     --grid-dot: rgba(var(--color-ink), 0.08);
   }
 
