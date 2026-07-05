@@ -142,6 +142,9 @@ export function DashboardWorkbench({
   const urgentThreads = threadGroups.filter((thread) =>
     ["expired", "imbalanced", "tightPace", "needsScheduling"].includes(thread.status)
   );
+  const hasSevereThreadPressure = urgentThreads.some((thread) =>
+    ["expired", "imbalanced", "tightPace"].includes(thread.status)
+  );
   
   const factLayerTitle = getFactLayerTitle(rangeView.startDate, rangeView.endDate, rangeView.timezone);
 
@@ -322,7 +325,7 @@ export function DashboardWorkbench({
         <Metric 
           label="待规划线程" 
           value={`${urgentThreads.length}`} 
-          danger={urgentThreads.length > 0} 
+          danger={hasSevereThreadPressure} 
         />
       </section>
 
