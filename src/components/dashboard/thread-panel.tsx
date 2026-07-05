@@ -227,47 +227,51 @@ export function ThreadPanel({
                         }
                       >
                         {(close) => (
-                          <>
-                            <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} onSuccess={close}>
-                              <input type="hidden" name="group" value={thread.group} />
-                              <input type="hidden" name="item" value={thread.item} />
-                              
-                              <div className="grid grid-cols-2 gap-4">
-                                <label className="flex flex-col gap-1">
-                                  <span className="font-mono text-xs font-bold uppercase">Target</span>
-                                  <input
-                                    className="input-brutal w-full"
-                                    name="expectedMinutes"
-                                    inputMode="text"
-                                    defaultValue={thread.expectedMinutes ?? ""}
-                                    placeholder="120 / 2h30m"
-                                  />
-                                </label>
-                                <label className="flex flex-col gap-1">
+                          <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} onSuccess={close}>
+                            <input type="hidden" name="group" value={thread.group} />
+                            <input type="hidden" name="item" value={thread.item} />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              <label className="flex flex-col gap-1">
+                                <span className="font-mono text-xs font-bold uppercase">Target</span>
+                                <input
+                                  className="input-brutal w-full"
+                                  name="expectedMinutes"
+                                  inputMode="text"
+                                  defaultValue={thread.expectedMinutes ?? ""}
+                                  placeholder="120 / 2h30m"
+                                />
+                              </label>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center justify-between gap-2">
                                   <span className="font-mono text-xs font-bold uppercase">Deadline</span>
-                                  <input
-                                    className="input-brutal w-full"
-                                    name="deadline"
-                                    type="date"
-                                    defaultValue={thread.deadline ?? ""}
-                                  />
-                                </label>
+                                  {thread.deadline ? (
+                                    <button
+                                      type="button"
+                                      className="font-mono text-xs font-bold text-danger hover:underline"
+                                      onClick={(event) => {
+                                        const input = event.currentTarget.form?.elements.namedItem("deadline");
+                                        if (input instanceof HTMLInputElement) {
+                                          input.value = "";
+                                        }
+                                      }}
+                                    >
+                                      清空
+                                    </button>
+                                  ) : null}
+                                </div>
+                                <input
+                                  className="input-brutal w-full"
+                                  name="deadline"
+                                  type="date"
+                                  defaultValue={thread.deadline ?? ""}
+                                />
                               </div>
-                              <div className="flex justify-end mt-4">
-                                <SubmitButton className="btn-brutal text-sm py-2" pendingText="UPDATING...">更新</SubmitButton>
-                              </div>
-                            </ActionForm>
-                            {thread.deadline ? (
-                              <ActionForm className="mt-3 flex justify-end" action={saveThreadDeclarationAction} onSuccess={close}>
-                                <input type="hidden" name="group" value={thread.group} />
-                                <input type="hidden" name="item" value={thread.item} />
-                                <input type="hidden" name="expectedMinutes" value={thread.expectedMinutes ?? ""} />
-                                <SubmitButton className="font-mono text-xs font-bold text-danger hover:underline" pendingText="REMOVING...">
-                                  移除
-                                </SubmitButton>
-                              </ActionForm>
-                            ) : null}
-                          </>
+                            </div>
+                            <div className="flex justify-end mt-4">
+                              <SubmitButton className="btn-brutal text-sm py-2" pendingText="UPDATING...">更新</SubmitButton>
+                            </div>
+                          </ActionForm>
                         )}
                       </BrutalDialog>
 
