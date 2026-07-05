@@ -85,7 +85,7 @@ function ThemeModeButton() {
 
 function getFactLayerTitle(startDate: string, endDate: string, timezone: string) {
   if (startDate !== endDate) {
-    return "时间分布";
+    return "时间分布 (TEMPORAL DISTRIBUTION)";
   }
 
   const today = todayKey(timezone);

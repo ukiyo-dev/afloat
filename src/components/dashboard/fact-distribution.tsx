@@ -60,8 +60,8 @@ export function FactDistribution({
         <div className="flex flex-col gap-3">
           {coreStats.map((stat) => {
             return (
-              <div className="grid grid-cols-[80px_1fr_100px] gap-4 items-center group" key={stat.key}>
-                <span className="font-bold truncate">{stat.label}</span>
+              <div className="grid grid-cols-[max-content_minmax(0,1fr)_max-content] gap-2 items-center group sm:grid-cols-[80px_minmax(0,1fr)_100px] sm:gap-4" key={stat.key}>
+                <span className="font-bold truncate min-w-0">{stat.label}</span>
                 
                 {/* Visual scale container acting as a pure flex row, just like TIME COMPOSITION */}
                 <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal group-hover:opacity-80 transition-opacity">
