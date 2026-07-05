@@ -1,6 +1,7 @@
 import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
+import { buildMacroDistributionDays } from "./macro-distribution-utils";
 
 export function MacroDistribution({
   timeline,
@@ -15,50 +16,9 @@ export function MacroDistribution({
 }) {
   if (timeline.length === 0) return null;
 
-  // 1. Generate dates array (YYYY-MM-DD) based on local timezone
-  const days: { date: string; displayDate: string; total: number; kinds: Record<string, number> }[] = [];
-  
-  // We parse startDate and endDate as local dates in the requested timezone
-  // Assuming startDate and endDate are already localized YYYY-MM-DD strings
-  const [startY, startM, startD] = startDate.split('-').map(Number);
-  const [endY, endM, endD] = endDate.split('-').map(Number);
-  
-  let cur = new Date(Date.UTC(startY, startM - 1, startD));
-  const end = new Date(Date.UTC(endY, endM - 1, endD));
-  
-  while (cur <= end) {
-    const dateStr = cur.toISOString().slice(0, 10);
-    // Format display date ignoring timezone since we created a UTC date that represents local time
-    const displayDate = `${cur.getUTCMonth() + 1}月${cur.getUTCDate()}日`;
-    days.push({ date: dateStr, displayDate, total: 0, kinds: {} });
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
+  const days = buildMacroDistributionDays({ timeline, timezone, startDate, endDate });
 
-  // 2. Map timeline to days
-  for (const fact of timeline) {
-    // Get local date of the fact based on startAt
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(new Date(fact.startAt));
-    
-    const y = parts.find(p => p.type === "year")?.value;
-    const m = parts.find(p => p.type === "month")?.value;
-    const d = parts.find(p => p.type === "day")?.value;
-    
-    if (!y || !m || !d) continue;
-    const localDateStr = `${y}-${m}-${d}`;
-    
-    const dayData = days.find(d => d.date === localDateStr);
-    if (dayData) {
-      dayData.total += fact.minutes;
-      dayData.kinds[fact.kind] = (dayData.kinds[fact.kind] || 0) + fact.minutes;
-    }
-  }
-
-  // 3. Find max daily total to set the chart height. Minimum cap at 12 hours (720m) for visual balance if days are low.
+  // Minimum cap at 12 hours (720m) for visual balance if days are low.
   const maxDailyMinutes = Math.max(720, ...days.map(d => d.total));
 
   // Match the visual stack order with the tooltip order, top to bottom.

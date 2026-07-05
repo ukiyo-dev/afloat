@@ -1,6 +1,7 @@
 import { DashboardData } from "@/server/services/dashboard-service";
 import { timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
+import { buildTimeTapeSlices } from "./time-tape-utils";
 
 export function TimeTape({ 
   timeline, 
@@ -18,11 +19,10 @@ export function TimeTape({
   if (timeline.length === 0) return null;
 
   // Calculate the total duration of the current view window
-  const startMs = new Date(startDate).getTime();
   const endMs = new Date(endDate).getTime();
-  const totalMs = endMs - startMs;
   const isSingleLocalDay =
     localDayKey(startDate, timezone) === localDayKey(new Date(endMs - 1).toISOString(), timezone);
+  const slices = buildTimeTapeSlices({ timeline, startDate, endDate });
 
   return (
     <div>
@@ -33,38 +33,32 @@ export function TimeTape({
       </div>
       
       {/* The Brutalist Stacked Bar Container */}
-      <div className="w-full h-12 border-2 border-ink bg-paper relative flex shadow-brutal">
-        {timeline.map((fact, idx) => {
-          const factStartMs = new Date(fact.startAt).getTime();
-          const factEndMs = new Date(fact.endAt).getTime();
-          
-          // Clip fact to the view window
-          const clippedStartMs = Math.max(startMs, factStartMs);
-          const clippedEndMs = Math.min(endMs, factEndMs);
-          
-          if (clippedEndMs <= clippedStartMs) return null;
+      <div className="w-full h-12 border-2 border-ink bg-paper relative flex shadow-brutal overflow-visible">
+        {slices.map((slice, idx) => {
+          if (!slice.fact) {
+            return (
+              <div
+                key={`tape-gap-${slice.startAt}-${slice.endAt}-${idx}`}
+                className="h-full min-w-0 bg-paper"
+                style={{ flexGrow: slice.durationMs, flexBasis: 0 }}
+              />
+            );
+          }
 
-          const leftPercent = ((clippedStartMs - startMs) / totalMs) * 100;
-          const widthPercent = ((clippedEndMs - clippedStartMs) / totalMs) * 100;
-
-          // Add a tiny right border to separate adjacent blocks visually like a barcode
           return (
             <div 
-              key={`tape-${fact.startAt}-${fact.endAt}-${idx}`}
-              className={`absolute top-0 bottom-0 hover:opacity-80 transition-opacity group/tape cursor-crosshair ${semanticColorClass(fact.kind)}`}
-              style={{
-                left: `${leftPercent}%`,
-                width: `${widthPercent}%`
-              }}
+              key={`tape-${slice.startAt}-${slice.endAt}-${idx}`}
+              className={`relative h-full min-w-0 hover:opacity-80 transition-opacity group/tape cursor-crosshair ${semanticColorClass(slice.fact.kind)}`}
+              style={{ flexGrow: slice.durationMs, flexBasis: 0 }}
             >
               {/* Tooltip on hover */}
               <div className="opacity-0 group-hover/tape:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-brutal border border-paper transition-opacity text-center">
                 {visitorMode ? (
-                   <strong className="block">{kindLabel(fact.kind)}</strong>
+                   <strong className="block">{kindLabel(slice.fact.kind)}</strong>
                 ) : (
-                   <strong className="block">{fact.title}</strong>
+                   <strong className="block">{slice.fact.title}</strong>
                 )}
-                <div className="text-highlight mt-1 opacity-90">{timeRange(fact.startAt, fact.endAt, timezone)}</div>
+                <div className="text-highlight mt-1 opacity-90">{timeRange(slice.startAt, slice.endAt, timezone)}</div>
               </div>
             </div>
           );
