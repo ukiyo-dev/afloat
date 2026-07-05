@@ -61,7 +61,7 @@ export function MacroDistribution({
   // 3. Find max daily total to set the chart height. Minimum cap at 12 hours (720m) for visual balance if days are low.
   const maxDailyMinutes = Math.max(720, ...days.map(d => d.total));
 
-  // The order of kinds from bottom to top
+  // Match the visual stack order with the tooltip order, top to bottom.
   const kindOrder = [
     "idealFulfilled", 
     "leisureFulfilled", 
@@ -97,7 +97,7 @@ export function MacroDistribution({
                 }`}
                 style={{ height: `${heightPercent}%` }}
               >
-                {[...kindOrder].reverse().map(kind => {
+                {kindOrder.map(kind => {
                   const mins = day.kinds[kind] || 0;
                   if (mins === 0) return null;
                   

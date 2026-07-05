@@ -292,9 +292,12 @@ export function ThreadPanel({
                         <ActionForm className="mt-4 flex justify-end" action={deleteThreadDeclarationAction}>
                           <input type="hidden" name="group" value={thread.group} />
                           <input type="hidden" name="item" value={thread.item} />
-                          <button className="text-xs font-mono text-danger hover:underline flex items-center gap-1" type="submit">
+                          <SubmitButton
+                            className="text-xs font-mono text-danger hover:underline flex items-center gap-1"
+                            pendingText="DELETING..."
+                          >
                             <Cross2Icon /> 删除空 Item
-                          </button>
+                          </SubmitButton>
                         </ActionForm>
                       ) : null}
                     </section>
