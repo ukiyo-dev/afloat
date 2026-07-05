@@ -2,7 +2,7 @@
   <img src="public/favicon.ico" alt="Afloat logo" width="128" height="128">
 </p>
 
-<h1 align="center">Afloat</h1>
+<h1 align="center">AFLOAT V1</h1>
 
 <p align="center">
   <img src="docs/v1/assets/welcome_page.png" alt="Afloat welcome page" width="720">
