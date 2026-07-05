@@ -4,17 +4,15 @@ import { semanticColorClass } from "../semantic-colors";
 
 export function Timeline({ 
   timeline, 
-  timezone, 
-  factLayerTitle 
+  timezone
 }: { 
   timeline: DashboardData["view"]["timeline"]; 
-  timezone: string; 
-  factLayerTitle: string 
+  timezone: string;
 }) {
   if (timeline.length === 0) {
     return (
       <div className="border-2 border-dashed border-ink/20 p-8 text-center">
-        <p className="font-mono text-ink-light text-sm">当前时间范围内没有{factLayerTitle}相关记录。</p>
+        <p className="font-mono text-ink-light text-sm">当前时间范围内没有相关记录。</p>
       </div>
     );
   }

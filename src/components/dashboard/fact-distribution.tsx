@@ -3,16 +3,14 @@ import { formatDuration } from "../view-formatters";
 export function FactDistribution({ 
   factTotals, 
   planTotals, 
-  shiftComposition,
-  factLayerTitle
+  shiftComposition
 }: { 
   factTotals: Record<string, number>; 
   planTotals: Record<string, number>;
   shiftComposition?: Record<string, { internal: number; external: number }>;
-  factLayerTitle: string;
 }) {
   if (Object.keys(factTotals).length === 0 && Object.keys(planTotals).length === 0) {
-    return <p className="font-mono text-ink-light text-sm italic">当前没有{factLayerTitle}相关记录。</p>;
+    return <p className="font-mono text-ink-light text-sm italic">当前时间范围内没有相关记录。</p>;
   }
 
   const shiftComp = shiftComposition || {

@@ -85,7 +85,7 @@ function ThemeModeButton() {
 
 function getFactLayerTitle(startDate: string, endDate: string, timezone: string) {
   if (startDate !== endDate) {
-    return "岁月";
+    return "时间分布";
   }
 
   const today = todayKey(timezone);
@@ -352,7 +352,7 @@ export function DashboardWorkbench({
               
               <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
                 <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
-                <FactDistribution factTotals={rangeView.factTotals} planTotals={rangeView.planTotals} shiftComposition={rangeView.shiftComposition} factLayerTitle={factLayerTitle} />
+                <FactDistribution factTotals={rangeView.factTotals} planTotals={rangeView.planTotals} shiftComposition={rangeView.shiftComposition} />
               </div>
             </div>
           </section>
@@ -370,7 +370,7 @@ export function DashboardWorkbench({
                   </h2>
                 </div>
               </div>
-              <Timeline timeline={rangeView.timeline} timezone={rangeView.timezone} factLayerTitle={factLayerTitle} />
+              <Timeline timeline={rangeView.timeline} timezone={rangeView.timezone} />
             </section>
           )}
         </div>
