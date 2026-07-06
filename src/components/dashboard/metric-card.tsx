@@ -4,7 +4,7 @@ export function Metric({ label, value, secondaryValue, highlight, danger }: { la
       <span className="font-mono text-xs font-bold uppercase text-ink/70 mb-2 block">{label}</span>
       <strong className={`font-mono text-3xl font-black whitespace-nowrap ${danger ? 'text-danger' : 'text-ink'}`}>
         {value}
-        {secondaryValue ? <span className="text-xl align-baseline">（{secondaryValue}）</span> : null}
+        {secondaryValue ? <span className="text-l align-baseline">（{secondaryValue}）</span> : null}
       </strong>
     </article>
   );
