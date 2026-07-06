@@ -9,7 +9,7 @@ import { saveThreadDeclarationAction, deleteThreadDeclarationAction } from "../.
 import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, formatGeneratedAt, percent, statusLabel, timeRange, kindLabel } from "../view-formatters";
 import { MetricItem } from "./metric-card";
-import { semanticColorClass } from "../semantic-colors";
+import { semanticTagColorClass } from "../semantic-colors";
 import { threadSourceLabel } from "./utils";
 
 export function ThreadPanel({
@@ -297,7 +297,7 @@ export function ThreadPanel({
                                       <span>{formatGeneratedAt(entry.startAt, rangeView.timezone).slice(0, 10)}</span>
                                       <span>{timeRange(entry.startAt, entry.endAt, rangeView.timezone)}</span>
                                     </span>
-                                    <span className={`font-bold w-16 truncate px-1 text-center border border-ink ${semanticColorClass(entry.kind)}`}>{kindLabel(entry.kind)}</span>
+                                    <span className={`font-bold w-16 truncate px-1 text-center border ${semanticTagColorClass(entry.kind)}`}>{kindLabel(entry.kind)}</span>
                                     <span className="flex-1 truncate mx-2">{entry.title}</span>
                                     <span className="font-bold">{formatDuration(entry.minutes)}</span>
                                   </div>

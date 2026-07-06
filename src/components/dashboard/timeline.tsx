@@ -1,6 +1,6 @@
 import { DashboardData } from "@/server/services/dashboard-service";
 import { kindLabel, formatDuration, timelineTimeRange } from "../view-formatters";
-import { semanticColorClass } from "../semantic-colors";
+import { semanticTagColorClass } from "../semantic-colors";
 
 export function Timeline({ 
   timeline, 
@@ -39,7 +39,7 @@ export function Timeline({
             </div>
 
             <div className="flex items-start gap-3 md:contents">
-              <strong className={`shrink-0 px-1 text-center truncate border border-ink ${semanticColorClass(fact.kind)}`}>{kindLabel(fact.kind)}</strong>
+              <strong className={`shrink-0 px-1 text-center truncate border ${semanticTagColorClass(fact.kind)}`}>{kindLabel(fact.kind)}</strong>
               <span className="font-serif text-base leading-tight break-all md:break-normal">{fact.title}</span>
             </div>
 

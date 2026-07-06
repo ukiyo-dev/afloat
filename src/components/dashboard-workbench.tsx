@@ -172,6 +172,14 @@ export function DashboardWorkbench({
     () => projectRangeViewForNow({ rangeView, view, runtimeNowIso: runtimeNow }),
     [rangeView, runtimeNow, view]
   );
+  const internalFulfillmentValue =
+    projectedRangeView.internalFulfillmentRate === null
+      ? "---"
+      : percent(projectedRangeView.internalFulfillmentRate);
+  const fulfillmentValue =
+    projectedRangeView.fulfillmentRate === null ? undefined : percent(projectedRangeView.fulfillmentRate);
+  const fulfillmentSecondaryValue =
+    fulfillmentValue && fulfillmentValue !== internalFulfillmentValue ? fulfillmentValue : undefined;
   const projectedThreads = useMemo(
     () => projectThreadsForNow(view.threads, runtimeNow, rangeView.timezone, view.generatedAt),
     [rangeView.timezone, runtimeNow, view.generatedAt, view.threads]
@@ -336,8 +344,8 @@ export function DashboardWorkbench({
         <Metric label="平均计划时间" value={formatDuration(projectedRangeView.averagePlannedMinutes)} />
         <Metric
           label="兑现率"
-          value={projectedRangeView.internalFulfillmentRate === null ? "---" : percent(projectedRangeView.internalFulfillmentRate)}
-          secondaryValue={projectedRangeView.fulfillmentRate === null ? undefined : percent(projectedRangeView.fulfillmentRate)}
+          value={internalFulfillmentValue}
+          secondaryValue={fulfillmentSecondaryValue}
           highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
         />
         <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
