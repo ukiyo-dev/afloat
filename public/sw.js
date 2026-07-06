@@ -1,6 +1,7 @@
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.0.2";
 const CACHE_NAME = `afloat-pwa-v${APP_VERSION}`;
 const APP_SHELL = ["/offline.html", "/favicon.ico", "/icon.svg", "/manifest.webmanifest"];
+const STATIC_CACHE_PATHS = new Set(APP_SHELL);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -28,13 +29,15 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/offline.html")))
+        .catch(() => caches.match("/offline.html"))
     );
+    return;
+  }
+
+  const url = new URL(request.url);
+
+  if (url.origin !== self.location.origin || !isCacheableStaticRequest(request, url)) {
+    event.respondWith(fetch(request));
     return;
   }
 
@@ -54,3 +57,19 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+function isCacheableStaticRequest(request, url) {
+  if (
+    request.headers.has("RSC") ||
+    request.headers.has("Next-Router-State-Tree") ||
+    url.searchParams.has("_rsc") ||
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/dashboard") ||
+    url.pathname.startsWith("/settings") ||
+    url.pathname.startsWith("/login")
+  ) {
+    return false;
+  }
+
+  return url.pathname.startsWith("/_next/static/") || STATIC_CACHE_PATHS.has(url.pathname);
+}

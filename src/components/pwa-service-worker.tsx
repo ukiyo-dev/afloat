@@ -9,9 +9,12 @@ export function PwaServiceWorker() {
     }
 
     const registerServiceWorker = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // PWA support is opportunistic; the app should still run as a normal web app.
-      });
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((registration) => registration.update())
+        .catch(() => {
+          // PWA support is opportunistic; the app should still run as a normal web app.
+        });
     };
 
     if (document.readyState === "complete") {
