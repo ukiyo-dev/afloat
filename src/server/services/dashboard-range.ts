@@ -29,6 +29,8 @@ export interface DashboardRangeView {
   plannedDays: number;
   averagePlannedMinutes: number;
   fulfilledPlanMinutes: number;
+  internalFulfilledPlanMinutes: number;
+  internalFulfillmentRate: number | null;
   fulfillmentRate: number | null;
   maintenanceRate: number;
   factTotals: Record<string, number>;
@@ -174,6 +176,12 @@ export function buildDashboardRangeView(input: {
     ),
     range
   );
+  const externalShiftPlanMinutes = clippedOverlapMinutes(
+    planTimeline,
+    timeline.filter((fact) => fact.kind === "externalShift"),
+    range
+  );
+  const internalFulfilledPlanMinutes = fulfilledPlanMinutes + externalShiftPlanMinutes;
 
   return {
     key: selection.key,
@@ -188,6 +196,9 @@ export function buildDashboardRangeView(input: {
     plannedDays,
     averagePlannedMinutes: plannedDays > 0 ? plannedMinutes / plannedDays : 0,
     fulfilledPlanMinutes,
+    internalFulfilledPlanMinutes,
+    internalFulfillmentRate:
+      plannedMinutes > 0 ? internalFulfilledPlanMinutes / plannedMinutes : null,
     fulfillmentRate: plannedMinutes > 0 ? fulfilledPlanMinutes / plannedMinutes : null,
     maintenanceRate: calculateMaintenanceRate(
       input.view.maintenanceTimeline ?? [...planTimeline, ...timeline],
@@ -547,6 +558,29 @@ function sumClippedMinutes(
 function clippedMinutes(segment: { startAt: string; endAt: string }, range: DateRange): number {
   const clipped = intersection(serializedRange(segment), range);
   return clipped ? minutesInRange(clipped) : 0;
+}
+
+function clippedOverlapMinutes(
+  plans: Array<{ startAt: string; endAt: string }>,
+  shifts: Array<{ startAt: string; endAt: string }>,
+  range: DateRange
+): number {
+  return shifts.reduce((total, shift) => {
+    const shiftRange = intersection(serializedRange(shift), range);
+    if (!shiftRange) {
+      return total;
+    }
+
+    return total + plans.reduce((shiftTotal, plan) => {
+      const planRange = intersection(serializedRange(plan), range);
+      if (!planRange) {
+        return shiftTotal;
+      }
+
+      const overlap = intersection(planRange, shiftRange);
+      return shiftTotal + (overlap ? minutesInRange(overlap) : 0);
+    }, 0);
+  }, 0);
 }
 
 function serializedRange(segment: { startAt: string; endAt: string }): DateRange {

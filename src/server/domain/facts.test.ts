@@ -7,6 +7,7 @@ import type { CalendarSource, RawCalendarEvent } from "./types";
 const sources: CalendarSource[] = [
   { id: "ideal", name: "理想", semantic: "ideal" },
   { id: "leisure", name: "娱乐", semantic: "leisure" },
+  { id: "external", name: "外部偏移", semantic: "externalShift" },
   { id: "internal", name: "内部偏移", semantic: "internalShift" }
 ];
 
@@ -28,7 +29,26 @@ describe("buildFactLayer", () => {
     expect(commitmentStats(result.cleanPlanSegments, result.facts)).toMatchObject({
       plannedMinutes: 120,
       fulfilledPlanMinutes: 90,
-      fulfillmentRate: 0.75
+      fulfillmentRate: 0.75,
+      internalFulfilledPlanMinutes: 90,
+      internalFulfillmentRate: 0.75
+    });
+  });
+
+  it("keeps external shifts in the original plan rate but not the internal rate", () => {
+    const events = parseCalendarEvents(sources, [
+      raw("p1", "ideal", "Afloat：MVP 1", "2026-05-06T20:00:00Z", "2026-05-06T22:00:00Z"),
+      raw("s1", "external", "临时会议", "2026-05-06T20:30:00Z", "2026-05-06T21:00:00Z")
+    ]);
+
+    const result = buildFactLayer(events);
+
+    expect(commitmentStats(result.cleanPlanSegments, result.facts)).toMatchObject({
+      plannedMinutes: 120,
+      fulfilledPlanMinutes: 90,
+      fulfillmentRate: 0.75,
+      internalFulfilledPlanMinutes: 120,
+      internalFulfillmentRate: 1
     });
   });
 
@@ -45,7 +65,9 @@ describe("buildFactLayer", () => {
     expect(commitmentStats(result.cleanPlanSegments, result.facts)).toMatchObject({
       plannedMinutes: 60,
       fulfilledPlanMinutes: 60,
-      fulfillmentRate: 1
+      fulfillmentRate: 1,
+      internalFulfilledPlanMinutes: 60,
+      internalFulfillmentRate: 1
     });
   });
 });

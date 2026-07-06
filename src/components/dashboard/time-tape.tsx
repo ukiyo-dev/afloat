@@ -1,5 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { DashboardData } from "@/server/services/dashboard-service";
-import { timeRange, kindLabel } from "../view-formatters";
+import { formatDuration, timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 import { buildTimeTapeSlices, nowMarkerPositionPercent } from "./time-tape-utils";
 
@@ -18,6 +21,12 @@ export function TimeTape({
   now?: string;
   visitorMode?: boolean;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   if (timeline.length === 0) return null;
 
   // Calculate the total duration of the current view window
@@ -63,7 +72,10 @@ export function TimeTape({
                 ) : (
                    <strong className="block">{slice.fact.title}</strong>
                 )}
-                <div className="text-highlight mt-1 opacity-90">{timeRange(slice.startAt, slice.endAt, timezone)}</div>
+                <div className="text-highlight mt-1 opacity-90">
+                  {timeRange(slice.startAt, slice.endAt, timezone)}
+                  {mounted ? ` / ${formatDuration(durationMinutes(slice.durationMs))}` : null}
+                </div>
               </div>
             </div>
           );
@@ -89,6 +101,10 @@ export function TimeTape({
       ) : null}
     </div>
   );
+}
+
+function durationMinutes(durationMs: number): number {
+  return Math.max(0, Math.round(durationMs / 60_000));
 }
 
 function localDayKey(value: string, timezone: string) {

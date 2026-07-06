@@ -29,6 +29,8 @@ export interface PrivateDerivedView {
   observedSemantics: string[];
   plannedMinutes: number;
   fulfilledPlanMinutes: number;
+  internalFulfilledPlanMinutes: number;
+  internalFulfillmentRate: number | null;
   fulfillmentRate: number | null;
   maintenanceRate: number;
   maintenanceTimeline?: Array<SerializedMaintenanceSegment>;
@@ -101,6 +103,8 @@ export function buildDerivedViews(input: DerivedViewInput): DerivedViews {
       observedSemantics,
       plannedMinutes: stats.plannedMinutes,
       fulfilledPlanMinutes: stats.fulfilledPlanMinutes,
+      internalFulfilledPlanMinutes: stats.internalFulfilledPlanMinutes,
+      internalFulfillmentRate: stats.internalFulfillmentRate,
       fulfillmentRate: stats.fulfillmentRate,
       maintenanceRate: maintenanceRate(parsedEvents, input.now, 30, input.timezone ?? "UTC"),
       maintenanceTimeline: parsedEvents.map(serializeMaintenanceSegment),

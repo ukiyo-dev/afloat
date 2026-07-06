@@ -155,6 +155,8 @@ export function commitmentStats(
   plannedMinutes: number;
   fulfilledPlanMinutes: number;
   fulfillmentRate: number | null;
+  internalFulfilledPlanMinutes: number;
+  internalFulfillmentRate: number | null;
 } {
   const plannedMinutes = cleanPlanSegments.reduce(
     (total, segment) => total + minutesInRange(segment),
@@ -168,12 +170,29 @@ export function commitmentStats(
         fact.kind === "restFulfilled"
     )
     .reduce((total, fact) => total + minutesInRange(fact), 0);
+  const externalShiftPlanMinutes = overlapMinutes(
+    cleanPlanSegments,
+    facts.filter((fact) => fact.kind === "externalShift")
+  );
+  const internalFulfilledPlanMinutes = fulfilledPlanMinutes + externalShiftPlanMinutes;
 
   return {
     plannedMinutes,
     fulfilledPlanMinutes,
-    fulfillmentRate: plannedMinutes > 0 ? fulfilledPlanMinutes / plannedMinutes : null
+    fulfillmentRate: plannedMinutes > 0 ? fulfilledPlanMinutes / plannedMinutes : null,
+    internalFulfilledPlanMinutes,
+    internalFulfillmentRate:
+      plannedMinutes > 0 ? internalFulfilledPlanMinutes / plannedMinutes : null
   };
+}
+
+function overlapMinutes(plans: TimeSegment[], shifts: FactSegment[]): number {
+  return shifts.reduce((total, shift) => {
+    return total + plans.reduce((shiftTotal, plan) => {
+      const overlap = intersection(plan, shift);
+      return shiftTotal + (overlap ? minutesInRange(overlap) : 0);
+    }, 0);
+  }, 0);
 }
 
 function cleanSegments(events: ParsedEvent[], blockers: ProtocolError[]): TimeSegment[] {

@@ -1,13 +1,15 @@
 import { DashboardData } from "@/server/services/dashboard-service";
-import { timeRange, kindLabel, formatDuration } from "../view-formatters";
+import { kindLabel, formatDuration, timelineTimeRange } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 
 export function Timeline({ 
   timeline, 
-  timezone
+  timezone,
+  startDate
 }: { 
   timeline: DashboardData["view"]["timeline"]; 
   timezone: string;
+  startDate: string;
 }) {
   if (timeline.length === 0) {
     return (
@@ -19,24 +21,48 @@ export function Timeline({
 
   return (
     <div className="flex flex-col font-mono text-sm max-h-[320px] overflow-y-auto brutal-scrollbar pr-2 mr-[-8px]">
-      {timeline.map((fact, idx) => (
-        <div 
-          className="flex flex-col md:grid md:grid-cols-[120px_100px_1fr_60px] gap-2 md:gap-4 py-3 border-b border-ink/20 hover:bg-highlight/10 transition-colors px-2 -mx-2" 
-          key={`${fact.startAt}-${fact.endAt}-${fact.kind}-${idx}`}
-        >
-          <div className="flex justify-between md:contents">
-            <span className="text-ink-light">{timeRange(fact.startAt, fact.endAt, timezone)}</span>
-            <strong className="md:hidden text-right">{formatDuration(fact.minutes)}</strong>
+      {timeline.map((fact, idx) => {
+        const range = timelineTimeRange(fact.startAt, fact.endAt, timezone, startDate);
+
+        return (
+          <div
+            className="flex flex-col md:grid md:grid-cols-[136px_100px_1fr_60px] gap-2 md:gap-4 py-3 border-b border-ink/20 hover:bg-highlight/10 transition-colors px-2 -mx-2"
+            key={`${fact.startAt}-${fact.endAt}-${fact.kind}-${idx}`}
+          >
+            <div className="flex justify-between md:contents">
+              <span className="grid grid-cols-[24px_92px_24px] items-baseline text-ink-light tabular-nums whitespace-nowrap">
+                <DayOffset value={range.startDayOffset} side="start" />
+                <span>{range.startTime}-{range.endTime}</span>
+                <DayOffset value={range.endDayOffset} side="end" />
+              </span>
+              <strong className="md:hidden text-right">{formatDuration(fact.minutes)}</strong>
+            </div>
+
+            <div className="flex items-start gap-3 md:contents">
+              <strong className={`shrink-0 px-1 text-center truncate border border-ink ${semanticColorClass(fact.kind)}`}>{kindLabel(fact.kind)}</strong>
+              <span className="font-serif text-base leading-tight break-all md:break-normal">{fact.title}</span>
+            </div>
+
+            <strong className="hidden md:block text-right">{formatDuration(fact.minutes)}</strong>
           </div>
-          
-          <div className="flex items-start gap-3 md:contents">
-            <strong className={`shrink-0 px-1 text-center truncate border border-ink ${semanticColorClass(fact.kind)}`}>{kindLabel(fact.kind)}</strong>
-            <span className="font-serif text-base leading-tight break-all md:break-normal">{fact.title}</span>
-          </div>
-          
-          <strong className="hidden md:block text-right">{formatDuration(fact.minutes)}</strong>
-        </div>
-      ))}
+        );
+      })}
     </div>
+  );
+}
+
+function DayOffset({ value, side }: { value: number; side: "start" | "end" }) {
+  if (value === 0) {
+    return <span aria-hidden="true" />;
+  }
+
+  return (
+    <sup
+      className={`relative -top-1 block px-0.5 text-[10px] font-bold leading-none text-ink ${
+        side === "start" ? "text-right" : "text-left"
+      }`}
+    >
+      {value > 0 ? `+${value}` : value}
+    </sup>
   );
 }

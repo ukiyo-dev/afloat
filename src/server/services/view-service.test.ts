@@ -35,6 +35,8 @@ describe("summarizeViews", () => {
         plannedDays: 1,
         averagePlannedMinutes: 510,
         fulfilledPlanMinutes: 510,
+        internalFulfilledPlanMinutes: 510,
+        internalFulfillmentRate: 1,
         fulfillmentRate: 1,
         maintenanceRate: 0.5,
         protocolErrors: 0

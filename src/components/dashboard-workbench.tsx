@@ -336,8 +336,9 @@ export function DashboardWorkbench({
         <Metric label="平均计划时间" value={formatDuration(projectedRangeView.averagePlannedMinutes)} />
         <Metric
           label="兑现率"
-          value={projectedRangeView.fulfillmentRate === null ? "---" : percent(projectedRangeView.fulfillmentRate)}
-          highlight={projectedRangeView.fulfillmentRate !== null && projectedRangeView.fulfillmentRate < 0.5}
+          value={projectedRangeView.internalFulfillmentRate === null ? "---" : percent(projectedRangeView.internalFulfillmentRate)}
+          secondaryValue={projectedRangeView.fulfillmentRate === null ? undefined : percent(projectedRangeView.fulfillmentRate)}
+          highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
         />
         <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
         {projectedRangeView.protocolErrors.length > 0 ? (
@@ -430,7 +431,11 @@ export function DashboardWorkbench({
                   </h2>
                 </div>
               </div>
-              <Timeline timeline={projectedRangeView.timeline} timezone={projectedRangeView.timezone} />
+              <Timeline
+                timeline={projectedRangeView.timeline}
+                timezone={projectedRangeView.timezone}
+                startDate={projectedRangeView.startDate}
+              />
             </section>
           )}
         </div>

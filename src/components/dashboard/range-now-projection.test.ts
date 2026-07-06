@@ -10,6 +10,8 @@ describe("projectRangeViewForNow", () => {
         observedSemantics: ["ideal"],
         plannedMinutes: 120,
         fulfilledPlanMinutes: 0,
+        internalFulfilledPlanMinutes: 0,
+        internalFulfillmentRate: 0,
         fulfillmentRate: 0,
         maintenanceRate: 1,
         factTotals: {},
@@ -43,6 +45,8 @@ describe("projectRangeViewForNow", () => {
         plannedDays: 1,
         averagePlannedMinutes: 120,
         fulfilledPlanMinutes: 0,
+        internalFulfilledPlanMinutes: 0,
+        internalFulfillmentRate: 0,
         fulfillmentRate: 0,
         maintenanceRate: 1,
         factTotals: {},
@@ -56,6 +60,8 @@ describe("projectRangeViewForNow", () => {
     });
 
     expect(rangeView.fulfilledPlanMinutes).toBe(30);
+    expect(rangeView.internalFulfilledPlanMinutes).toBe(30);
+    expect(rangeView.internalFulfillmentRate).toBe(0.25);
     expect(rangeView.fulfillmentRate).toBe(0.25);
     expect(rangeView.factTotals).toEqual({ idealFulfilled: 30 });
     expect(rangeView.timeline).toEqual([
@@ -78,6 +84,8 @@ describe("projectRangeViewForNow", () => {
         observedSemantics: ["ideal"],
         plannedMinutes: 120,
         fulfilledPlanMinutes: 30,
+        internalFulfilledPlanMinutes: 30,
+        internalFulfillmentRate: 0.25,
         fulfillmentRate: 0.25,
         maintenanceRate: 1,
         factTotals: {},
@@ -111,6 +119,8 @@ describe("projectRangeViewForNow", () => {
         plannedDays: 1,
         averagePlannedMinutes: 120,
         fulfilledPlanMinutes: 30,
+        internalFulfilledPlanMinutes: 30,
+        internalFulfillmentRate: 0.25,
         fulfillmentRate: 0.25,
         maintenanceRate: 1,
         factTotals: { idealFulfilled: 30 },
@@ -134,6 +144,7 @@ describe("projectRangeViewForNow", () => {
     });
 
     expect(rangeView.fulfilledPlanMinutes).toBe(60);
+    expect(rangeView.internalFulfilledPlanMinutes).toBe(60);
     expect(rangeView.factTotals).toEqual({ idealFulfilled: 60 });
     expect(rangeView.timeline).toEqual([
       {
@@ -155,6 +166,8 @@ describe("projectRangeViewForNow", () => {
         observedSemantics: ["ideal"],
         plannedMinutes: 120,
         fulfilledPlanMinutes: 120,
+        internalFulfilledPlanMinutes: 120,
+        internalFulfillmentRate: 1,
         fulfillmentRate: 1,
         maintenanceRate: 1,
         factTotals: {},
@@ -188,6 +201,8 @@ describe("projectRangeViewForNow", () => {
         plannedDays: 1,
         averagePlannedMinutes: 120,
         fulfilledPlanMinutes: 120,
+        internalFulfilledPlanMinutes: 120,
+        internalFulfillmentRate: 1,
         fulfillmentRate: 1,
         maintenanceRate: 1,
         factTotals: { idealFulfilled: 120 },

@@ -1,8 +1,11 @@
-export function Metric({ label, value, highlight, danger }: { label: string; value: string; highlight?: boolean; danger?: boolean }) {
+export function Metric({ label, value, secondaryValue, highlight, danger }: { label: string; value: string; secondaryValue?: string; highlight?: boolean; danger?: boolean }) {
   return (
     <article className={`metric-box ${danger ? 'border-danger bg-danger/5 shadow-[4px_4px_0_0_rgb(var(--color-danger))]' : highlight ? 'bg-highlight shadow-brutal' : 'shadow-brutal'}`}>
       <span className="font-mono text-xs font-bold uppercase text-ink/70 mb-2 block">{label}</span>
-      <strong className={`font-mono text-3xl font-black ${danger ? 'text-danger' : 'text-ink'}`}>{value}</strong>
+      <strong className={`font-mono text-3xl font-black whitespace-nowrap ${danger ? 'text-danger' : 'text-ink'}`}>
+        {value}
+        {secondaryValue ? <span className="text-xl align-baseline">（{secondaryValue}）</span> : null}
+      </strong>
     </article>
   );
 }

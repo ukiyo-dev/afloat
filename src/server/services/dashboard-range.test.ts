@@ -84,6 +84,8 @@ describe("dashboard range", () => {
     expect(rangeView.plannedDays).toBe(1);
     expect(rangeView.averagePlannedMinutes).toBe(120);
     expect(rangeView.fulfilledPlanMinutes).toBe(90);
+    expect(rangeView.internalFulfilledPlanMinutes).toBe(120);
+    expect(rangeView.internalFulfillmentRate).toBe(1);
     expect(rangeView.fulfillmentRate).toBe(0.75);
     expect(rangeView.maintenanceRate).toBe(1);
     expect(rangeView.factTotals).toEqual({
@@ -216,6 +218,8 @@ function samplePrivateView(): PrivateDerivedView {
     observedSemantics: ["ideal", "externalShift"],
     plannedMinutes: 180,
     fulfilledPlanMinutes: 90,
+    internalFulfilledPlanMinutes: 180,
+    internalFulfillmentRate: 1,
     fulfillmentRate: 0.5,
     maintenanceRate: 1,
     factTotals: {},

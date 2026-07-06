@@ -55,10 +55,15 @@ export function projectRangeViewForNow({
     .filter((fact) => isFulfilledKind(fact.kind))
     .reduce((total, fact) => total + fact.minutes, 0);
   const fulfilledPlanMinutes = rangeView.fulfilledPlanMinutes + projectedFulfilledPlanMinutes;
+  const internalFulfilledPlanMinutes =
+    rangeView.internalFulfilledPlanMinutes + projectedFulfilledPlanMinutes;
 
   return {
     ...rangeView,
     fulfilledPlanMinutes,
+    internalFulfilledPlanMinutes,
+    internalFulfillmentRate:
+      rangeView.plannedMinutes > 0 ? internalFulfilledPlanMinutes / rangeView.plannedMinutes : null,
     fulfillmentRate:
       rangeView.plannedMinutes > 0 ? fulfilledPlanMinutes / rangeView.plannedMinutes : null,
     factTotals: addFactTotals(rangeView.factTotals, projectedFacts),

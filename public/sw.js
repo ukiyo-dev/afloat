@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.2";
+const APP_VERSION = "1.0.3";
 const CACHE_NAME = `afloat-pwa-v${APP_VERSION}`;
 const APP_SHELL = ["/offline.html", "/favicon.ico", "/icon.svg", "/manifest.webmanifest"];
 const STATIC_CACHE_PATHS = new Set(APP_SHELL);
@@ -71,5 +71,5 @@ function isCacheableStaticRequest(request, url) {
     return false;
   }
 
-  return url.pathname.startsWith("/_next/static/") || STATIC_CACHE_PATHS.has(url.pathname);
+  return STATIC_CACHE_PATHS.has(url.pathname);
 }

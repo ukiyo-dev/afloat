@@ -111,26 +111,29 @@ export function ThreadPanel({
         {filteredThreadGroups.map((group: any) => {
           const dangerBorder = ['expired', 'imbalanced'].includes(group.status);
           const warnBorder = ['tightPace', 'needsScheduling'].includes(group.status);
+          const showGroupStatus = group.status !== "untracked";
           
           return (
             <details 
               suppressHydrationWarning
               className={`group panel-brutal !p-0 overflow-hidden ${
-                dangerBorder ? 'border-danger shadow-[8px_8px_0_0_rgb(var(--color-danger))]' : 
+                dangerBorder ? 'border-danger shadow-[8px_8px_0_0_rgb(var(--color-danger))]' :
                 warnBorder ? 'border-highlight shadow-[8px_8px_0_0_rgb(var(--color-highlight))]' : ''
-              }`} 
+              }`}
               key={group.key}
             >
               <summary className="bg-ledger text-ledger-foreground p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-ink-light transition-colors select-none">
                 <div className="flex items-center gap-4">
                   <span className="text-ledger-foreground opacity-50 group-open:rotate-90 transition-transform w-4 inline-block text-center font-mono">▶</span>
                   <h3 className="font-serif text-2xl font-bold">{group.group}</h3>
-                  <span className={`font-mono text-xs px-2 py-1 uppercase font-bold ${
-                    dangerBorder ? 'bg-danger text-ink-fixed' : 
-                    warnBorder ? 'bg-highlight text-ink-fixed' : 'bg-paper/20'
-                  }`}>
-                    {statusLabel(group.status)}
-                  </span>
+                  {showGroupStatus ? (
+                    <span className={`font-mono text-xs px-2 py-1 uppercase font-bold ${
+                      dangerBorder ? 'bg-danger text-ink-fixed' :
+                      warnBorder ? 'bg-highlight text-ink-fixed' : 'bg-paper/20'
+                    }`}>
+                      {statusLabel(group.status)}
+                    </span>
+                  ) : null}
                 </div>
                 <span className="font-mono text-sm opacity-80">{group.items.length} Items</span>
               </summary>

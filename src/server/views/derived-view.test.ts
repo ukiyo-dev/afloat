@@ -7,6 +7,7 @@ describe("buildDerivedViews", () => {
     const views = buildDerivedViews(sampleInput());
 
     expect(views.private.plannedMinutes).toBe(120);
+    expect(views.private.internalFulfillmentRate).toBe(1);
     expect(views.private.fulfillmentRate).toBe(1);
     expect(views.private.factTotals).toEqual({ idealFulfilled: 120 });
     expect(views.private.planTimeline).toHaveLength(2);

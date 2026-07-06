@@ -19,6 +19,8 @@ export interface RecomputeSummary {
     plannedDays: number;
     averagePlannedMinutes: number;
     fulfilledPlanMinutes: number;
+    internalFulfilledPlanMinutes: number;
+    internalFulfillmentRate: number | null;
     fulfillmentRate: number | null;
     maintenanceRate: number;
     protocolErrors: number;
@@ -48,6 +50,8 @@ export function summarizeViews(
           plannedDays: rangeView.plannedDays,
           averagePlannedMinutes: rangeView.averagePlannedMinutes,
           fulfilledPlanMinutes: rangeView.fulfilledPlanMinutes,
+          internalFulfilledPlanMinutes: rangeView.internalFulfilledPlanMinutes,
+          internalFulfillmentRate: rangeView.internalFulfillmentRate,
           fulfillmentRate: rangeView.fulfillmentRate,
           maintenanceRate: rangeView.maintenanceRate,
           protocolErrors: rangeView.protocolErrors.length

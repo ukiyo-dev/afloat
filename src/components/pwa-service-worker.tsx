@@ -8,6 +8,25 @@ export function PwaServiceWorker() {
       return;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .then(() => {
+          if ("caches" in window) {
+            return caches
+              .keys()
+              .then((keys) =>
+                Promise.all(keys.filter((key) => key.startsWith("afloat-pwa-")).map((key) => caches.delete(key)))
+              );
+          }
+        })
+        .catch(() => {
+          // Development should never depend on PWA cache state.
+        });
+      return;
+    }
+
     const registerServiceWorker = () => {
       navigator.serviceWorker
         .register("/sw.js", { updateViaCache: "none" })
