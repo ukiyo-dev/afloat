@@ -34,6 +34,7 @@ export interface DashboardData {
     publicPageEnabled: boolean;
     defaultDashboardRange: DashboardDefaultRange;
     timezone: string;
+    threadStaleDays: number;
   };
 }
 
@@ -73,7 +74,8 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
         startOffsetDays: 0,
         endOffsetDays: 0
       },
-      timezone
+      timezone,
+      threadStaleDays: settings.threadStaleDays || 7
     }
   };
 }
@@ -129,7 +131,8 @@ async function loadDashboardDataForOwner(
         startOffsetDays: 0,
         endOffsetDays: 0
       },
-      timezone
+      timezone,
+      threadStaleDays: settings.threadStaleDays || 7
     }
   };
 }

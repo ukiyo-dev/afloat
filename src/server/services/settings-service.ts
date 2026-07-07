@@ -15,6 +15,7 @@ export interface PublicSettingsInput {
 export interface DashboardSettingsInput extends PublicSettingsInput {
   defaultDashboardRange: DashboardDefaultRange;
   timezone: string;
+  threadStaleDays: number;
 }
 
 export async function saveDashboardSettings(input: DashboardSettingsInput) {
@@ -35,6 +36,7 @@ export async function loadDashboardSettings(): Promise<DashboardSettingsInput> {
       startOffsetDays: 0,
       endOffsetDays: 0
     },
-    timezone: settings.timezone || "UTC"
+    timezone: settings.timezone || "UTC",
+    threadStaleDays: settings.threadStaleDays || 7
   };
 }

@@ -3,6 +3,66 @@ import { describe, expect, it } from "vitest";
 import { projectThreadGroupsForNow, projectThreadsForNow } from "./thread-now-projection";
 
 describe("projectThreadsForNow", () => {
+  it("marks active items stale when last activity exceeds the configured threshold", () => {
+    const [active, inactive] = projectThreadsForNow(
+      [
+        {
+          key: "afloat-active",
+          group: "Afloat",
+          item: "Active",
+          activityState: "active",
+          source: "declared",
+          fulfilledMinutes: 0,
+          futureMinutes: 0,
+          externalShiftMinutes: 0,
+          internalShiftMinutes: 0,
+          expectedMinutes: null,
+          deadline: null,
+          lastActivityAt: "2026-06-29T00:00:00.000Z",
+          factGapMinutes: null,
+          unscheduledGapMinutes: null,
+          planCoverageRate: null,
+          dailyRequiredMinutes: null,
+          status: "untracked",
+          canDelete: true,
+          closed: false,
+          sequences: [],
+          history: []
+        },
+        {
+          key: "afloat-inactive",
+          group: "Afloat",
+          item: "Inactive",
+          activityState: "inactive",
+          source: "auto",
+          fulfilledMinutes: 60,
+          futureMinutes: 0,
+          externalShiftMinutes: 0,
+          internalShiftMinutes: 0,
+          expectedMinutes: null,
+          deadline: null,
+          lastActivityAt: "2026-06-29T00:00:00.000Z",
+          factGapMinutes: null,
+          unscheduledGapMinutes: null,
+          planCoverageRate: null,
+          dailyRequiredMinutes: null,
+          status: "fulfilled",
+          canDelete: false,
+          closed: true,
+          sequences: [],
+          history: []
+        }
+      ],
+      "2026-07-07T00:00:01.000Z",
+      "UTC",
+      "2026-07-07T00:00:00.000Z",
+      7
+    );
+
+    expect(active?.status).toBe("stale");
+    expect(inactive?.status).toBe("fulfilled");
+  });
+
   it("moves elapsed future plan minutes into fulfilled minutes without server recompute", () => {
     const [thread] = projectThreadsForNow(
       [

@@ -174,11 +174,7 @@ export function buildThreadViews(input: {
 
   return threadAccumulators
     .map((thread) => toThreadView(thread, input.now, recentDailyCapacity, timezone))
-    .sort(
-      (a, b) =>
-        activityStateRank(a.activityState) - activityStateRank(b.activityState) ||
-        statusRank(a.status) - statusRank(b.status)
-    );
+    .sort(compareThreadViews);
 }
 
 export function buildThreadGroupViews(
@@ -193,7 +189,7 @@ export function buildThreadGroupViews(
 
   return [...byGroup.entries()]
     .map(([group, items]) => toThreadGroupView(group, items, now, timezone))
-    .sort((a, b) => statusRank(a.status) - statusRank(b.status));
+    .sort(compareThreadGroupViews);
 }
 
 function ensureThread(
@@ -332,6 +328,7 @@ function toThreadView(
     unscheduledGapMinutes !== null && deadline && daysLeft !== null && daysLeft > 0
       ? unscheduledGapMinutes / daysLeft
       : null;
+  const lastActivityAt = latestFactActivityAt(thread) ?? thread.declaration?.createdAt ?? null;
 
   return {
     key:
@@ -348,6 +345,7 @@ function toThreadView(
     internalShiftMinutes: thread.internalShiftMinutes,
     expectedMinutes,
     deadline: deadline ? deadline.toISOString().slice(0, 10) : null,
+    lastActivityAt: lastActivityAt ? lastActivityAt.toISOString() : null,
     factGapMinutes,
     unscheduledGapMinutes,
     planCoverageRate,
@@ -551,18 +549,45 @@ function recentFulfilledDailyCapacity(facts: FactSegment[], now: Date): number {
 function statusRank(status: FeasibilityStatus): number {
   const ranks: Record<FeasibilityStatus, number> = {
     expired: 0,
-    imbalanced: 1,
-    tightPace: 2,
-    needsScheduling: 3,
-    scheduled: 4,
-    fulfilled: 5,
-    untracked: 6
+    stale: 1,
+    imbalanced: 2,
+    tightPace: 3,
+    needsScheduling: 4,
+    scheduled: 5,
+    fulfilled: 6,
+    untracked: 7
   };
   return ranks[status];
 }
 
 function activityStateRank(state: ThreadView["activityState"]): number {
   return state === "inactive" ? 1 : 0;
+}
+
+function compareThreadViews(a: ThreadView, b: ThreadView): number {
+  return (
+    activityStateRank(a.activityState) - activityStateRank(b.activityState) ||
+    deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
+    statusRank(a.status) - statusRank(b.status)
+  );
+}
+
+function compareThreadGroupViews(a: ThreadGroupView, b: ThreadGroupView): number {
+  return (
+    deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
+    statusRank(a.status) - statusRank(b.status)
+  );
+}
+
+function deadlineRank(deadline: string | null): number {
+  return deadline ? Date.parse(`${deadline}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
+}
+
+function latestFactActivityAt(thread: ThreadAccumulator): Date | null {
+  return thread.history
+    .filter((entry) => entry.source === "fact")
+    .map((entry) => entry.endAt)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
 }
 
 function threadKey(group: string, item: string): string {

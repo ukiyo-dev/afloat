@@ -14,11 +14,13 @@ export async function saveSettingsAction(formData: FormData) {
   const publicPageEnabled = formData.get("publicPageEnabled") === "on";
   const defaultDashboardStartOffset = parseOffset(formData.get("defaultDashboardStartOffset"));
   const defaultDashboardEndOffset = parseOffset(formData.get("defaultDashboardEndOffset"));
+  const threadStaleDays = parsePositiveInteger(formData.get("threadStaleDays"));
   const timezone = formData.get("timezone");
 
   if (
     defaultDashboardStartOffset === null ||
     defaultDashboardEndOffset === null ||
+    threadStaleDays === null ||
     typeof timezone !== "string"
   ) {
     throw new Error("Invalid settings form data.");
@@ -37,12 +39,18 @@ export async function saveSettingsAction(formData: FormData) {
       startOffsetDays: defaultDashboardStartOffset,
       endOffsetDays: defaultDashboardEndOffset
     }),
-    timezone
+    timezone,
+    threadStaleDays
   });
   await recomputeCurrentOwnerViews();
   revalidatePath("/dashboard");
   revalidatePath("/settings");
   redirect("/settings");
+}
+
+function parsePositiveInteger(value: FormDataEntryValue | null): number | null {
+  const parsed = parseOffset(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
 }
 
 function parseOffset(value: FormDataEntryValue | null): number | null {

@@ -42,7 +42,7 @@ export async function loadPrivateViewForOwner(ownerId: string): Promise<PrivateD
   ]);
   if (existing && existing.ruleVersion === currentRuleVersion(settings.ruleVersion)) {
     const payload = existing.payload as PrivateDerivedView;
-    if (payload.maintenanceTimeline) {
+    if (payload.maintenanceTimeline && payload.threads.every((thread) => "lastActivityAt" in thread)) {
       return payload;
     }
   }

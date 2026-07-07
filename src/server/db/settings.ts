@@ -25,6 +25,7 @@ export async function updateSettings(
     publicPageEnabled?: boolean;
     defaultDashboardRange?: string;
     timezone?: string;
+    threadStaleDays?: number;
   }
 ) {
   const [row] = await database
@@ -35,7 +36,8 @@ export async function updateSettings(
       ...(input.defaultDashboardRange === undefined
         ? {}
         : { defaultDashboardRange: input.defaultDashboardRange }),
-      ...(input.timezone === undefined ? {} : { timezone: input.timezone })
+      ...(input.timezone === undefined ? {} : { timezone: input.timezone }),
+      ...(input.threadStaleDays === undefined ? {} : { threadStaleDays: input.threadStaleDays })
     })
     .onConflictDoUpdate({
       target: settings.ownerId,
@@ -47,6 +49,9 @@ export async function updateSettings(
           ? {}
           : { defaultDashboardRange: sql`excluded.default_dashboard_range` }),
         ...(input.timezone === undefined ? {} : { timezone: sql`excluded.timezone` }),
+        ...(input.threadStaleDays === undefined
+          ? {}
+          : { threadStaleDays: sql`excluded.thread_stale_days` }),
         updatedAt: sql`now()`
       }
     })

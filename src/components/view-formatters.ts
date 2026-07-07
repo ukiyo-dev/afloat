@@ -162,6 +162,7 @@ export function statusLabel(status: string) {
   const labels: Record<string, string> = {
     fulfilled: "已兑现",
     scheduled: "已安排",
+    stale: "需要关注",
     needsScheduling: "仍需安排",
     tightPace: "节奏紧张",
     imbalanced: "结构失衡",

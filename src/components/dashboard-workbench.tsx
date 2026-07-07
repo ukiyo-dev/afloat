@@ -147,6 +147,7 @@ export function DashboardWorkbench({
   view,
   rangeView,
   latestSyncRun,
+  settings,
   visitorMode = false,
   isOwner = false,
   basePath = "/dashboard"
@@ -190,8 +191,15 @@ export function DashboardWorkbench({
   const fulfillmentSecondaryValue =
     fulfillmentValue && fulfillmentValue !== internalFulfillmentValue ? fulfillmentValue : undefined;
   const projectedThreads = useMemo(
-    () => projectThreadsForNow(view.threads, runtimeNow, rangeView.timezone, view.generatedAt),
-    [rangeView.timezone, runtimeNow, view.generatedAt, view.threads]
+    () =>
+      projectThreadsForNow(
+        view.threads,
+        runtimeNow,
+        rangeView.timezone,
+        view.generatedAt,
+        settings.threadStaleDays
+      ),
+    [rangeView.timezone, runtimeNow, settings.threadStaleDays, view.generatedAt, view.threads]
   );
   const threadGroups = useMemo(
     () => groupThreads(projectedThreads),
@@ -206,10 +214,10 @@ export function DashboardWorkbench({
     [projectedThreads, threadGroups, view]
   );
   const urgentThreads = threadGroups.filter((thread) =>
-    ["expired", "imbalanced", "tightPace", "needsScheduling"].includes(thread.status)
+    ["expired", "stale", "imbalanced", "tightPace", "needsScheduling"].includes(thread.status)
   );
   const hasSevereThreadPressure = urgentThreads.some((thread) =>
-    ["expired", "imbalanced", "tightPace"].includes(thread.status)
+    ["expired", "stale", "imbalanced", "tightPace"].includes(thread.status)
   );
   
   const factLayerTitle = getFactLayerTitle(

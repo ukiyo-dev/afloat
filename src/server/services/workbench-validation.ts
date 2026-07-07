@@ -37,6 +37,9 @@ export function validateDashboardSettings(input: DashboardSettingsInput): void {
   if (!isValidTimeZone(input.timezone)) {
     throw new Error("timezone is invalid.");
   }
+  if (!Number.isInteger(input.threadStaleDays) || input.threadStaleDays < 1) {
+    throw new Error("threadStaleDays must be a positive integer.");
+  }
 }
 
 export function validateThreadDeclaration(input: ThreadDeclarationInput): void {

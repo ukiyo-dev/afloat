@@ -106,6 +106,46 @@ describe("buildThreadViews", () => {
     expect(JSON.stringify(threads)).not.toContain("\\u0000");
   });
 
+  it("sorts active thread items and groups by nearest deadline first", () => {
+    const declarations: ThreadDeclaration[] = [
+      {
+        id: "later",
+        group: "B",
+        item: "later",
+        expectedMinutes: 60,
+        deadline: new Date("2026-05-20T00:00:00Z")
+      },
+      {
+        id: "none",
+        group: "C",
+        item: "none",
+        expectedMinutes: 60,
+        deadline: null
+      },
+      {
+        id: "soon",
+        group: "A",
+        item: "soon",
+        expectedMinutes: 60,
+        deadline: new Date("2026-05-10T00:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, []);
+    const factLayer = buildFactLayer(parsedEvents);
+    const now = new Date("2026-05-07T12:00:00Z");
+    const threads = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now
+    });
+    const groups = buildThreadGroupViews(threads, now);
+
+    expect(threads.map((thread) => thread.item)).toEqual(["soon", "later", "none"]);
+    expect(groups.map((group) => group.group)).toEqual(["A", "B", "C"]);
+  });
+
   it("marks a sequenced thread closed when a later unnumbered plan event is still future", () => {
     const rawEvents: RawCalendarEvent[] = [
       {

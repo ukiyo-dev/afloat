@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "thread_stale_days" integer DEFAULT 7 NOT NULL;

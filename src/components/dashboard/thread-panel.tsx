@@ -156,7 +156,7 @@ export function ThreadPanel({
 
       <div className="grid grid-cols-1 gap-6">
         {filteredThreadGroups.map((group: any) => {
-          const dangerBorder = ['expired', 'imbalanced'].includes(group.status);
+          const dangerBorder = ['expired', 'stale', 'imbalanced'].includes(group.status);
           const warnBorder = ['tightPace', 'needsScheduling'].includes(group.status);
           const showGroupStatus = group.status !== "untracked";
           

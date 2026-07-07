@@ -30,7 +30,8 @@ describe("workbench validation", () => {
           startOffsetDays: -1,
           endOffsetDays: -1
         },
-        timezone: "Asia/Shanghai"
+        timezone: "Asia/Shanghai",
+        threadStaleDays: 7
       })
     ).not.toThrow();
     expect(() =>
@@ -40,7 +41,8 @@ describe("workbench validation", () => {
           startOffsetDays: -7,
           endOffsetDays: -1
         },
-        timezone: "Bad/Zone"
+        timezone: "Bad/Zone",
+        threadStaleDays: 7
       })
     ).toThrow("timezone is invalid");
     expect(() =>
@@ -50,9 +52,21 @@ describe("workbench validation", () => {
           startOffsetDays: 2,
           endOffsetDays: -1
         },
-        timezone: "UTC"
+        timezone: "UTC",
+        threadStaleDays: 7
       })
     ).toThrow("defaultDashboardRange must be in ascending order");
+    expect(() =>
+      validateDashboardSettings({
+        publicPageEnabled: true,
+        defaultDashboardRange: {
+          startOffsetDays: 0,
+          endOffsetDays: 0
+        },
+        timezone: "UTC",
+        threadStaleDays: 0
+      })
+    ).toThrow("threadStaleDays must be a positive integer");
   });
 
   it("validates thread declarations", () => {

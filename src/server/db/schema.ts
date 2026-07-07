@@ -42,6 +42,7 @@ export const settings = pgTable("settings", {
   publicPageEnabled: boolean("public_page_enabled").notNull().default(false),
   defaultDashboardRange: text("default_dashboard_range").notNull().default("day"),
   timezone: text("timezone").notNull().default("UTC"),
+  threadStaleDays: integer("thread_stale_days").notNull().default(7),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });

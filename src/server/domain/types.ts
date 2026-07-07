@@ -85,6 +85,7 @@ export type ThreadSource = "declared" | "auto" | "both";
 export type FeasibilityStatus =
   | "fulfilled"
   | "scheduled"
+  | "stale"
   | "needsScheduling"
   | "tightPace"
   | "imbalanced"
@@ -103,6 +104,7 @@ export interface ThreadView {
   internalShiftMinutes: number;
   expectedMinutes: number | null;
   deadline: string | null;
+  lastActivityAt?: string | null;
   factGapMinutes: number | null;
   unscheduledGapMinutes: number | null;
   planCoverageRate: number | null;

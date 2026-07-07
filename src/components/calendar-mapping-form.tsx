@@ -28,8 +28,8 @@ export function CalendarMappingForm({
     <div className="flex flex-col gap-4">
       {calendars.calendars.map((calendar) => (
         <ActionForm
-          className="panel-brutal !p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:bg-highlight/5 transition-colors" 
-          action={action} 
+          className="panel-brutal !p-4 !shadow-[2px_2px_0_0_rgb(var(--color-shadow))] flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:bg-highlight/5 transition-colors"
+          action={action}
           key={calendar.id}
         >
           <input type="hidden" name="externalCalendarId" value={calendar.id} />

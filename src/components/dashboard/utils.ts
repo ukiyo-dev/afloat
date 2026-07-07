@@ -1,6 +1,9 @@
 import { DashboardData } from "@/server/services/dashboard-service";
 
-export function groupThreads(threads: DashboardData["view"]["threads"]) {
+type ThreadGroup = DashboardData["view"]["threadGroups"][number];
+type ThreadStatus = ThreadGroup["status"];
+
+export function groupThreads(threads: DashboardData["view"]["threads"]): DashboardData["view"]["threadGroups"] {
   const byGroup = new Map<string, DashboardData["view"]["threads"]>();
   for (const thread of threads) {
     byGroup.set(thread.group, [...(byGroup.get(thread.group) ?? []), thread]);
@@ -41,10 +44,28 @@ export function groupThreads(threads: DashboardData["view"]["threads"]) {
       unscheduledGapMinutes,
       planCoverageRate,
       dailyRequiredMinutes: null,
-      status: items[0]?.status ?? "untracked",
+      status: highestRiskStatus(items.map((item) => item.status)),
       items
     };
   });
+}
+
+function highestRiskStatus(statuses: ThreadStatus[]): ThreadStatus {
+  return [...statuses].sort((a, b) => statusRank(a) - statusRank(b))[0] ?? "untracked";
+}
+
+function statusRank(status: ThreadStatus): number {
+  const ranks: Record<ThreadStatus, number> = {
+    expired: 0,
+    stale: 1,
+    imbalanced: 2,
+    tightPace: 3,
+    needsScheduling: 4,
+    scheduled: 5,
+    fulfilled: 6,
+    untracked: 7
+  };
+  return ranks[status] ?? 8;
 }
 
 export function sum(values: number[]): number {

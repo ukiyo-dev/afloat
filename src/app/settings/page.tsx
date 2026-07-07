@@ -102,25 +102,42 @@ export default async function SettingsPage() {
                 </p>
               </fieldset>
               
-              <label className="flex flex-col gap-1 relative">
-                <span className="font-mono text-xs font-bold uppercase">视图时区</span>
-                <div className="relative w-full">
-                  <select
-                    className="input-brutal w-full appearance-none pr-8 cursor-pointer"
-                    name="timezone"
-                    defaultValue={settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
-                  >
-                    {Intl.supportedValuesOf("timeZone").map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-ink">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 relative">
+                  <span className="font-mono text-xs font-bold uppercase">视图时区</span>
+                  <div className="relative w-full">
+                    <select
+                      className="input-brutal w-full appearance-none pr-8 cursor-pointer"
+                      name="timezone"
+                      defaultValue={settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+                    >
+                      {Intl.supportedValuesOf("timeZone").map((tz) => (
+                        <option key={tz} value={tz}>
+                          {tz}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-ink">
+                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                    </div>
                   </div>
-                </div>
-              </label>
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="font-mono text-xs font-bold uppercase">Thread 关注阈值 / days</span>
+                  <input
+                    className="input-brutal w-full"
+                    name="threadStaleDays"
+                    type="number"
+                    min="1"
+                    step="1"
+                    defaultValue={settings.threadStaleDays}
+                  />
+                </label>
+              </div>
+              <p className="font-mono text-xs text-ink-light italic">
+                Active item 超过该天数没有事实活动时，标记为需要关注。默认 7 天。
+              </p>
               
               <label className="flex items-center gap-3 p-3 bg-surface border border-ink mt-2 cursor-pointer hover:bg-highlight/10 transition-colors">
                 <input
