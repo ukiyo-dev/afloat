@@ -153,6 +153,7 @@ export function DashboardWorkbench({
 }: DashboardData & { visitorMode?: boolean; isOwner?: boolean; basePath?: string }) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+  const activeDashboardTab = visitorMode ? "overview" : activeTab;
   const isDefaultView =
     !searchParams.has("range") &&
     !searchParams.has("date") &&
@@ -226,18 +227,22 @@ export function DashboardWorkbench({
 
   return (
     <main className="shell pt-0 md:pt-0">
-      <nav className="mb-8 flex flex-wrap items-start justify-end" aria-label="Dashboard tabs">
-        {dashboardTabs.map((tab) => (
-          <DashboardTabButton
-            key={tab.key}
-            active={activeTab === tab.key}
-            label={tab.label}
-            onSelect={() => setActiveTab(tab.key)}
-          />
-        ))}
-      </nav>
+      <div className="mb-8">
+        {!visitorMode ? (
+          <nav className="flex flex-wrap items-start justify-end" aria-label="Dashboard tabs">
+            {dashboardTabs.map((tab) => (
+              <DashboardTabButton
+                key={tab.key}
+                active={activeDashboardTab === tab.key}
+                label={tab.label}
+                onSelect={() => setActiveTab(tab.key)}
+              />
+            ))}
+          </nav>
+        ) : null}
+      </div>
 
-      <section hidden={activeTab !== "overview"}>
+      <section hidden={activeDashboardTab !== "overview"}>
         <div>
           {/* Header Section */}
           <section className="mb-8 border-b-4 border-ink pb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -516,7 +521,7 @@ export function DashboardWorkbench({
         </div>
       </section>
 
-      <section hidden={activeTab !== "threads"}>
+      <section hidden={activeDashboardTab !== "threads"}>
         <ThreadPanel
           threadGroups={threadGroups}
           view={projectedView}
@@ -525,7 +530,7 @@ export function DashboardWorkbench({
         />
       </section>
 
-      <section hidden={activeTab !== "rules"}>
+      <section hidden={activeDashboardTab !== "rules"}>
         <RulesLedgerPanel />
       </section>
 
