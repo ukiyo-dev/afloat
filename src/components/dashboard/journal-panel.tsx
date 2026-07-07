@@ -128,7 +128,7 @@ export function JournalPanel({
                         </label>
                         <div className="flex justify-between items-center mt-4 pt-4 border-t-2 border-dashed border-ink/30">
                           <button
-                            className="btn-danger inline-flex items-center gap-2"
+                            className="inline-flex items-center gap-2 border-2 border-danger bg-paper px-4 py-2 font-mono font-bold text-danger shadow-[4px_4px_0_0_rgb(var(--color-danger))] transition-all hover:bg-danger hover:text-ink hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
                             form={`delete-note-${note.id}`}
                             type="submit"
                           >
