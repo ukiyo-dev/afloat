@@ -19,7 +19,6 @@ import type { DashboardData } from "@/server/services/dashboard-service";
 
 import { JournalPanel } from "./dashboard/journal-panel";
 import { ThreadPanel } from "./dashboard/thread-panel";
-import { SyncPanel } from "./dashboard/sync-panel";
 import { FactDistribution } from "./dashboard/fact-distribution";
 import { Timeline } from "./dashboard/timeline";
 import { TimeTape } from "./dashboard/time-tape";
@@ -32,15 +31,22 @@ import {
   protocolErrorLabel, 
   todayKey, 
   addLocalDaysKey,
-  syncKindLabel,
   syncStatusLabel
 } from "./dashboard/utils";
 import { projectThreadsForNow } from "./dashboard/thread-now-projection";
 import { projectRangeViewForNow } from "./dashboard/range-now-projection";
+import { runRecentSyncAction, runRecalibrateAction, recomputeViewsAction } from "@/app/dashboard/actions";
+import { SubmitButton } from "./submit-button";
 
 type ThemeMode = "system" | "light" | "dark";
+type DashboardTab = "overview" | "threads" | "rules";
 
 const themeModes: ThemeMode[] = ["system", "light", "dark"];
+const dashboardTabs: Array<{ key: DashboardTab; label: string }> = [
+  { key: "overview", label: "OVERVIEW" },
+  { key: "threads", label: "THREADS" },
+  { key: "rules", label: "RULES" }
+];
 
 function applyThemeMode(mode: ThemeMode) {
   const root = document.documentElement;
@@ -146,6 +152,7 @@ export function DashboardWorkbench({
   basePath = "/dashboard"
 }: DashboardData & { visitorMode?: boolean; isOwner?: boolean; basePath?: string }) {
   const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const isDefaultView =
     !searchParams.has("range") &&
     !searchParams.has("date") &&
@@ -154,6 +161,7 @@ export function DashboardWorkbench({
   
   const buildHref = (newParams: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("tab");
     for (const [key, value] of Object.entries(newParams)) {
       if (value === null) {
         params.delete(key);
@@ -217,255 +225,309 @@ export function DashboardWorkbench({
   const isUltraMacro = daysCount > 30;
 
   return (
-    <main className="shell">
-      {/* Header Section */}
-      <section className="mb-8 border-b-4 border-ink pb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <main className="shell pt-0 md:pt-0">
+      <nav className="mb-8 flex flex-wrap items-start justify-end" aria-label="Dashboard tabs">
+        {dashboardTabs.map((tab) => (
+          <DashboardTabButton
+            key={tab.key}
+            active={activeTab === tab.key}
+            label={tab.label}
+            onSelect={() => setActiveTab(tab.key)}
+          />
+        ))}
+      </nav>
+
+      <section hidden={activeTab !== "overview"}>
         <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="inline-flex h-[26px] items-stretch border border-ink bg-ledger shadow-[2px_2px_0_0_rgb(var(--color-highlight))]">
-              {isOwner ? (
-                <Link
-                  href={guestModeHref}
-                  className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs hover:bg-highlight hover:text-ink-fixed transition-colors cursor-pointer"
-                  title={visitorMode ? "Switch to Owner Mode" : "View as Guest"}
-                >
-                  {visitorMode ? "GUEST MODE" : "OWNER MODE"}
-                </Link>
-              ) : (
-                <p className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs">
-                  GUEST MODE
-                </p>
-              )}
-              <ThemeModeButton />
-            </div>
-            <span className="font-mono text-ink-light text-sm">
-              <LocalClock fallback={view.generatedAt} timezone={projectedRangeView.timezone} />
-            </span>
-          </div>
-          
-          <h1 className="font-serif text-5xl md:text-7xl font-black text-ink leading-none tracking-tighter mb-4">
-            浮生
-          </h1>
-          <p className="font-serif text-xl md:text-2xl font-normal text-ink-light max-w-2xl text-balance">
-            <span className="bg-highlight px-1 text-ink-fixed">{projectedRangeView.label}</span> / {projectedRangeView.timezone}
-          </p>
-        </div>
-
-        <div className="panel-brutal !p-4 min-w-[240px] flex flex-col gap-4">
-          <div className="flex justify-between items-start">
-             <div>
-                <span className="block font-mono text-xs text-ink-light mb-1">SYNC STATUS</span>
-                <strong className="font-mono text-lg block mb-1">
-                  {latestSyncRun ? syncKindLabel(latestSyncRun.kind) : "NO SYNC"}
-                </strong>
-                <span className="font-mono text-xs flex items-center gap-1">
-                  {latestSyncRun?.status === 'succeeded' ? <CheckIcon className="text-success" /> : null}
-                  {latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "---"}
+          {/* Header Section */}
+          <section className="mb-8 border-b-4 border-ink pb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="inline-flex h-[26px] items-stretch border border-ink bg-ledger shadow-[2px_2px_0_0_rgb(var(--color-highlight))]">
+                  {isOwner ? (
+                    <Link
+                      href={guestModeHref}
+                      className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs hover:bg-highlight hover:text-ink-fixed transition-colors cursor-pointer"
+                      title={visitorMode ? "Switch to Owner Mode" : "View as Guest"}
+                    >
+                      {visitorMode ? "GUEST MODE" : "OWNER MODE"}
+                    </Link>
+                  ) : (
+                    <p className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs">
+                      GUEST MODE
+                    </p>
+                  )}
+                  <ThemeModeButton />
+                </div>
+                <span className="font-mono text-ink-light text-sm">
+                  <LocalClock fallback={view.generatedAt} timezone={projectedRangeView.timezone} />
                 </span>
-             </div>
-             {latestSyncRun?.status === 'running' && <UpdateIcon className="animate-spin text-ink" />}
-          </div>
-          
-          <div className="ledger-border-t pt-3 mt-1 flex justify-between items-center">
-            {visitorMode ? (
-              <Link href="/login" className="font-mono text-sm font-bold hover:underline hover:text-highlight hover:bg-ledger px-2 py-1 transition-colors">
-                OWNER LOGIN →
-              </Link>
-            ) : (
-              <>
-                <Link href="/settings" className="font-mono text-sm font-bold hover:underline">
-                  SETTINGS
-                </Link>
-                <ActionForm action={logoutAction}>
-                  <button type="submit" className="font-mono text-sm font-bold text-danger hover:underline">
-                    LOGOUT
-                  </button>
-                </ActionForm>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Range Navigation */}
-      <div className="mb-8 flex flex-col xl:flex-row gap-6 xl:items-end justify-between bg-surface border-2 border-ink p-4 shadow-brutal">
-        <nav className="flex flex-col gap-2" aria-label="Dashboard range">
-          <div className="flex flex-wrap gap-2">
-            <RangeLink
-              active={false}
-              href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, -1), start: null, end: null })}
-              label="Prev"
-              title="上一天"
-            />
-            <RangeLink
-              active={isDefaultView}
-              href={buildHref({ range: null, date: null, start: null, end: null })}
-              label="Default"
-              title="回到默认视图"
-            />
-            <RangeLink
-              active={false}
-              href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, 1), start: null, end: null })}
-              label="Next"
-              title="下一天"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <RangeLink
-              active={!isDefaultView && rangeView.startDate === todayKey(rangeView.timezone) && rangeView.endDate === todayKey(rangeView.timezone)}
-              href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
-              label="今天"
-            />
-            <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="7 天" />
-            <RangeLink active={!isDefaultView && rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="30 天" />
-            <RangeLink active={!isDefaultView && rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="90 天" />
-          </div>
-        </nav>
-
-        <form className="flex flex-wrap items-end gap-3" action={basePath}>
-          <input type="hidden" name="range" value="custom" />
-          {visitorMode && <input type="hidden" name="viewAs" value="guest" />}
-          <label className="font-mono text-xs flex flex-col gap-1">
-            <span className="uppercase font-bold">Start Date</span>
-            <input className="input-brutal w-40" name="start" type="date" defaultValue={rangeView.startDate} />
-          </label>
-          <label className="font-mono text-xs flex flex-col gap-1">
-            <span className="uppercase font-bold">End Date</span>
-            <input className="input-brutal w-40" name="end" type="date" defaultValue={rangeView.endDate} />
-          </label>
-          <button className="btn-brutal h-[40px] flex items-center gap-2" type="submit">
-            <CalendarIcon /> 统计
-          </button>
-        </form>
-      </div>
-
-      {/* Metrics Grid */}
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <Metric label="平均计划时间" value={formatDuration(projectedRangeView.averagePlannedMinutes)} />
-        <Metric
-          label="兑现率"
-          value={internalFulfillmentValue}
-          secondaryValue={fulfillmentSecondaryValue}
-          highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
-        />
-        <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
-        {projectedRangeView.protocolErrors.length > 0 ? (
-          <BrutalDialog
-            title="协议错误详情"
-            trigger={
-              <button type="button" className="text-left w-full h-full cursor-pointer hover:opacity-80 transition-opacity">
-                <Metric 
-                  label="范围协议错误" 
-                  value={`${projectedRangeView.protocolErrors.length}`} 
-                  danger={true} 
-                />
-              </button>
-            }
-          >
-            {(close) => (
-              <div className="flex flex-col gap-6 max-h-[60vh] overflow-y-auto brutal-scrollbar pr-2">
-                <div className="flex flex-col gap-4">
-                  {projectedRangeView.protocolErrors.map((error, idx) => (
-                    <div className="border-l-4 border-danger pl-4 py-2 bg-danger/5" key={`${error.type}-${error.startAt}-${error.endAt}-${idx}`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <strong className="font-mono text-base text-danger">{protocolErrorLabel(error.type)}</strong>
-                        <span className="font-mono text-sm text-ink-light bg-paper px-1 border border-ink">{error.date}</span>
-                      </div>
-                      <p className="font-serif text-base mb-2 font-bold leading-relaxed">{error.message}</p>
-                      <span className="font-mono text-sm text-ink-fixed bg-highlight px-1 border border-ink inline-block">{timeRange(error.startAt, error.endAt, projectedRangeView.timezone)}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="flex justify-end pt-4 border-t-2 border-ink">
-                  <button type="button" onClick={close} className="btn-brutal px-8 py-2">关闭 (CLOSE)</button>
-                </div>
               </div>
-            )}
-          </BrutalDialog>
-        ) : null}
-        <Metric 
-          label="待规划线程" 
-          value={`${urgentThreads.length}`} 
-          danger={hasSevereThreadPressure} 
-        />
-      </section>
 
-      {/* Main Grid Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-        {/* Left Column: Overview & Facts */}
-        <div className="lg:col-span-8 flex flex-col gap-8">
-          <section className="panel-brutal">
-            <div className="flex justify-between items-start mb-8 border-b-2 border-ink pb-4">
-              <div>
-                <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Overview</p>
-                <h2 className="font-serif text-3xl font-bold">时间镜像</h2>
-              </div>
+              <h1 className="font-serif text-5xl md:text-7xl font-black text-ink leading-none tracking-tighter mb-4">
+                浮生
+              </h1>
+              <p className="font-serif text-xl md:text-2xl font-normal text-ink-light max-w-2xl text-balance">
+                <span className="bg-highlight px-1 text-ink-fixed">{projectedRangeView.label}</span> / {projectedRangeView.timezone}
+              </p>
             </div>
-            
-            <div className="grid grid-cols-1 gap-12">
-              
-              {projectedRangeView.startDate === projectedRangeView.endDate ? (
-                <TimeTape
-                  timeline={projectedRangeView.timeline}
-                  timezone={projectedRangeView.timezone}
-                  startDate={projectedRangeView.startAt}
-                  endDate={projectedRangeView.endAt}
-                  now={runtimeNow}
-                  visitorMode={visitorMode}
-                />
-              ) : !isUltraMacro ? (
-                <MacroDistribution timeline={projectedRangeView.timeline} timezone={projectedRangeView.timezone} startDate={projectedRangeView.startDate} endDate={projectedRangeView.endDate} />
-              ) : null}
 
-              
-              <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
-                <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
-                <FactDistribution factTotals={projectedRangeView.factTotals} planTotals={projectedRangeView.planTotals} shiftComposition={projectedRangeView.shiftComposition} />
+            <div className="panel-brutal relative overflow-visible !p-4 min-w-[240px] flex flex-col gap-4">
+              <div>
+                 <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                   {visitorMode ? (
+                     <span className="font-mono text-xs font-bold tracking-widest text-ink-light">SYNC</span>
+                   ) : (
+                     <>
+                       <ActionForm action={runRecentSyncAction}>
+                         <SubmitButton className="border-0 bg-transparent p-0 font-mono text-xs font-bold tracking-widest text-ink-light shadow-none hover:bg-highlight hover:text-ink-fixed" pendingText="SYNCING..." showMask>
+                           SYNC
+                         </SubmitButton>
+                       </ActionForm>
+                       <span className="ml-auto flex items-center gap-3">
+                         <ActionForm action={runRecalibrateAction}>
+                           <SubmitButton className="border-0 bg-transparent p-0 font-mono text-xs font-bold tracking-widest text-ink-light shadow-none hover:bg-highlight hover:text-ink-fixed" pendingText="FULL..." showMask>
+                             FULL
+                           </SubmitButton>
+                         </ActionForm>
+                         <ActionForm action={recomputeViewsAction}>
+                           <SubmitButton className="border-0 bg-transparent p-0 font-mono text-xs font-bold tracking-widest text-ink-light shadow-none hover:bg-highlight hover:text-ink-fixed" pendingText="COMPUTING..." showMask>
+                             COMPUTE
+                           </SubmitButton>
+                         </ActionForm>
+                       </span>
+                     </>
+                   )}
+                 </div>
+                 <div className="flex items-start justify-between gap-2">
+                   <div className="min-w-0 flex-1">
+                     <span className="mb-1 flex w-full items-center justify-between gap-3 font-mono text-xs font-bold text-ink">
+                       <span>UPDATED</span>
+                       <span className="text-right">
+                         {latestSyncRun ? formatGeneratedAt(latestSyncRun.startedAt, projectedRangeView.timezone) : "NO SYNC"}
+                       </span>
+                     </span>
+                   </div>
+                   {latestSyncRun?.status === 'running' ? (
+                     <UpdateIcon className="shrink-0 animate-spin text-ink" />
+                   ) : null}
+                 </div>
+                 <span className="font-mono text-xs flex items-center gap-1">
+                   {latestSyncRun?.status === 'succeeded' ? <CheckIcon className="text-success" /> : null}
+                   {latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "---"}
+                 </span>
+                 {latestSyncRun?.errorMessage ? (
+                   <p className="mt-2 border-l-2 border-danger bg-danger/5 p-2 font-mono text-[10px] text-danger break-words">
+                     {latestSyncRun.errorMessage}
+                   </p>
+                 ) : null}
+              </div>
+
+              <div className="ledger-border-t pt-3 mt-1 flex justify-between items-center">
+                {visitorMode ? (
+                  <Link href="/login" className="font-mono text-sm font-bold hover:underline hover:text-highlight hover:bg-ledger px-2 py-1 transition-colors">
+                    OWNER LOGIN →
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/settings" className="font-mono text-sm font-bold hover:underline">
+                      SETTINGS
+                    </Link>
+                    <ActionForm action={logoutAction}>
+                      <button type="submit" className="font-mono text-sm font-bold text-danger hover:underline">
+                        LOGOUT
+                      </button>
+                    </ActionForm>
+                  </>
+                )}
               </div>
             </div>
           </section>
 
-          {(projectedRangeView.startDate === projectedRangeView.endDate) && !visitorMode && (
-            <section className="panel-brutal">
-              <div className="flex justify-between items-start mb-6 border-b-2 border-ink pb-4">
-                <div>
-                  <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">
-                    Timeline
-                  </p>
-                  <h2 className="font-serif text-3xl font-bold">
-                    {factLayerTitle}
-                    <span className="text-xl text-ink-light font-mono ml-2">({projectedRangeView.label})</span>
-                  </h2>
-                </div>
+          {/* Range Navigation */}
+          <div className="mb-8 flex flex-col xl:flex-row gap-6 xl:items-end justify-between bg-surface border-2 border-ink p-4 shadow-brutal">
+            <nav className="flex flex-col gap-2" aria-label="Dashboard range">
+              <div className="flex flex-wrap gap-2">
+                <RangeLink
+                  active={false}
+                  href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, -1), start: null, end: null })}
+                  label="Prev"
+                  title="上一天"
+                />
+                <RangeLink
+                  active={isDefaultView}
+                  href={buildHref({ range: null, date: null, start: null, end: null })}
+                  label="Default"
+                  title="回到默认视图"
+                />
+                <RangeLink
+                  active={false}
+                  href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, 1), start: null, end: null })}
+                  label="Next"
+                  title="下一天"
+                />
               </div>
-              <Timeline
-                timeline={projectedRangeView.timeline}
-                timezone={projectedRangeView.timezone}
-                startDate={projectedRangeView.startDate}
-              />
-            </section>
-          )}
-        </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <RangeLink
+                  active={!isDefaultView && rangeView.startDate === todayKey(rangeView.timezone) && rangeView.endDate === todayKey(rangeView.timezone)}
+                  href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
+                  label="今天"
+                />
+                <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="7 天" />
+                <RangeLink active={!isDefaultView && rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="30 天" />
+                <RangeLink active={!isDefaultView && rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="90 天" />
+              </div>
+            </nav>
 
-        {/* Right Column: Sync & Protocol Errors */}
-        <div className="lg:col-span-4 relative min-h-[760px]">
-          <div className="lg:absolute lg:inset-0 flex flex-col gap-8">
-            <SyncPanel latestSyncRun={latestSyncRun} timezone={projectedRangeView.timezone} readOnly={visitorMode} />
-            
-            {/* Notes Section */}
-            {!isUltraMacro && <JournalPanel rangeView={projectedRangeView} visitorMode={visitorMode} />}
+            <form className="flex flex-wrap items-end gap-3" action={basePath}>
+              <input type="hidden" name="range" value="custom" />
+              {visitorMode && <input type="hidden" name="viewAs" value="guest" />}
+              <label className="font-mono text-xs flex flex-col gap-1">
+                <span className="uppercase font-bold">Start Date</span>
+                <input className="input-brutal w-40" name="start" type="date" defaultValue={rangeView.startDate} />
+              </label>
+              <label className="font-mono text-xs flex flex-col gap-1">
+                <span className="uppercase font-bold">End Date</span>
+                <input className="input-brutal w-40" name="end" type="date" defaultValue={rangeView.endDate} />
+              </label>
+              <button className="btn-brutal h-[40px] flex items-center gap-2" type="submit">
+                <CalendarIcon /> 统计
+              </button>
+            </form>
+          </div>
+
+          {/* Metrics Grid */}
+          <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+            <Metric label="平均计划时间" value={formatDuration(projectedRangeView.averagePlannedMinutes)} />
+            <Metric
+              label="兑现率"
+              value={internalFulfillmentValue}
+              secondaryValue={fulfillmentSecondaryValue}
+              highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
+            />
+            <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
+            {projectedRangeView.protocolErrors.length > 0 ? (
+              <BrutalDialog
+                title="协议错误详情"
+                trigger={
+                  <button type="button" className="text-left w-full h-full cursor-pointer hover:opacity-80 transition-opacity">
+                    <Metric
+                      label="范围协议错误"
+                      value={`${projectedRangeView.protocolErrors.length}`}
+                      danger={true}
+                    />
+                  </button>
+                }
+              >
+                {(close) => (
+                  <div className="flex flex-col gap-6 max-h-[60vh] overflow-y-auto brutal-scrollbar pr-2">
+                    <div className="flex flex-col gap-4">
+                      {projectedRangeView.protocolErrors.map((error, idx) => (
+                        <div className="border-l-4 border-danger pl-4 py-2 bg-danger/5" key={`${error.type}-${error.startAt}-${error.endAt}-${idx}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <strong className="font-mono text-base text-danger">{protocolErrorLabel(error.type)}</strong>
+                            <span className="font-mono text-sm text-ink-light bg-paper px-1 border border-ink">{error.date}</span>
+                          </div>
+                          <p className="font-serif text-base mb-2 font-bold leading-relaxed">{error.message}</p>
+                          <span className="font-mono text-sm text-ink-fixed bg-highlight px-1 border border-ink inline-block">{timeRange(error.startAt, error.endAt, projectedRangeView.timezone)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t-2 border-ink">
+                      <button type="button" onClick={close} className="btn-brutal px-8 py-2">关闭 (CLOSE)</button>
+                    </div>
+                  </div>
+                )}
+              </BrutalDialog>
+            ) : null}
+            <Metric
+              label="待规划线程"
+              value={`${urgentThreads.length}`}
+              danger={hasSevereThreadPressure}
+            />
+          </section>
+
+          {/* Main Grid Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+            {/* Left Column: Overview & Facts */}
+            <div className="lg:col-span-8 flex flex-col gap-8">
+              <section className="panel-brutal">
+                <div className="flex justify-between items-start mb-8 border-b-2 border-ink pb-4">
+                  <div>
+                    <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Overview</p>
+                    <h2 className="font-serif text-3xl font-bold">时间镜像</h2>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-12">
+
+                  {projectedRangeView.startDate === projectedRangeView.endDate ? (
+                    <TimeTape
+                      timeline={projectedRangeView.timeline}
+                      timezone={projectedRangeView.timezone}
+                      startDate={projectedRangeView.startAt}
+                      endDate={projectedRangeView.endAt}
+                      now={runtimeNow}
+                      visitorMode={visitorMode}
+                    />
+                  ) : !isUltraMacro ? (
+                    <MacroDistribution timeline={projectedRangeView.timeline} timezone={projectedRangeView.timezone} startDate={projectedRangeView.startDate} endDate={projectedRangeView.endDate} />
+                  ) : null}
+
+
+                  <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
+                    <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
+                    <FactDistribution factTotals={projectedRangeView.factTotals} planTotals={projectedRangeView.planTotals} shiftComposition={projectedRangeView.shiftComposition} />
+                  </div>
+                </div>
+              </section>
+
+              {(projectedRangeView.startDate === projectedRangeView.endDate) && !visitorMode && (
+                <section className="panel-brutal">
+                  <div className="flex justify-between items-start mb-6 border-b-2 border-ink pb-4">
+                    <div>
+                      <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">
+                        Timeline
+                      </p>
+                      <h2 className="font-serif text-3xl font-bold">
+                        {factLayerTitle}
+                        <span className="text-xl text-ink-light font-mono ml-2">({projectedRangeView.label})</span>
+                      </h2>
+                    </div>
+                  </div>
+                  <Timeline
+                    timeline={projectedRangeView.timeline}
+                    timezone={projectedRangeView.timezone}
+                    startDate={projectedRangeView.startDate}
+                  />
+                </section>
+              )}
+            </div>
+
+            {/* Right Column: Sync & Protocol Errors */}
+            <div className="lg:col-span-4 relative min-h-[760px]">
+              <div className="lg:absolute lg:inset-0 flex flex-col gap-8">
+                {/* Notes Section */}
+                {!isUltraMacro && <JournalPanel rangeView={projectedRangeView} visitorMode={visitorMode} />}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Threads Section */}
-      <ThreadPanel 
-        threadGroups={threadGroups} 
-        view={projectedView} 
-        rangeView={rangeView} 
-        visitorMode={visitorMode} 
-      />
+      <section hidden={activeTab !== "threads"}>
+        <ThreadPanel
+          threadGroups={threadGroups}
+          view={projectedView}
+          rangeView={rangeView}
+          visitorMode={visitorMode}
+        />
+      </section>
+
+      <section hidden={activeTab !== "rules"}>
+        <RulesLedgerPanel />
+      </section>
 
     </main>
   );
@@ -484,5 +546,53 @@ function RangeLink({ active, href, label, title }: { active: boolean; href: stri
     >
       {label}
     </Link>
+  );
+}
+
+function DashboardTabButton({ active, label, onSelect }: { active: boolean; label: string; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={`dashboard-bookmark -ml-3 first:ml-0 min-w-[104px] px-3 py-1.5 text-center font-mono text-xs font-black tracking-widest transition-colors ${
+        active
+          ? "[--bookmark-bg:rgb(var(--color-ledger))] [--bookmark-fg:rgb(var(--color-highlight))]"
+          : "[--bookmark-bg:rgb(var(--color-paper))] [--bookmark-fg:rgb(var(--color-ink))] hover:[--bookmark-bg:rgb(var(--color-highlight))] hover:[--bookmark-fg:rgb(var(--color-ink-fixed))]"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function RulesLedgerPanel() {
+  return (
+    <section className="panel-brutal mb-12 !p-0 overflow-hidden">
+      <div className="border-b-4 border-ink bg-ledger p-5 text-ledger-foreground">
+        <p className="font-mono text-xs font-bold tracking-widest uppercase text-highlight">Rules</p>
+        <h2 className="font-serif text-4xl md:text-5xl font-black uppercase">规则账本</h2>
+      </div>
+      <div className="grid grid-cols-1 border-b-2 border-ink md:grid-cols-3">
+        <div className="border-b-2 border-ink p-5 md:border-b-0 md:border-r-2">
+          <p className="font-mono text-xs font-bold uppercase text-ink-light">Active Rules</p>
+          <strong className="font-mono text-5xl font-black">0</strong>
+        </div>
+        <div className="border-b-2 border-ink p-5 md:border-b-0 md:border-r-2">
+          <p className="font-mono text-xs font-bold uppercase text-ink-light">Today</p>
+          <strong className="font-mono text-5xl font-black">---</strong>
+        </div>
+        <div className="p-5">
+          <p className="font-mono text-xs font-bold uppercase text-ink-light">Breaks</p>
+          <strong className="font-mono text-5xl font-black">0</strong>
+        </div>
+      </div>
+      <div className="grid min-h-[280px] place-items-center bg-surface p-8 text-center">
+        <div className="border-2 border-dashed border-ink px-6 py-8">
+          <p className="font-mono text-xs font-bold uppercase tracking-widest text-ink-light">No Active Rules Recorded</p>
+          <p className="mt-3 font-serif text-2xl font-bold">规则层等待接入</p>
+        </div>
+      </div>
+    </section>
   );
 }
