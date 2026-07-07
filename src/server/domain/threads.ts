@@ -13,10 +13,12 @@ import type {
 interface ThreadAccumulator {
   group: string;
   item: string;
+  activityState: "active" | "inactive";
   declared: boolean;
   auto: boolean;
   declaration?: ThreadDeclaration;
   generationStartAt?: Date;
+  windows: Array<{ startAt: Date; endAt?: Date }>;
   fulfilledMinutes: number;
   futureMinutes: number;
   externalShiftMinutes: number;
@@ -46,7 +48,8 @@ export function buildThreadViews(input: {
   now: Date;
   timezone?: string;
 }): ThreadView[] {
-  const threads = new Map<string, ThreadAccumulator>();
+  const activeThreads = new Map<string, ThreadAccumulator>();
+  const inactiveThreads = new Map<string, ThreadAccumulator>();
   const activeKeysByGroup = new Map<string, Set<string>>();
   const timeline = buildThreadTimeline(input.declarations, input.parsedEvents);
 
@@ -54,10 +57,11 @@ export function buildThreadViews(input: {
     if (entry.type === "declaration") {
       const declaration = entry.declaration;
       const key = threadKey(declaration.group, declaration.item);
-      const thread = ensureThread(threads, declaration.group, declaration.item);
+      const thread = ensureThread(activeThreads, declaration.group, declaration.item, "active");
       thread.declared = true;
       thread.declaration = declaration;
       thread.generationStartAt ??= entry.at;
+      ensureOpenWindow(thread, entry.at);
       ensureSet(activeKeysByGroup, declaration.group).add(key);
       continue;
     }
@@ -65,70 +69,67 @@ export function buildThreadViews(input: {
     const event = entry.event;
     const key = threadKey(event.title.group, event.title.item);
     if (event.title.sequence === null) {
-      const thread = threads.get(key);
+      const thread = activeThreads.get(key);
       const activeKeys = activeKeysByGroup.get(event.title.group);
       if (thread && activeKeys?.has(key)) {
         thread.closed = true;
         if (event.endAt <= input.now) {
           thread.fulfilledByClosure = true;
+          closeOpenWindow(thread, event.endAt);
           activeKeys.delete(key);
-          threads.delete(key);
+          activeThreads.delete(key);
+          mergeClosedThread(inactiveThreads, thread);
         }
       }
       continue;
     }
 
-    const thread = ensureThread(threads, event.title.group, event.title.item);
+    const thread = ensureThread(activeThreads, event.title.group, event.title.item, "active");
     thread.auto = true;
     thread.closed = false;
     thread.fulfilledByClosure = false;
     thread.generationStartAt ??= event.startAt;
+    ensureOpenWindow(thread, event.startAt);
     thread.sequences.add(event.title.sequence);
     ensureSet(activeKeysByGroup, event.title.group).add(key);
   }
+
+  const threadAccumulators = [...activeThreads.values(), ...inactiveThreads.values()];
 
   for (const fact of input.facts) {
     if (fact.startAt >= input.now) {
       continue;
     }
 
-    const thread = threads.get(threadKey(fact.title.group, fact.title.item));
-    if (!thread) {
-      continue;
-    }
-    if (thread.generationStartAt && fact.endAt <= thread.generationStartAt) {
-      continue;
-    }
+    const matchingThreads = threadAccumulators.filter(
+      (thread) => thread.group === fact.title.group && thread.item === fact.title.item
+    );
 
-    const minutes = minutesInRange({
-      startAt:
-        thread.generationStartAt && fact.startAt < thread.generationStartAt
-          ? thread.generationStartAt
-          : fact.startAt,
-      endAt: fact.endAt > input.now ? input.now : fact.endAt
-    });
-    if (
-      fact.kind === "idealFulfilled" ||
-      fact.kind === "leisureFulfilled" ||
-      fact.kind === "restFulfilled"
-    ) {
-      thread.fulfilledMinutes += minutes;
-    } else if (fact.kind === "externalShift") {
-      thread.externalShiftMinutes += minutes;
-    } else {
-      thread.internalShiftMinutes += minutes;
+    for (const thread of matchingThreads) {
+      const ranges = rangesInThreadWindows(thread, fact, input.now);
+
+      for (const range of ranges) {
+        const minutes = minutesInRange(range);
+        if (
+          fact.kind === "idealFulfilled" ||
+          fact.kind === "leisureFulfilled" ||
+          fact.kind === "restFulfilled"
+        ) {
+          thread.fulfilledMinutes += minutes;
+        } else if (fact.kind === "externalShift") {
+          thread.externalShiftMinutes += minutes;
+        } else {
+          thread.internalShiftMinutes += minutes;
+        }
+        thread.history.push({
+          ...range,
+          kind: fact.kind,
+          minutes,
+          title: fact.title.rawTitle,
+          source: "fact"
+        });
+      }
     }
-    thread.history.push({
-      startAt:
-        thread.generationStartAt && fact.startAt < thread.generationStartAt
-          ? thread.generationStartAt
-          : fact.startAt,
-      endAt: fact.endAt > input.now ? input.now : fact.endAt,
-      kind: fact.kind,
-      minutes,
-      title: fact.title.rawTitle,
-      source: "fact"
-    });
   }
 
   for (const segment of input.cleanPlanSegments) {
@@ -136,11 +137,11 @@ export function buildThreadViews(input: {
       continue;
     }
 
-    const thread = threads.get(threadKey(segment.title.group, segment.title.item));
+    const thread = activeThreads.get(threadKey(segment.title.group, segment.title.item));
     if (!thread) {
       continue;
     }
-    if (thread.generationStartAt && segment.endAt <= thread.generationStartAt) {
+    if (thread.activityState === "inactive") {
       continue;
     }
 
@@ -154,6 +155,9 @@ export function buildThreadViews(input: {
       ),
       endAt: segment.endAt
     };
+    if (!isRangeInOpenThreadWindow(thread, range)) {
+      continue;
+    }
     const minutes = minutesInRange(range);
     thread.futureMinutes += minutes;
     thread.history.push({
@@ -168,9 +172,13 @@ export function buildThreadViews(input: {
   const recentDailyCapacity = recentFulfilledDailyCapacity(input.facts, input.now);
   const timezone = input.timezone ?? "UTC";
 
-  return [...threads.values()]
+  return threadAccumulators
     .map((thread) => toThreadView(thread, input.now, recentDailyCapacity, timezone))
-    .sort((a, b) => statusRank(a.status) - statusRank(b.status));
+    .sort(
+      (a, b) =>
+        activityStateRank(a.activityState) - activityStateRank(b.activityState) ||
+        statusRank(a.status) - statusRank(b.status)
+    );
 }
 
 export function buildThreadGroupViews(
@@ -191,7 +199,8 @@ export function buildThreadGroupViews(
 function ensureThread(
   threads: Map<string, ThreadAccumulator>,
   group: string,
-  item: string
+  item: string,
+  activityState: "active" | "inactive"
 ): ThreadAccumulator {
   const key = threadKey(group, item);
   const existing = threads.get(key);
@@ -202,8 +211,10 @@ function ensureThread(
   const created: ThreadAccumulator = {
     group,
     item,
+    activityState,
     declared: false,
     auto: false,
+    windows: [],
     fulfilledMinutes: 0,
     futureMinutes: 0,
     externalShiftMinutes: 0,
@@ -215,6 +226,43 @@ function ensureThread(
   };
   threads.set(key, created);
   return created;
+}
+
+function ensureOpenWindow(thread: ThreadAccumulator, startAt: Date): void {
+  if (thread.windows.length === 0) {
+    thread.windows.push({ startAt });
+  }
+}
+
+function closeOpenWindow(thread: ThreadAccumulator, endAt: Date): void {
+  const window = thread.windows.at(-1);
+  if (window && !window.endAt) {
+    window.endAt = endAt;
+  }
+}
+
+function mergeClosedThread(
+  inactiveThreads: Map<string, ThreadAccumulator>,
+  closedThread: ThreadAccumulator
+): void {
+  const inactive = ensureThread(
+    inactiveThreads,
+    closedThread.group,
+    closedThread.item,
+    "inactive"
+  );
+  inactive.declared ||= closedThread.declared;
+  inactive.auto ||= closedThread.auto;
+  inactive.declaration ??= closedThread.declaration;
+  inactive.generationStartAt =
+    earlierDate(inactive.generationStartAt, closedThread.generationStartAt) ??
+    closedThread.generationStartAt;
+  inactive.closed = true;
+  inactive.fulfilledByClosure = true;
+  for (const sequence of closedThread.sequences) {
+    inactive.sequences.add(sequence);
+  }
+  inactive.windows.push(...closedThread.windows.filter((window) => window.endAt));
 }
 
 function buildThreadTimeline(
@@ -286,9 +334,13 @@ function toThreadView(
       : null;
 
   return {
-    key: publicThreadKey(thread.group, thread.item),
+    key:
+      thread.activityState === "active"
+        ? publicThreadKey(thread.group, thread.item)
+        : `${publicThreadKey(thread.group, thread.item)}?state=inactive`,
     group: thread.group,
     item: thread.item,
+    activityState: thread.activityState,
     source,
     fulfilledMinutes: thread.fulfilledMinutes,
     futureMinutes: thread.futureMinutes,
@@ -329,6 +381,40 @@ function toThreadView(
         source: entry.source
       }))
   };
+}
+
+function rangesInThreadWindows(
+  thread: ThreadAccumulator,
+  range: { startAt: Date; endAt: Date },
+  now: Date
+): Array<{ startAt: Date; endAt: Date }> {
+  return thread.windows.flatMap((window) => {
+    const startAt = new Date(Math.max(range.startAt.getTime(), window.startAt.getTime()));
+    const endLimit = window.endAt ?? now;
+    const endAt = new Date(Math.min(range.endAt.getTime(), endLimit.getTime(), now.getTime()));
+    return endAt > startAt ? [{ startAt, endAt }] : [];
+  });
+}
+
+function isRangeInOpenThreadWindow(
+  thread: ThreadAccumulator,
+  range: { startAt: Date; endAt: Date }
+): boolean {
+  const window = thread.windows.at(-1);
+  if (!window || window.endAt) {
+    return false;
+  }
+  return range.endAt > window.startAt;
+}
+
+function earlierDate(a?: Date, b?: Date): Date | undefined {
+  if (!a) {
+    return b;
+  }
+  if (!b) {
+    return a;
+  }
+  return a <= b ? a : b;
 }
 
 function feasibilityStatus(input: {
@@ -473,6 +559,10 @@ function statusRank(status: FeasibilityStatus): number {
     untracked: 6
   };
   return ranks[status];
+}
+
+function activityStateRank(state: ThreadView["activityState"]): number {
+  return state === "inactive" ? 1 : 0;
 }
 
 function threadKey(group: string, item: string): string {

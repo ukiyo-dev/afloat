@@ -181,7 +181,7 @@ describe("buildThreadViews", () => {
     });
   });
 
-  it("releases an auto group after every active item is closed by historical unnumbered plans", () => {
+  it("keeps historically closed auto items as inactive threads", () => {
     const rawEvents: RawCalendarEvent[] = [
       {
         id: "p1",
@@ -222,10 +222,21 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    expect(threads.filter((thread) => thread.group === "Afloat")).toEqual([]);
+    expect(threads.filter((thread) => thread.group === "Afloat")).toEqual([
+      expect.objectContaining({
+        item: "同步闭环",
+        activityState: "inactive",
+        fulfilledMinutes: 120
+      }),
+      expect.objectContaining({
+        item: "公开页",
+        activityState: "inactive",
+        fulfilledMinutes: 120
+      })
+    ]);
   });
 
-  it("treats a same-name group after release as a new active generation", () => {
+  it("treats a same-name item after closure as a new active generation", () => {
     const rawEvents: RawCalendarEvent[] = [
       {
         id: "old-seq",
@@ -259,7 +270,12 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    const thread = threads.find((item) => item.group === "Afloat" && item.item === "同步闭环");
+    const thread = threads.find(
+      (item) =>
+        item.group === "Afloat" &&
+        item.item === "同步闭环" &&
+        item.activityState === "active"
+    );
     expect(thread).toMatchObject({
       closed: false,
       fulfilledMinutes: 60
@@ -268,6 +284,118 @@ describe("buildThreadViews", () => {
       expect.objectContaining({
         title: "Afloat：同步闭环 1",
         startAt: "2026-05-05T20:00:00.000Z"
+      })
+    ]);
+  });
+
+  it("aggregates all closed episodes only when the item is currently inactive", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "old-seq",
+        calendarSourceId: "ideal",
+        title: "健康：牙医 1",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      },
+      {
+        id: "old-close",
+        calendarSourceId: "ideal",
+        title: "健康：牙医",
+        startAt: new Date("2026-05-02T20:00:00Z"),
+        endAt: new Date("2026-05-02T21:00:00Z")
+      },
+      {
+        id: "new-seq",
+        calendarSourceId: "ideal",
+        title: "健康：牙医 1",
+        startAt: new Date("2026-05-05T20:00:00Z"),
+        endAt: new Date("2026-05-05T21:00:00Z")
+      },
+      {
+        id: "new-close",
+        calendarSourceId: "ideal",
+        title: "健康：牙医",
+        startAt: new Date("2026-05-06T20:00:00Z"),
+        endAt: new Date("2026-05-06T21:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-07T12:00:00Z")
+    });
+
+    expect(threads).toEqual([
+      expect.objectContaining({
+        group: "健康",
+        item: "牙医",
+        activityState: "inactive",
+        fulfilledMinutes: 240,
+        history: expect.arrayContaining([
+          expect.objectContaining({ title: "健康：牙医 1" }),
+          expect.objectContaining({ title: "健康：牙医" })
+        ])
+      })
+    ]);
+  });
+
+  it("keeps closed history visible when a future numbered event opens the same item again", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "p1",
+        calendarSourceId: "ideal",
+        title: "健康：牙医 1",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      },
+      {
+        id: "p2",
+        calendarSourceId: "ideal",
+        title: "健康：牙医 2",
+        startAt: new Date("2026-05-02T20:00:00Z"),
+        endAt: new Date("2026-05-02T21:00:00Z")
+      },
+      {
+        id: "close",
+        calendarSourceId: "ideal",
+        title: "健康：牙医",
+        startAt: new Date("2026-05-03T20:00:00Z"),
+        endAt: new Date("2026-05-03T21:00:00Z")
+      },
+      {
+        id: "future",
+        calendarSourceId: "ideal",
+        title: "健康：牙医 4",
+        startAt: new Date("2026-05-10T20:00:00Z"),
+        endAt: new Date("2026-05-10T21:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-07T12:00:00Z")
+    });
+
+    expect(threads.filter((thread) => thread.group === "健康" && thread.item === "牙医")).toEqual([
+      expect.objectContaining({
+        activityState: "active",
+        fulfilledMinutes: 0,
+        futureMinutes: 60,
+        sequences: [4]
+      }),
+      expect.objectContaining({
+        activityState: "inactive",
+        fulfilledMinutes: 180,
+        futureMinutes: 0,
+        sequences: [1, 2]
       })
     ]);
   });
@@ -309,10 +437,13 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    expect(threads.map((thread) => thread.item).sort()).toEqual(["手动项"]);
+    expect(threads.map((thread) => [thread.item, thread.activityState]).sort()).toEqual([
+      ["同步闭环", "inactive"],
+      ["手动项", "active"]
+    ]);
   });
 
-  it("releases a group only after declared empty items also receive historical unnumbered plans", () => {
+  it("keeps closed declared and auto items as inactive threads", () => {
     const declarations: ThreadDeclaration[] = [
       {
         id: "manual",
@@ -356,7 +487,18 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    expect(threads.filter((thread) => thread.group === "Afloat")).toEqual([]);
+    expect(threads.filter((thread) => thread.group === "Afloat")).toEqual([
+      expect.objectContaining({
+        item: "同步闭环",
+        activityState: "inactive",
+        fulfilledMinutes: 120
+      }),
+      expect.objectContaining({
+        item: "手动项",
+        activityState: "inactive",
+        fulfilledMinutes: 60
+      })
+    ]);
   });
 
   it("aggregates item-level expected minutes and deadlines into group views", () => {
@@ -610,7 +752,7 @@ describe("buildThreadViews", () => {
     });
   });
 
-  it("removes an item from active threads when its unnumbered closing plan is historical", () => {
+  it("moves an item to inactive threads when its unnumbered closing plan is historical", () => {
     const declarations: ThreadDeclaration[] = [
       {
         id: "t1",
@@ -654,7 +796,12 @@ describe("buildThreadViews", () => {
       now: new Date("2026-05-07T12:00:00Z")
     });
 
-    expect(threads.find((item) => item.item === "同步")).toBeUndefined();
-    expect(threads.find((item) => item.item === "未关闭项")).toBeDefined();
+    expect(threads.find((item) => item.item === "同步")).toMatchObject({
+      activityState: "inactive",
+      fulfilledMinutes: 120
+    });
+    expect(threads.find((item) => item.item === "未关闭项")).toMatchObject({
+      activityState: "active"
+    });
   });
 });

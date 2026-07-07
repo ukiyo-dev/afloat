@@ -60,17 +60,21 @@ export function detectLayerOverlaps(events: ParsedEvent[]): ProtocolError[] {
 export function detectSequenceRegressions(events: ParsedEvent[]): ProtocolError[] {
   const errors: ProtocolError[] = [];
   const planEvents = events
-    .filter((event) => event.layer === "plan" && event.title.sequence !== null)
+    .filter((event) => event.layer === "plan")
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
   const lastByThread = new Map<string, ParsedEvent>();
 
   for (const event of planEvents) {
     const key = threadKey(event.title.group, event.title.item);
+    if (event.title.sequence === null) {
+      lastByThread.delete(key);
+      continue;
+    }
+
     const previous = lastByThread.get(key);
     if (
       previous &&
       previous.title.sequence !== null &&
-      event.title.sequence !== null &&
       event.title.sequence < previous.title.sequence
     ) {
       errors.push({

@@ -95,6 +95,7 @@ export interface ThreadView {
   key: string;
   group: string;
   item: string;
+  activityState?: "active" | "inactive";
   source: ThreadSource;
   fulfilledMinutes: number;
   futureMinutes: number;

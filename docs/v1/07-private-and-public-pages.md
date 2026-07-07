@@ -85,7 +85,7 @@ Afloat 只有一个主展示系统：镜像页。
 
 线程操作区包含 `New Plan` 和搜索框。移动端下两者保持同一行：`New Plan` 不换行，搜索框占用剩余宽度。
 
-当前搜索框过滤活跃线程的 Group / Item，不改变顶部统计数字，也不查询已归档 Item。历史归档数据源引入后，该入口可以扩展为同时查询 Active 与 Archive。
+当前搜索框过滤所选线程视图的 Group / Item，不改变顶部统计数字。线程视图提供 `Active / Inactive / All` 过滤：Active 只看当前活跃 Item，Inactive 只看已收束 Item，All 合并两者。
 
 线程排序优先展示最需要被看见的承诺：
 

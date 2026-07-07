@@ -70,6 +70,37 @@ describe("buildFactLayer", () => {
       internalFulfillmentRate: 1
     });
   });
+
+  it("does not report sequence regression after an unnumbered closure starts a new item instance", () => {
+    const events = parseCalendarEvents(sources, [
+      raw("p1", "ideal", "健康：牙医 1", "2026-05-06T20:00:00Z", "2026-05-06T21:00:00Z"),
+      raw("p2", "ideal", "健康：牙医 2", "2026-05-07T20:00:00Z", "2026-05-07T21:00:00Z"),
+      raw("p3", "ideal", "健康：牙医", "2026-05-08T20:00:00Z", "2026-05-08T21:00:00Z"),
+      raw("p4", "ideal", "健康：牙医 1", "2026-05-09T20:00:00Z", "2026-05-09T21:00:00Z")
+    ]);
+
+    const result = buildFactLayer(events);
+
+    expect(result.errors.filter((error) => error.type === "sequenceRegression")).toEqual([]);
+  });
+
+  it("reports sequence regression within the same item instance", () => {
+    const events = parseCalendarEvents(sources, [
+      raw("p1", "ideal", "健康：牙医 1", "2026-05-06T20:00:00Z", "2026-05-06T21:00:00Z"),
+      raw("p2", "ideal", "健康：牙医 2", "2026-05-07T20:00:00Z", "2026-05-07T21:00:00Z"),
+      raw("p3", "ideal", "健康：牙医 1", "2026-05-08T20:00:00Z", "2026-05-08T21:00:00Z")
+    ]);
+
+    const result = buildFactLayer(events);
+
+    expect(result.errors).toEqual([
+      expect.objectContaining({
+        type: "sequenceRegression",
+        eventIds: ["p2", "p3"],
+        message: "线程序号倒退"
+      })
+    ]);
+  });
 });
 
 function raw(
