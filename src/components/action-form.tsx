@@ -8,12 +8,14 @@ export function ActionForm({
   action, 
   children, 
   className,
+  id,
   resetOnSuccess = false,
   onSuccess
 }: { 
   action: (formData: FormData) => Promise<any>; 
   children: React.ReactNode; 
   className?: string;
+  id?: string;
   resetOnSuccess?: boolean;
   onSuccess?: () => void;
 }) {
@@ -21,6 +23,7 @@ export function ActionForm({
   
   return (
     <form
+      id={id}
       ref={formRef}
       className={className}
       action={async (formData) => {

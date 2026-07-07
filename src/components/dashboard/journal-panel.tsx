@@ -103,44 +103,46 @@ export function JournalPanel({
                   }
                 >
                   {(close) => (
-                    <ActionForm className="flex flex-col gap-4" action={saveNoteAction} onSuccess={close}>
-                      <div className="grid grid-cols-2 gap-4">
-                        <label className="flex flex-col gap-1">
-                          <span className="font-mono text-xs font-bold uppercase">Date</span>
-                          <input className="input-brutal w-full font-mono text-sm" name="date" type="date" defaultValue={note.date} readOnly />
+                    <div className="flex flex-col gap-4">
+                      <ActionForm className="flex flex-col gap-4" action={saveNoteAction} onSuccess={close}>
+                        <div className="grid grid-cols-2 gap-4">
+                          <label className="flex flex-col gap-1">
+                            <span className="font-mono text-xs font-bold uppercase">Date</span>
+                            <input className="input-brutal w-full font-mono text-sm" name="date" type="date" defaultValue={note.date} readOnly />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="font-mono text-xs font-bold uppercase">Visibility</span>
+                            <select className="input-brutal w-full font-mono text-sm" name="visibility" defaultValue={note.visibility}>
+                              <option value="private">私密 (PRIVATE)</option>
+                              <option value="public">公开 (PUBLIC)</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label className="flex flex-col gap-1 mt-2">
+                          <span className="font-mono text-xs font-bold uppercase">Content</span>
+                          <textarea 
+                            className="input-brutal w-full min-h-[160px] font-serif text-lg leading-relaxed resize-y" 
+                            name="body" 
+                            defaultValue={note.body}
+                          />
                         </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="font-mono text-xs font-bold uppercase">Visibility</span>
-                          <select className="input-brutal w-full font-mono text-sm" name="visibility" defaultValue={note.visibility}>
-                            <option value="private">私密 (PRIVATE)</option>
-                            <option value="public">公开 (PUBLIC)</option>
-                          </select>
-                        </label>
-                      </div>
-                      <label className="flex flex-col gap-1 mt-2">
-                        <span className="font-mono text-xs font-bold uppercase">Content</span>
-                        <textarea 
-                          className="input-brutal w-full min-h-[160px] font-serif text-lg leading-relaxed resize-y" 
-                          name="body" 
-                          defaultValue={note.body}
-                        />
-                      </label>
-                      <div className="flex justify-end items-center mt-4 pt-4 border-t-2 border-dashed border-ink/30">
-                        <SubmitButton className="btn-brutal" pendingText="SAVING...">更新笔记</SubmitButton>
-                      </div>
-                    </ActionForm>
+                        <div className="flex justify-between items-center mt-4 pt-4 border-t-2 border-dashed border-ink/30">
+                          <button
+                            className="btn-danger inline-flex items-center gap-2"
+                            form={`delete-note-${note.id}`}
+                            type="submit"
+                          >
+                            <Cross2Icon /> 删除笔记
+                          </button>
+                          <SubmitButton className="btn-brutal" pendingText="SAVING...">更新笔记</SubmitButton>
+                        </div>
+                      </ActionForm>
+                      <ActionForm id={`delete-note-${note.id}`} action={deleteNoteAction} onSuccess={close} className="hidden">
+                        <input type="hidden" name="date" value={note.date} />
+                      </ActionForm>
+                    </div>
                   )}
                 </BrutalDialog>
-                
-                <ActionForm action={deleteNoteAction} className="inline-flex">
-                   <input type="hidden" name="date" value={note.date} />
-                   <button 
-                     type="submit" 
-                     className="text-xs font-mono text-danger hover:underline flex items-center gap-1 absolute top-0 right-0 -mt-6 opacity-0 group-hover/note:opacity-100 transition-opacity"
-                   >
-                     <Cross2Icon /> DELETE
-                   </button>
-                </ActionForm>
                 
                 <p className="font-serif text-lg leading-relaxed whitespace-pre-wrap mt-2 relative group-hover/note:z-10">{note.body}</p>
               </div>

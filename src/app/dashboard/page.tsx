@@ -47,7 +47,7 @@ export default async function DashboardPage({
           ACCESS DENIED<span className="text-highlight drop-shadow-[-2px_-2px_0_rgb(var(--color-shadow))]">.</span>
         </h1>
         <p className="font-serif text-xl md:text-2xl font-normal text-ink-light mb-12 max-w-xl leading-relaxed text-balance">
-          个人计划镜像观察系统。当前环境为私有状态，访客模式尚未开启。
+          个人时间镜像观察系统。当前环境为私有状态，访客模式尚未开启。
         </p>
         
         <Link href="/login" className="btn-brutal text-2xl py-4 px-12 inline-flex items-center justify-center gap-4 group">
