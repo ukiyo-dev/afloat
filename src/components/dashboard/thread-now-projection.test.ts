@@ -63,6 +63,42 @@ describe("projectThreadsForNow", () => {
     expect(inactive?.status).toBe("fulfilled");
   });
 
+  it("still evaluates stale state when runtime now has not advanced past generatedAt", () => {
+    const [thread] = projectThreadsForNow(
+      [
+        {
+          key: "afloat-active",
+          group: "Afloat",
+          item: "Active",
+          activityState: "active",
+          source: "declared",
+          fulfilledMinutes: 0,
+          futureMinutes: 0,
+          externalShiftMinutes: 0,
+          internalShiftMinutes: 0,
+          expectedMinutes: null,
+          deadline: null,
+          lastActivityAt: "2026-06-29T00:00:00.000Z",
+          factGapMinutes: null,
+          unscheduledGapMinutes: null,
+          planCoverageRate: null,
+          dailyRequiredMinutes: null,
+          status: "untracked",
+          canDelete: true,
+          closed: false,
+          sequences: [],
+          history: []
+        }
+      ],
+      "2026-07-07T00:00:00.000Z",
+      "UTC",
+      "2026-07-07T00:00:00.000Z",
+      7
+    );
+
+    expect(thread?.status).toBe("stale");
+  });
+
   it("moves elapsed future plan minutes into fulfilled minutes without server recompute", () => {
     const [thread] = projectThreadsForNow(
       [

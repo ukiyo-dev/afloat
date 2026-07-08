@@ -34,11 +34,12 @@ export function projectThreadsForNow(
 ): DashboardData["view"]["threads"] {
   const baseNow = new Date(baseNowIso);
   const runtimeNow = new Date(runtimeNowIso);
-  if (Number.isNaN(baseNow.getTime()) || Number.isNaN(runtimeNow.getTime()) || runtimeNow <= baseNow) {
+  if (Number.isNaN(baseNow.getTime()) || Number.isNaN(runtimeNow.getTime())) {
     return threads;
   }
 
-  return threads.map((thread) => projectThreadForNow(thread, baseNow, runtimeNow, timezone, staleDays));
+  const projectionNow = runtimeNow > baseNow ? runtimeNow : baseNow;
+  return threads.map((thread) => projectThreadForNow(thread, baseNow, projectionNow, timezone, staleDays));
 }
 
 export function projectThreadGroupsForNow(
