@@ -19,6 +19,7 @@ import type { DashboardData } from "@/server/services/dashboard-service";
 
 import { JournalPanel } from "./dashboard/journal-panel";
 import { ThreadPanel } from "./dashboard/thread-panel";
+import { RulePanel } from "./dashboard/rule-panel";
 import { FactDistribution } from "./dashboard/fact-distribution";
 import { Timeline } from "./dashboard/timeline";
 import { TimeTape } from "./dashboard/time-tape";
@@ -148,6 +149,7 @@ export function DashboardWorkbench({
   rangeView,
   latestSyncRun,
   settings,
+  personalRules,
   visitorMode = false,
   isOwner = false,
   basePath = "/dashboard"
@@ -539,7 +541,7 @@ export function DashboardWorkbench({
       </section>
 
       <section hidden={activeDashboardTab !== "rules"}>
-        <RulesLedgerPanel />
+        <RulePanel rules={personalRules} timezone={rangeView.timezone} visitorMode={visitorMode} />
       </section>
 
     </main>
@@ -576,36 +578,5 @@ function DashboardTabButton({ active, label, onSelect }: { active: boolean; labe
     >
       {label}
     </button>
-  );
-}
-
-function RulesLedgerPanel() {
-  return (
-    <section className="panel-brutal mb-12 !p-0 overflow-hidden">
-      <div className="border-b-4 border-ink bg-ledger p-5 text-ledger-foreground">
-        <p className="font-mono text-xs font-bold tracking-widest uppercase text-highlight">Rules</p>
-        <h2 className="font-serif text-4xl md:text-5xl font-black uppercase">规则账本</h2>
-      </div>
-      <div className="grid grid-cols-1 border-b-2 border-ink md:grid-cols-3">
-        <div className="border-b-2 border-ink p-5 md:border-b-0 md:border-r-2">
-          <p className="font-mono text-xs font-bold uppercase text-ink-light">Active Rules</p>
-          <strong className="font-mono text-5xl font-black">0</strong>
-        </div>
-        <div className="border-b-2 border-ink p-5 md:border-b-0 md:border-r-2">
-          <p className="font-mono text-xs font-bold uppercase text-ink-light">Today</p>
-          <strong className="font-mono text-5xl font-black">---</strong>
-        </div>
-        <div className="p-5">
-          <p className="font-mono text-xs font-bold uppercase text-ink-light">Breaks</p>
-          <strong className="font-mono text-5xl font-black">0</strong>
-        </div>
-      </div>
-      <div className="grid min-h-[280px] place-items-center bg-surface p-8 text-center">
-        <div className="border-2 border-dashed border-ink px-6 py-8">
-          <p className="font-mono text-xs font-bold uppercase tracking-widest text-ink-light">No Active Rules Recorded</p>
-          <p className="mt-3 font-serif text-2xl font-bold">规则层等待接入</p>
-        </div>
-      </div>
-    </section>
   );
 }

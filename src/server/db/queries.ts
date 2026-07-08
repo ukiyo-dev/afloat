@@ -5,6 +5,7 @@ export * from "./computed-views";
 export * from "./derived-input";
 export * from "./notes";
 export * from "./owners";
+export * from "./personal-rules";
 export * from "./settings";
 export * from "./sync-runs";
 export * from "./thread-declarations";

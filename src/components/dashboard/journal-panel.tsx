@@ -137,7 +137,13 @@ export function JournalPanel({
                           <SubmitButton className="btn-brutal" pendingText="SAVING...">更新笔记</SubmitButton>
                         </div>
                       </ActionForm>
-                      <ActionForm id={`delete-note-${note.id}`} action={deleteNoteAction} onSuccess={close} className="hidden">
+                      <ActionForm
+                        id={`delete-note-${note.id}`}
+                        action={deleteNoteAction}
+                        onSuccess={close}
+                        className="hidden"
+                        confirmMessage="Delete this journal entry?"
+                      >
                         <input type="hidden" name="date" value={note.date} />
                       </ActionForm>
                     </div>

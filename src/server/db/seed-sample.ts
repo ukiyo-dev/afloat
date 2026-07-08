@@ -8,6 +8,8 @@ import {
   calendarEventsRaw,
   calendarSources,
   notes,
+  personalRuleBreaks,
+  personalRules,
   settings,
   threadDeclarations
 } from "./schema";
@@ -20,6 +22,8 @@ export async function seedSampleData(): Promise<{ ownerId: string; events: numbe
   await db.delete(calendarSources).where(eq(calendarSources.ownerId, ownerId));
   await db.delete(threadDeclarations).where(eq(threadDeclarations.ownerId, ownerId));
   await db.delete(notes).where(eq(notes.ownerId, ownerId));
+  await db.delete(personalRuleBreaks).where(eq(personalRuleBreaks.ownerId, ownerId));
+  await db.delete(personalRules).where(eq(personalRules.ownerId, ownerId));
 
   const sourceIdBySampleId = new Map<string, string>();
 

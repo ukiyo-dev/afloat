@@ -10,7 +10,8 @@ export function ActionForm({
   className,
   id,
   resetOnSuccess = false,
-  onSuccess
+  onSuccess,
+  confirmMessage
 }: { 
   action: (formData: FormData) => Promise<any>; 
   children: React.ReactNode; 
@@ -18,6 +19,7 @@ export function ActionForm({
   id?: string;
   resetOnSuccess?: boolean;
   onSuccess?: () => void;
+  confirmMessage?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   
@@ -26,6 +28,11 @@ export function ActionForm({
       id={id}
       ref={formRef}
       className={className}
+      onSubmit={(event) => {
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+          event.preventDefault();
+        }
+      }}
       action={async (formData) => {
         try {
           await action(formData);

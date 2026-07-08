@@ -11,9 +11,12 @@ import {
 } from "@/server/services/dashboard-range";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
 import { getLocalOwnerId } from "@/server/services/owner-service";
+import { loadPersonalRuleViews } from "@/server/services/personal-rule-service";
 import { loadPrivateView } from "@/server/services/view-service";
 import { loadPrivateViewForOwner } from "@/server/services/view-service";
+import { localDayKey } from "@/server/domain/time";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
+import type { PersonalRuleView } from "@/server/domain/personal-rules";
 
 export type { DashboardRangeRequest } from "@/server/services/dashboard-range";
 
@@ -36,6 +39,7 @@ export interface DashboardData {
     timezone: string;
     threadStaleDays: number;
   };
+  personalRules: PersonalRuleView[];
 }
 
 export async function loadDashboardData(request?: DashboardRangeRequest): Promise<DashboardData> {
@@ -46,6 +50,7 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
     loadSettings(db, ownerId)
   ]);
   const timezone = settings.timezone || "UTC";
+  const personalRules = await loadPersonalRuleViews(localDayKey(new Date(), timezone));
   const rangeView = buildDashboardRangeView({
     view,
     request,
@@ -76,7 +81,8 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
       },
       timezone,
       threadStaleDays: settings.threadStaleDays || 7
-    }
+    },
+    personalRules
   };
 }
 
@@ -133,7 +139,8 @@ async function loadDashboardDataForOwner(
       },
       timezone,
       threadStaleDays: settings.threadStaleDays || 7
-    }
+    },
+    personalRules: []
   };
 }
 

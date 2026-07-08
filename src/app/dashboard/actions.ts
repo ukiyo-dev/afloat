@@ -11,6 +11,12 @@ import {
   deleteEmptyThreadDeclaration,
   saveThreadDeclaration
 } from "@/server/services/thread-declaration-service";
+import {
+  deletePersonalRule,
+  recordPersonalRuleBreak,
+  savePersonalRule,
+  stopPersonalRule
+} from "@/server/services/personal-rule-service";
 import { recomputeCurrentOwnerViews } from "@/server/services/view-service";
 
 export async function runRecentSyncAction() {
@@ -84,6 +90,68 @@ export async function deleteThreadDeclarationAction(formData: FormData) {
 
   await deleteEmptyThreadDeclaration(group, item);
   await recomputeCurrentOwnerViews();
+  revalidatePath("/dashboard");
+}
+
+export async function savePersonalRuleAction(formData: FormData) {
+  const title = formData.get("title");
+  const content = formData.get("content");
+  const startDate = formData.get("startDate");
+
+  if (
+    typeof title !== "string" ||
+    typeof content !== "string" ||
+    typeof startDate !== "string"
+  ) {
+    throw new Error("Invalid personal rule form data.");
+  }
+
+  await savePersonalRule({ title, content, startDate });
+  revalidatePath("/dashboard");
+}
+
+export async function recordPersonalRuleBreakAction(formData: FormData) {
+  const ruleId = formData.get("ruleId");
+  const brokenDate = formData.get("brokenDate");
+  const scene = formData.get("scene");
+  const reason = formData.get("reason");
+
+  if (
+    typeof ruleId !== "string" ||
+    typeof brokenDate !== "string" ||
+    typeof scene !== "string" ||
+    typeof reason !== "string"
+  ) {
+    throw new Error("Invalid personal rule break form data.");
+  }
+
+  await recordPersonalRuleBreak({ ruleId, brokenDate, scene, reason });
+  revalidatePath("/dashboard");
+}
+
+export async function stopPersonalRuleAction(formData: FormData) {
+  const ruleId = formData.get("ruleId");
+  const archiveReason = formData.get("archiveReason");
+
+  if (typeof ruleId !== "string") {
+    throw new Error("Invalid personal rule archive form data.");
+  }
+
+  await stopPersonalRule({
+    ruleId,
+    archiveReason: typeof archiveReason === "string" ? archiveReason : null
+  });
+  revalidatePath("/dashboard");
+}
+
+export async function deletePersonalRuleAction(formData: FormData) {
+  const ruleId = formData.get("ruleId");
+
+  if (typeof ruleId !== "string") {
+    throw new Error("Invalid personal rule deletion form data.");
+  }
+
+  await deletePersonalRule(ruleId);
   revalidatePath("/dashboard");
 }
 

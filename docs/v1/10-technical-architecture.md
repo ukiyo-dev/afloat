@@ -128,6 +128,8 @@ notes
 computed_views
 sync_runs
 calendar_credentials
+personal_rules
+personal_rule_breaks
 ```
 
 所有核心表都应预留 `owner_id`。
@@ -153,6 +155,8 @@ thread_views
 - 原始日历事件缓存
 - 日历语义映射
 - 线程声明
+- 用户规则
+- 规则违约记录
 - 每日笔记
 - 设置
 

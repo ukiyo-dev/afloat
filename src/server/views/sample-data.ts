@@ -43,7 +43,7 @@ export function sampleInput(now = new Date("2026-05-07T12:00:00.000Z")): Derived
         id: "n2",
         date: "2026-05-07",
         visibility: "public",
-        body: "今天访客模式复用镜像界面，只隐藏 Threads。"
+        body: "今天访客模式复用镜像界面，隐藏 Threads 和 Rules。"
       }
     ]
   };

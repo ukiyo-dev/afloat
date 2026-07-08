@@ -26,6 +26,7 @@ export const noteVisibilityEnum = pgEnum("note_visibility", ["private", "public"
 export const computedViewKindEnum = pgEnum("computed_view_kind", ["private"]);
 export const syncRunKindEnum = pgEnum("sync_run_kind", ["recent", "recalibrate"]);
 export const syncRunStatusEnum = pgEnum("sync_run_status", ["running", "succeeded", "failed"]);
+export const personalRuleStatusEnum = pgEnum("personal_rule_status", ["active", "archived"]);
 
 export const owners = pgTable("owners", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -158,6 +159,49 @@ export const notes = pgTable(
   },
   (table) => [
     uniqueIndex("notes_owner_date_idx_unique").on(table.ownerId, table.date)
+  ]
+);
+
+export const personalRules = pgTable(
+  "personal_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => owners.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    startDate: text("start_date").notNull(),
+    status: personalRuleStatusEnum("status").notNull().default("active"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archiveReason: text("archive_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    index("personal_rules_owner_idx").on(table.ownerId),
+    index("personal_rules_owner_status_idx").on(table.ownerId, table.status)
+  ]
+);
+
+export const personalRuleBreaks = pgTable(
+  "personal_rule_breaks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => owners.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id")
+      .notNull()
+      .references(() => personalRules.id, { onDelete: "cascade" }),
+    brokenDate: text("broken_date").notNull(),
+    scene: text("scene").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    index("personal_rule_breaks_owner_idx").on(table.ownerId),
+    index("personal_rule_breaks_rule_date_idx").on(table.ruleId, table.brokenDate)
   ]
 );
 
