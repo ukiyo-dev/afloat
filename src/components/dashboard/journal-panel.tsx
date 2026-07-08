@@ -4,6 +4,7 @@ import { SubmitButton } from "../submit-button";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { saveNoteAction, deleteNoteAction } from "../../app/dashboard/actions";
 import { DashboardData } from "../../server/services/dashboard-service";
+import { todayKey } from "./utils";
 
 export function JournalPanel({ 
   rangeView, 
@@ -12,6 +13,8 @@ export function JournalPanel({
   rangeView: DashboardData["rangeView"]; 
   visitorMode?: boolean; 
 }) {
+  const today = todayKey(rangeView.timezone);
+
   return (
     <details 
       suppressHydrationWarning
@@ -42,7 +45,7 @@ export function JournalPanel({
                 <div className="grid grid-cols-2 gap-4">
                   <label className="flex flex-col gap-1">
                     <span className="font-mono text-xs font-bold uppercase">Date</span>
-                    <input className="input-brutal w-full font-mono text-sm" name="date" type="date" defaultValue={rangeView.endDate} />
+                    <input className="input-brutal w-full font-mono text-sm" name="date" type="date" defaultValue={today} />
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="font-mono text-xs font-bold uppercase">Visibility</span>
@@ -105,10 +108,11 @@ export function JournalPanel({
                   {(close) => (
                     <div className="flex flex-col gap-4">
                       <ActionForm className="flex flex-col gap-4" action={saveNoteAction} onSuccess={close}>
+                        <input type="hidden" name="originalDate" value={note.date} />
                         <div className="grid grid-cols-2 gap-4">
                           <label className="flex flex-col gap-1">
                             <span className="font-mono text-xs font-bold uppercase">Date</span>
-                            <input className="input-brutal w-full font-mono text-sm" name="date" type="date" defaultValue={note.date} readOnly />
+                            <input className="input-brutal w-full font-mono text-sm" name="date" type="date" defaultValue={note.date} />
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="font-mono text-xs font-bold uppercase">Visibility</span>

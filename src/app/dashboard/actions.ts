@@ -157,6 +157,7 @@ export async function deletePersonalRuleAction(formData: FormData) {
 
 export async function saveNoteAction(formData: FormData) {
   const date = formData.get("date");
+  const originalDate = formData.get("originalDate");
   const body = formData.get("body");
   const visibility = formData.get("visibility");
 
@@ -168,7 +169,12 @@ export async function saveNoteAction(formData: FormData) {
     throw new Error("Invalid note form data.");
   }
 
-  await saveNote({ date, body, visibility });
+  await saveNote({
+    date,
+    body,
+    visibility,
+    originalDate: typeof originalDate === "string" && originalDate.trim() !== "" ? originalDate : null
+  });
   await recomputeCurrentOwnerViews();
   revalidatePath("/dashboard");
 }
