@@ -70,6 +70,7 @@ describe("buildThreadViews", () => {
       key: "Afloat/MVP",
       fulfilledMinutes: 90,
       futureMinutes: 60,
+      internalShiftMinutes: 30,
       factGapMinutes: 150,
       unscheduledGapMinutes: 90,
       source: "both",
@@ -87,6 +88,12 @@ describe("buildThreadViews", () => {
         kind: "idealFulfilled",
         minutes: 30,
         title: "Afloat：MVP 1"
+      }),
+      expect.objectContaining({
+        source: "fact",
+        kind: "internalShift",
+        minutes: 30,
+        title: "刷手机"
       }),
       expect.objectContaining({
         source: "fact",

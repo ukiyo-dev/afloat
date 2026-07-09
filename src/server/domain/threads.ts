@@ -95,14 +95,22 @@ export function buildThreadViews(input: {
   }
 
   const threadAccumulators = [...activeThreads.values(), ...inactiveThreads.values()];
+  const planSegmentsByEventId = new Map(
+    input.cleanPlanSegments.map((segment) => [segment.eventId, segment])
+  );
 
   for (const fact of input.facts) {
     if (fact.startAt >= input.now) {
       continue;
     }
 
+    const threadTitle =
+      (fact.kind === "externalShift" || fact.kind === "internalShift") &&
+      fact.coveredPlanEventId
+        ? planSegmentsByEventId.get(fact.coveredPlanEventId)?.title ?? fact.title
+        : fact.title;
     const matchingThreads = threadAccumulators.filter(
-      (thread) => thread.group === fact.title.group && thread.item === fact.title.item
+      (thread) => thread.group === threadTitle.group && thread.item === threadTitle.item
     );
 
     for (const thread of matchingThreads) {

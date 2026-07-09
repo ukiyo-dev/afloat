@@ -165,6 +165,8 @@ Sequence = 1
 
 被偏移覆盖的计划时间不计入已兑现。
 
+Recent activities 展示事实层活动本身。覆盖某线程计划的偏移应出现在该线程历史中，但只显示偏移活动标题，例如 `内部偏移：刷手机`，不追加 `覆盖 Afloat：MVP 1` 之类说明。
+
 ## Deadline 与 expectedMinutes
 
 Item 声明可以带：
