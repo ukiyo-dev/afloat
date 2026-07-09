@@ -49,6 +49,10 @@ const dashboardTabs: Array<{ key: DashboardTab; label: string }> = [
   { key: "rules", label: "RULES" }
 ];
 
+function parseDashboardTab(value: string | null): DashboardTab {
+  return value === "threads" || value === "rules" ? value : "overview";
+}
+
 function applyThemeMode(mode: ThemeMode) {
   const root = document.documentElement;
   if (mode === "system") {
@@ -155,7 +159,7 @@ export function DashboardWorkbench({
   basePath = "/dashboard"
 }: DashboardData & { visitorMode?: boolean; isOwner?: boolean; basePath?: string }) {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() => parseDashboardTab(searchParams.get("tab")));
   const activeDashboardTab = visitorMode ? "overview" : activeTab;
   const isDefaultView =
     !searchParams.has("range") &&
@@ -165,7 +169,6 @@ export function DashboardWorkbench({
   
   const buildHref = (newParams: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.delete("tab");
     for (const [key, value] of Object.entries(newParams)) {
       if (value === null) {
         params.delete(key);
@@ -178,6 +181,19 @@ export function DashboardWorkbench({
   };
 
   const guestModeHref = buildHref({ viewAs: visitorMode ? null : 'guest' });
+
+  useEffect(() => {
+    setActiveTab(parseDashboardTab(searchParams.get("tab")));
+  }, [searchParams]);
+
+  const selectTab = (tab: DashboardTab) => {
+    setActiveTab(tab);
+    if (typeof window === "undefined") {
+      return;
+    }
+    const nextHref = buildHref({ tab: tab === "overview" ? null : tab });
+    window.history.replaceState(window.history.state, "", nextHref);
+  };
 
   const runtimeNow = useMinuteNow(view.generatedAt);
   const projectedRangeView = useMemo(
@@ -245,7 +261,7 @@ export function DashboardWorkbench({
                 key={tab.key}
                 active={activeDashboardTab === tab.key}
                 label={tab.label}
-                onSelect={() => setActiveTab(tab.key)}
+                onSelect={() => selectTab(tab.key)}
               />
             ))}
           </nav>
@@ -396,6 +412,7 @@ export function DashboardWorkbench({
 
             <form className="flex flex-wrap items-end gap-3" action={basePath}>
               <input type="hidden" name="range" value="custom" />
+              {activeDashboardTab !== "overview" ? <input type="hidden" name="tab" value={activeDashboardTab} /> : null}
               {visitorMode && <input type="hidden" name="viewAs" value="guest" />}
               <label className="font-mono text-xs flex flex-col gap-1">
                 <span className="uppercase font-bold">Start Date</span>
