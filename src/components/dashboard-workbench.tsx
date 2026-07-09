@@ -108,17 +108,8 @@ function getFactLayerTitle(startDate: string, endDate: string, timezone: string)
   return "现在进行";
 }
 
-function LocalClock({ fallback, timezone }: { fallback: string; timezone: string }) {
-  const [now, setNow] = useState<string | null>(null);
-
-  useEffect(() => {
-    const tick = () => setNow(new Date().toISOString());
-    tick();
-    const timer = window.setInterval(tick, 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return <>{formatGeneratedAt(now ?? fallback, timezone)}</>;
+function LocalClock({ value, timezone }: { value: string; timezone: string }) {
+  return <>{formatGeneratedAt(value, timezone)}</>;
 }
 
 function useMinuteNow(fallback: string) {
@@ -126,12 +117,7 @@ function useMinuteNow(fallback: string) {
 
   useEffect(() => {
     let intervalTimer: number | undefined;
-    const minuteIso = () => {
-      const date = new Date();
-      date.setUTCSeconds(0, 0);
-      return date.toISOString();
-    };
-    const tick = () => setNow(minuteIso());
+    const tick = () => setNow(new Date().toISOString());
     tick();
     const timeoutTimer = window.setTimeout(() => {
       tick();
@@ -244,8 +230,8 @@ export function DashboardWorkbench({
     projectedRangeView.timezone
   );
 
-  const [startY, startM, startD] = projectedRangeView.startDate.split('-').map(Number);
-  const [endY, endM, endD] = projectedRangeView.endDate.split('-').map(Number);
+  const [startY, startM, startD] = rangeView.startDate.split('-').map(Number);
+  const [endY, endM, endD] = rangeView.endDate.split('-').map(Number);
   const startUtc = Date.UTC(startY, startM - 1, startD);
   const endUtc = Date.UTC(endY, endM - 1, endD);
   const daysCount = Math.round((endUtc - startUtc) / 86400000) + 1;
@@ -291,7 +277,7 @@ export function DashboardWorkbench({
                   <ThemeModeButton />
                 </div>
                 <span className="font-mono text-ink-light text-sm">
-                  <LocalClock fallback={view.generatedAt} timezone={projectedRangeView.timezone} />
+                  <LocalClock value={runtimeNow} timezone={projectedRangeView.timezone} />
                 </span>
               </div>
 
@@ -494,28 +480,33 @@ export function DashboardWorkbench({
 
                 <div className="grid grid-cols-1 gap-12">
 
-                  {projectedRangeView.startDate === projectedRangeView.endDate ? (
+                  {rangeView.startDate === rangeView.endDate ? (
                     <TimeTape
-                      timeline={projectedRangeView.timeline}
-                      timezone={projectedRangeView.timezone}
-                      startDate={projectedRangeView.startAt}
-                      endDate={projectedRangeView.endAt}
+                      timeline={rangeView.timeline}
+                      timezone={rangeView.timezone}
+                      startDate={rangeView.startAt}
+                      endDate={rangeView.endAt}
                       now={runtimeNow}
                       visitorMode={visitorMode}
                     />
                   ) : !isUltraMacro ? (
-                    <MacroDistribution timeline={projectedRangeView.timeline} timezone={projectedRangeView.timezone} startDate={projectedRangeView.startDate} endDate={projectedRangeView.endDate} />
+                    <MacroDistribution timeline={rangeView.timeline} timezone={rangeView.timezone} startDate={rangeView.startDate} endDate={rangeView.endDate} />
                   ) : null}
 
 
                   <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
                     <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
-                    <FactDistribution factTotals={projectedRangeView.factTotals} planTotals={projectedRangeView.planTotals} shiftComposition={projectedRangeView.shiftComposition} />
+                    <FactDistribution
+                      factTotals={projectedRangeView.factTotals}
+                      planTotals={projectedRangeView.planTotals}
+                      shiftComposition={projectedRangeView.shiftComposition}
+                      activePlanDays={projectedRangeView.observedPlannedDays}
+                    />
                   </div>
                 </div>
               </section>
 
-              {(projectedRangeView.startDate === projectedRangeView.endDate) && !visitorMode && (
+              {(rangeView.startDate === rangeView.endDate) && !visitorMode && (
                 <section className="panel-brutal">
                   <div className="flex justify-between items-start mb-6 border-b-2 border-ink pb-4">
                     <div>
@@ -529,9 +520,9 @@ export function DashboardWorkbench({
                     </div>
                   </div>
                   <Timeline
-                    timeline={projectedRangeView.timeline}
-                    timezone={projectedRangeView.timezone}
-                    startDate={projectedRangeView.startDate}
+                    timeline={rangeView.timeline}
+                    timezone={rangeView.timezone}
+                    startDate={rangeView.startDate}
                   />
                 </section>
               )}
@@ -550,7 +541,6 @@ export function DashboardWorkbench({
 
       <section hidden={activeDashboardTab !== "threads"}>
         <ThreadPanel
-          threadGroups={threadGroups}
           view={projectedView}
           rangeView={rangeView}
           visitorMode={visitorMode}

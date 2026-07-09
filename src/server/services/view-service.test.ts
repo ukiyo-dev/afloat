@@ -33,12 +33,14 @@ describe("summarizeViews", () => {
         endAt: "2026-05-09T00:00:00.000Z",
         plannedMinutes: 510,
         plannedDays: 1,
+        observedPlannedMinutes: 510,
+        observedPlannedDays: 1,
         averagePlannedMinutes: 510,
         fulfilledPlanMinutes: 510,
         internalFulfilledPlanMinutes: 510,
         internalFulfillmentRate: 1,
         fulfillmentRate: 1,
-        maintenanceRate: 0.5,
+        maintenanceRate: 1,
         protocolErrors: 0
       }
     });

@@ -3,11 +3,13 @@ import { formatDuration } from "../view-formatters";
 export function FactDistribution({ 
   factTotals, 
   planTotals, 
-  shiftComposition
+  shiftComposition,
+  activePlanDays
 }: { 
   factTotals: Record<string, number>; 
   planTotals: Record<string, number>;
   shiftComposition?: Record<string, { internal: number; external: number }>;
+  activePlanDays: number;
 }) {
   if (Object.keys(factTotals).length === 0 && Object.keys(planTotals).length === 0) {
     return <p className="font-mono text-ink-light text-sm italic">当前时间范围内没有相关记录。</p>;
@@ -53,6 +55,7 @@ export function FactDistribution({
 
   const intShift = factTotals.internalShift ?? 0;
   const extShift = factTotals.externalShift ?? 0;
+  const activeDayAverage = (minutes: number) => activePlanDays > 0 ? minutes / activePlanDays : 0;
 
   return (
     <div className="flex flex-col gap-6 font-mono text-sm">
@@ -93,7 +96,12 @@ export function FactDistribution({
                 
                 <div className="flex flex-col text-right">
                   <strong>{formatDuration(stat.fulfilled)}</strong>
-                  <span className="text-xs text-ink-light">/ {formatDuration(stat.plan)}</span>
+                  <span
+                    className="text-xs text-ink-light"
+                    title={`活跃日: ${activePlanDays} 天`}
+                  >
+                    / {formatDuration(activeDayAverage(stat.fulfilled))}
+                  </span>
                   {(stat.extShift > 0 || stat.intShift > 0) && (
                     <span className="text-[10px] mt-1 flex flex-col items-end gap-0.5">
                       {stat.extShift > 0 && <span className="text-[#a16207] font-bold">+{formatDuration(stat.extShift)} 外部</span>}

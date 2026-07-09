@@ -175,6 +175,73 @@ describe("dashboard range", () => {
     expect(rangeView.averagePlannedMinutes).toBe(80);
   });
 
+  it("keeps future days in plan stats while clipping fact stats to observed time", () => {
+    const view: PrivateDerivedView = {
+      ...samplePrivateView(),
+      protocolErrors: [],
+      notes: [],
+      planTimeline: [
+        {
+          startAt: "2026-05-07T10:00:00.000Z",
+          endAt: "2026-05-07T14:00:00.000Z",
+          kind: "ideal",
+          minutes: 240,
+          title: "A / B",
+          group: "A",
+          item: "B"
+        },
+        {
+          startAt: "2026-05-08T10:00:00.000Z",
+          endAt: "2026-05-08T11:00:00.000Z",
+          kind: "ideal",
+          minutes: 60,
+          title: "Future / Plan",
+          group: "Future",
+          item: "Plan"
+        }
+      ],
+      timeline: [
+        {
+          startAt: "2026-05-07T10:00:00.000Z",
+          endAt: "2026-05-07T11:00:00.000Z",
+          kind: "idealFulfilled",
+          minutes: 60,
+          title: "A / B",
+          group: "A",
+          item: "B"
+        },
+        {
+          startAt: "2026-05-08T10:00:00.000Z",
+          endAt: "2026-05-08T11:00:00.000Z",
+          kind: "idealFulfilled",
+          minutes: 60,
+          title: "Future / Plan",
+          group: "Future",
+          item: "Plan"
+        }
+      ]
+    };
+
+    const rangeView = buildDashboardRangeView({
+      view,
+      request: { range: "custom", start: "2026-05-07", end: "2026-05-08" },
+      timezone: "UTC",
+      now: new Date("2026-05-07T12:00:00.000Z")
+    });
+
+    expect(rangeView.plannedMinutes).toBe(300);
+    expect(rangeView.plannedDays).toBe(2);
+    expect(rangeView.averagePlannedMinutes).toBe(150);
+    expect(rangeView.planTotals).toEqual({ ideal: 300 });
+    expect(rangeView.observedPlannedMinutes).toBe(120);
+    expect(rangeView.observedPlannedDays).toBe(1);
+    expect(rangeView.fulfilledPlanMinutes).toBe(60);
+    expect(rangeView.fulfillmentRate).toBe(0.5);
+    expect(rangeView.factTotals).toEqual({ idealFulfilled: 60 });
+    expect(rangeView.timeline).toHaveLength(2);
+    expect(rangeView.maintenanceRate).toBe(1);
+  });
+
   it("uses raw maintenance records rather than cleaned fact segments", () => {
     const view = {
       ...samplePrivateView(),

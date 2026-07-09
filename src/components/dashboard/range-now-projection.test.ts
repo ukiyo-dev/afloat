@@ -43,6 +43,8 @@ describe("projectRangeViewForNow", () => {
         endAt: "2026-07-06T00:00:00.000Z",
         plannedMinutes: 120,
         plannedDays: 1,
+        observedPlannedMinutes: 0,
+        observedPlannedDays: 0,
         averagePlannedMinutes: 120,
         fulfilledPlanMinutes: 0,
         internalFulfilledPlanMinutes: 0,
@@ -61,8 +63,10 @@ describe("projectRangeViewForNow", () => {
 
     expect(rangeView.fulfilledPlanMinutes).toBe(30);
     expect(rangeView.internalFulfilledPlanMinutes).toBe(30);
-    expect(rangeView.internalFulfillmentRate).toBe(0.25);
-    expect(rangeView.fulfillmentRate).toBe(0.25);
+    expect(rangeView.observedPlannedMinutes).toBe(30);
+    expect(rangeView.observedPlannedDays).toBe(1);
+    expect(rangeView.internalFulfillmentRate).toBe(1);
+    expect(rangeView.fulfillmentRate).toBe(1);
     expect(rangeView.factTotals).toEqual({ idealFulfilled: 30 });
     expect(rangeView.timeline).toEqual([
       {
@@ -117,6 +121,8 @@ describe("projectRangeViewForNow", () => {
         endAt: "2026-07-06T00:00:00.000Z",
         plannedMinutes: 120,
         plannedDays: 1,
+        observedPlannedMinutes: 30,
+        observedPlannedDays: 1,
         averagePlannedMinutes: 120,
         fulfilledPlanMinutes: 30,
         internalFulfilledPlanMinutes: 30,
@@ -159,6 +165,78 @@ describe("projectRangeViewForNow", () => {
     ]);
   });
 
+  it("projects from the server snapshot when the display timeline contains the full plan range", () => {
+    const rangeView = projectRangeViewForNow({
+      view: {
+        generatedAt: "2026-07-05T10:30:00.000Z",
+        observedSemantics: ["ideal"],
+        plannedMinutes: 120,
+        fulfilledPlanMinutes: 30,
+        internalFulfilledPlanMinutes: 30,
+        internalFulfillmentRate: 1,
+        fulfillmentRate: 1,
+        maintenanceRate: 1,
+        factTotals: {},
+        protocolErrors: [],
+        planTimeline: [
+          {
+            startAt: "2026-07-05T10:00:00.000Z",
+            endAt: "2026-07-05T12:00:00.000Z",
+            kind: "ideal",
+            minutes: 120,
+            title: "Afloat: Sync 1",
+            group: "Afloat",
+            item: "Sync"
+          }
+        ],
+        timeline: [],
+        threadGroups: [],
+        threads: [],
+        notes: []
+      },
+      rangeView: {
+        key: "day",
+        quickRange: "day",
+        label: "今天",
+        timezone: "UTC",
+        startDate: "2026-07-05",
+        endDate: "2026-07-05",
+        startAt: "2026-07-05T00:00:00.000Z",
+        endAt: "2026-07-06T00:00:00.000Z",
+        plannedMinutes: 120,
+        plannedDays: 1,
+        observedPlannedMinutes: 30,
+        observedPlannedDays: 1,
+        averagePlannedMinutes: 120,
+        fulfilledPlanMinutes: 30,
+        internalFulfilledPlanMinutes: 30,
+        internalFulfillmentRate: 1,
+        fulfillmentRate: 1,
+        maintenanceRate: 1,
+        factTotals: { idealFulfilled: 30 },
+        planTotals: { ideal: 120 },
+        shiftComposition: {},
+        protocolErrors: [],
+        timeline: [
+          {
+            startAt: "2026-07-05T10:00:00.000Z",
+            endAt: "2026-07-05T12:00:00.000Z",
+            kind: "idealFulfilled",
+            minutes: 120,
+            title: "Afloat: Sync 1",
+            group: "Afloat",
+            item: "Sync"
+          }
+        ],
+        notes: []
+      },
+      runtimeNowIso: "2026-07-05T11:00:00.000Z"
+    });
+
+    expect(rangeView.fulfilledPlanMinutes).toBe(60);
+    expect(rangeView.factTotals).toEqual({ idealFulfilled: 60 });
+  });
+
   it("does not double count ranges already present in the server timeline", () => {
     const rangeView = projectRangeViewForNow({
       view: {
@@ -199,6 +277,8 @@ describe("projectRangeViewForNow", () => {
         endAt: "2026-07-06T00:00:00.000Z",
         plannedMinutes: 120,
         plannedDays: 1,
+        observedPlannedMinutes: 120,
+        observedPlannedDays: 1,
         averagePlannedMinutes: 120,
         fulfilledPlanMinutes: 120,
         internalFulfilledPlanMinutes: 120,

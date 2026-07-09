@@ -27,6 +27,8 @@ export interface DashboardRangeView {
   endAt: string;
   plannedMinutes: number;
   plannedDays: number;
+  observedPlannedMinutes: number;
+  observedPlannedDays: number;
   averagePlannedMinutes: number;
   fulfilledPlanMinutes: number;
   internalFulfilledPlanMinutes: number;
@@ -155,10 +157,17 @@ export function buildDashboardRangeView(input: {
     now
   });
   const range = selection.range;
+  const observedRange = observedDateRange(range, now);
   const timeline = input.view.timeline.filter((fact) => overlaps(serializedRange(fact), range));
+  const observedTimeline = observedRange
+    ? timeline.filter((fact) => overlaps(serializedRange(fact), observedRange))
+    : [];
   const planTimeline = (input.view.planTimeline ?? []).filter((plan) =>
     overlaps(serializedRange(plan), range)
   );
+  const observedPlanTimeline = observedRange
+    ? planTimeline.filter((plan) => overlaps(serializedRange(plan), observedRange))
+    : [];
   const protocolErrors = input.view.protocolErrors.filter((error) =>
     overlaps(serializedRange(error), range)
   );
@@ -167,19 +176,25 @@ export function buildDashboardRangeView(input: {
   );
   const plannedMinutes = sumClippedMinutes(planTimeline, range);
   const plannedDays = countDaysWithSegments(planTimeline, selection);
+  const observedPlannedMinutes = observedRange
+    ? sumClippedMinutes(observedPlanTimeline, observedRange)
+    : 0;
+  const observedPlannedDays = observedRange
+    ? countDaysWithSegments(observedPlanTimeline, selection, observedRange)
+    : 0;
   const fulfilledPlanMinutes = sumClippedMinutes(
-    timeline.filter(
+    observedTimeline.filter(
       (fact) =>
         fact.kind === "idealFulfilled" ||
         fact.kind === "leisureFulfilled" ||
         fact.kind === "restFulfilled"
     ),
-    range
+    observedRange
   );
   const externalShiftPlanMinutes = clippedOverlapMinutes(
-    planTimeline,
-    timeline.filter((fact) => fact.kind === "externalShift"),
-    range
+    observedPlanTimeline,
+    observedTimeline.filter((fact) => fact.kind === "externalShift"),
+    observedRange
   );
   const internalFulfilledPlanMinutes = fulfilledPlanMinutes + externalShiftPlanMinutes;
 
@@ -194,19 +209,22 @@ export function buildDashboardRangeView(input: {
     endAt: range.endAt.toISOString(),
     plannedMinutes,
     plannedDays,
+    observedPlannedMinutes,
+    observedPlannedDays,
     averagePlannedMinutes: plannedDays > 0 ? plannedMinutes / plannedDays : 0,
     fulfilledPlanMinutes,
     internalFulfilledPlanMinutes,
     internalFulfillmentRate:
-      plannedMinutes > 0 ? internalFulfilledPlanMinutes / plannedMinutes : null,
-    fulfillmentRate: plannedMinutes > 0 ? fulfilledPlanMinutes / plannedMinutes : null,
+      observedPlannedMinutes > 0 ? internalFulfilledPlanMinutes / observedPlannedMinutes : null,
+    fulfillmentRate: observedPlannedMinutes > 0 ? fulfilledPlanMinutes / observedPlannedMinutes : null,
     maintenanceRate: calculateMaintenanceRate(
       input.view.maintenanceTimeline ?? [...planTimeline, ...timeline],
-      selection
+      selection,
+      observedRange
     ),
-    factTotals: totalClippedMinutesByKind(timeline, range),
+    factTotals: totalClippedMinutesByKind(observedTimeline, observedRange),
     planTotals: totalClippedMinutesByKind(planTimeline, range),
-    shiftComposition: calculateShiftComposition(timeline, planTimeline, range),
+    shiftComposition: calculateShiftComposition(observedTimeline, observedPlanTimeline, observedRange),
     protocolErrors,
     timeline,
     notes
@@ -215,7 +233,8 @@ export function buildDashboardRangeView(input: {
 
 function countDaysWithSegments(
   segments: Array<{ startAt: string; endAt: string }>,
-  selection: DashboardRangeSelection
+  selection: DashboardRangeSelection,
+  limitRange?: DateRange | null
 ): number {
   let plannedDays = 0;
   let cursor = selection.startDate;
@@ -227,7 +246,11 @@ function countDaysWithSegments(
       endAt: localMidnightToUtc(localDateFromKey(next), selection.timezone)
     };
 
-    if (segments.some((segment) => overlaps(serializedRange(segment), dayRange))) {
+    const activeDayRange = limitRange ? intersection(dayRange, limitRange) : dayRange;
+    if (
+      activeDayRange &&
+      segments.some((segment) => overlaps(serializedRange(segment), activeDayRange))
+    ) {
       plannedDays += 1;
     }
 
@@ -239,21 +262,33 @@ function countDaysWithSegments(
 
 function calculateMaintenanceRate(
   segments: Array<{ startAt: string; endAt: string }>,
-  selection: DashboardRangeSelection
+  selection: DashboardRangeSelection,
+  observedRange: DateRange | null
 ): number {
+  if (!observedRange) {
+    return 0;
+  }
+
   let totalDays = 0;
   let maintainedDays = 0;
   let cursor = selection.startDate;
 
   while (cursor <= selection.endDate) {
-    totalDays += 1;
     const next = formatLocalDate(addLocalDays(localDateFromKey(cursor), 1));
     const dayRange = {
       startAt: localMidnightToUtc(localDateFromKey(cursor), selection.timezone),
       endAt: localMidnightToUtc(localDateFromKey(next), selection.timezone)
     };
+    const observedDayRange = intersection(dayRange, observedRange);
 
-    if (segments.some((segment) => overlaps(serializedRange(segment), dayRange))) {
+    if (!observedDayRange) {
+      cursor = next;
+      continue;
+    }
+
+    totalDays += 1;
+
+    if (segments.some((segment) => overlaps(serializedRange(segment), observedDayRange))) {
       maintainedDays += 1;
     }
 
@@ -475,8 +510,12 @@ export function isValidTimeZone(timezone: string): boolean {
 
 function totalClippedMinutesByKind(
   segments: Array<{ kind: string; startAt: string; endAt: string }>,
-  range: DateRange
+  range: DateRange | null
 ): Record<string, number> {
+  if (!range) {
+    return {};
+  }
+
   return segments.reduce<Record<string, number>>((totals, segment) => {
     totals[segment.kind] = (totals[segment.kind] ?? 0) + clippedMinutes(segment, range);
     return totals;
@@ -486,8 +525,17 @@ function totalClippedMinutesByKind(
 function calculateShiftComposition(
   timeline: Array<{ kind: string; startAt: string; endAt: string }>,
   planTimeline: Array<{ kind: string; startAt: string; endAt: string }>,
-  range: DateRange
+  range: DateRange | null
 ): Record<string, { internal: number; external: number }> {
+  if (!range) {
+    return {
+      ideal: { internal: 0, external: 0 },
+      leisure: { internal: 0, external: 0 },
+      rest: { internal: 0, external: 0 },
+      unmapped: { internal: 0, external: 0 }
+    };
+  }
+
   const shifts = timeline.filter(f => f.kind === "internalShift" || f.kind === "externalShift");
   
   const composition: Record<string, { internal: number; external: number }> = {
@@ -550,8 +598,12 @@ function calculateShiftComposition(
 
 function sumClippedMinutes(
   segments: Array<{ startAt: string; endAt: string }>,
-  range: DateRange
+  range: DateRange | null
 ): number {
+  if (!range) {
+    return 0;
+  }
+
   return segments.reduce((total, segment) => total + clippedMinutes(segment, range), 0);
 }
 
@@ -563,8 +615,12 @@ function clippedMinutes(segment: { startAt: string; endAt: string }, range: Date
 function clippedOverlapMinutes(
   plans: Array<{ startAt: string; endAt: string }>,
   shifts: Array<{ startAt: string; endAt: string }>,
-  range: DateRange
+  range: DateRange | null
 ): number {
+  if (!range) {
+    return 0;
+  }
+
   return shifts.reduce((total, shift) => {
     const shiftRange = intersection(serializedRange(shift), range);
     if (!shiftRange) {
@@ -581,6 +637,17 @@ function clippedOverlapMinutes(
       return shiftTotal + (overlap ? minutesInRange(overlap) : 0);
     }, 0);
   }, 0);
+}
+
+function observedDateRange(range: DateRange, now: Date): DateRange | null {
+  if (now <= range.startAt) {
+    return null;
+  }
+
+  return {
+    startAt: range.startAt,
+    endAt: now < range.endAt ? now : range.endAt
+  };
 }
 
 function serializedRange(segment: { startAt: string; endAt: string }): DateRange {

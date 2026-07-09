@@ -17,6 +17,15 @@ export function MacroDistribution({
   if (timeline.length === 0) return null;
 
   const days = buildMacroDistributionDays({ timeline, timezone, startDate, endDate });
+  const visibleLabelDates = new Set(
+    days.length <= 7
+      ? days.map((day) => day.date)
+      : [
+          days[0]?.date,
+          days[Math.floor((days.length - 1) / 2)]?.date,
+          days[days.length - 1]?.date
+        ].filter((date): date is string => Boolean(date))
+  );
 
   // Minimum cap at 12 hours (720m) for visual balance if days are low.
   const maxDailyMinutes = Math.max(720, ...days.map(d => d.total));
@@ -40,15 +49,18 @@ export function MacroDistribution({
       </div>
       
       {/* Brutalist Chart Container */}
-      <div className="w-full h-48 border-2 border-ink bg-paper relative flex justify-center items-end gap-[2px] shadow-brutal px-1 pb-1 pt-4">
-        
+      <div className="w-full border-2 border-ink bg-paper shadow-brutal px-1 pb-1 pt-4">
+        <div
+          className="grid h-48 items-end gap-[2px]"
+          style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 48px))`, justifyContent: "center" }}
+        >
         {days.map((day) => {
           const heightPercent = Math.min(100, (day.total / maxDailyMinutes) * 100);
           
           return (
             <div 
               key={day.date} 
-              className="group/bar relative flex-1 max-w-[48px] flex flex-col justify-end h-full transition-transform hover:-translate-y-0.5"
+              className="group/bar relative flex min-w-0 flex-col justify-end h-full transition-transform hover:-translate-y-0.5"
             >
               {/* Stacked Segments container */}
               <div 
@@ -99,15 +111,19 @@ export function MacroDistribution({
             </div>
           );
         })}
+        </div>
       </div>
       
       {/* X-Axis Labels */}
-      <div className="flex justify-between font-mono text-[10px] text-ink-light mt-2 px-1">
-        <span>{days[0]?.displayDate}</span>
-        {days.length > 7 && (
-          <span className="text-center">{days[Math.floor(days.length / 2)]?.displayDate}</span>
-        )}
-        <span>{days[days.length - 1]?.displayDate}</span>
+      <div
+        className="grid gap-[2px] font-mono text-[10px] text-ink-light mt-2 px-1"
+        style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 48px))`, justifyContent: "center" }}
+      >
+        {days.map((day) => (
+          <span key={day.date} className="min-w-0 text-center">
+            {visibleLabelDates.has(day.date) ? day.displayDate : ""}
+          </span>
+        ))}
       </div>
     </div>
   );

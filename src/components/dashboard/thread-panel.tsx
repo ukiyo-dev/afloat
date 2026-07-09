@@ -19,7 +19,6 @@ export function ThreadPanel({
   rangeView,
   visitorMode = false
 }: {
-  threadGroups: any[]; // Using any[] to avoid circular dependency complex types, we can infer from usage
   view: DashboardData["view"];
   rangeView: DashboardData["rangeView"];
   visitorMode?: boolean;

@@ -40,7 +40,7 @@ export function projectRangeViewForNow({
 
   const projectedFacts = buildProjectedFacts({
     plans: view.planTimeline ?? [],
-    existingTimeline: rangeView.timeline,
+    existingTimeline: clipTimelineToRange(rangeView.timeline, rangeStart, baseNow),
     baseNow,
     runtimeNow,
     rangeStart,
@@ -51,23 +51,48 @@ export function projectRangeViewForNow({
     return rangeView;
   }
 
-  const projectedFulfilledPlanMinutes = projectedFacts
+  const observedPlannedMinutes = Math.max(
+    rangeView.observedPlannedMinutes,
+    calculateObservedPlannedMinutes({
+      plans: view.planTimeline ?? [],
+      rangeStart,
+      rangeEnd,
+      runtimeNow
+    })
+  );
+  const remainingFulfilledMinutes = Math.max(
+    0,
+    observedPlannedMinutes - rangeView.fulfilledPlanMinutes
+  );
+  const effectiveProjectedFacts = takeProjectedMinutes(projectedFacts, remainingFulfilledMinutes);
+  const projectedFulfilledPlanMinutes = effectiveProjectedFacts
     .filter((fact) => isFulfilledKind(fact.kind))
     .reduce((total, fact) => total + fact.minutes, 0);
   const fulfilledPlanMinutes = rangeView.fulfilledPlanMinutes + projectedFulfilledPlanMinutes;
   const internalFulfilledPlanMinutes =
     rangeView.internalFulfilledPlanMinutes + projectedFulfilledPlanMinutes;
+  const observedPlannedDays = countObservedPlannedDays({
+    plans: view.planTimeline ?? [],
+    rangeStart,
+    rangeEnd,
+    runtimeNow,
+    startDate: rangeView.startDate,
+    endDate: rangeView.endDate,
+    timezone: rangeView.timezone
+  });
 
   return {
     ...rangeView,
+    observedPlannedMinutes,
+    observedPlannedDays,
     fulfilledPlanMinutes,
     internalFulfilledPlanMinutes,
     internalFulfillmentRate:
-      rangeView.plannedMinutes > 0 ? internalFulfilledPlanMinutes / rangeView.plannedMinutes : null,
+      observedPlannedMinutes > 0 ? internalFulfilledPlanMinutes / observedPlannedMinutes : null,
     fulfillmentRate:
-      rangeView.plannedMinutes > 0 ? fulfilledPlanMinutes / rangeView.plannedMinutes : null,
-    factTotals: addFactTotals(rangeView.factTotals, projectedFacts),
-    timeline: mergeTimelineEntries([...rangeView.timeline, ...projectedFacts])
+      observedPlannedMinutes > 0 ? fulfilledPlanMinutes / observedPlannedMinutes : null,
+    factTotals: addFactTotals(rangeView.factTotals, effectiveProjectedFacts),
+    timeline: mergeTimelineEntries([...rangeView.timeline, ...effectiveProjectedFacts])
   };
 }
 
@@ -180,6 +205,101 @@ function addFactTotals(
   return next;
 }
 
+function takeProjectedMinutes(projectedFacts: TimelineEntry[], maxMinutes: number): TimelineEntry[] {
+  if (maxMinutes <= 0) {
+    return [];
+  }
+
+  let remaining = maxMinutes;
+  const facts: TimelineEntry[] = [];
+
+  for (const fact of projectedFacts) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const minutes = Math.min(fact.minutes, remaining);
+    remaining -= minutes;
+    if (minutes === fact.minutes) {
+      facts.push(fact);
+      continue;
+    }
+
+    const startAt = new Date(fact.startAt);
+    if (!isFiniteDate(startAt)) {
+      continue;
+    }
+    const endAt = new Date(startAt.getTime() + minutes * MS_PER_MINUTE);
+    facts.push({
+      ...fact,
+      endAt: endAt.toISOString(),
+      minutes
+    });
+  }
+
+  return facts;
+}
+
+function calculateObservedPlannedMinutes({
+  plans,
+  rangeStart,
+  rangeEnd,
+  runtimeNow
+}: {
+  plans: PlanEntry[];
+  rangeStart: Date;
+  rangeEnd: Date;
+  runtimeNow: Date;
+}): number {
+  const observedEnd = new Date(Math.min(runtimeNow.getTime(), rangeEnd.getTime()));
+  if (observedEnd <= rangeStart) {
+    return 0;
+  }
+
+  return plans.reduce((total, plan) => {
+    const startAt = new Date(plan.startAt);
+    const endAt = new Date(plan.endAt);
+    if (!isFiniteDate(startAt) || !isFiniteDate(endAt)) {
+      return total;
+    }
+
+    const clippedStart = new Date(Math.max(startAt.getTime(), rangeStart.getTime()));
+    const clippedEnd = new Date(Math.min(endAt.getTime(), observedEnd.getTime()));
+    return total + minutesBetween(clippedStart, clippedEnd);
+  }, 0);
+}
+
+function clipTimelineToRange(
+  timeline: TimelineEntry[],
+  rangeStart: Date,
+  rangeEnd: Date
+): TimelineEntry[] {
+  if (rangeEnd <= rangeStart) {
+    return [];
+  }
+
+  return timeline.flatMap((entry) => {
+    const startAt = new Date(entry.startAt);
+    const endAt = new Date(entry.endAt);
+    if (!isFiniteDate(startAt) || !isFiniteDate(endAt)) {
+      return [];
+    }
+
+    const clippedStart = new Date(Math.max(startAt.getTime(), rangeStart.getTime()));
+    const clippedEnd = new Date(Math.min(endAt.getTime(), rangeEnd.getTime()));
+    if (clippedEnd <= clippedStart) {
+      return [];
+    }
+
+    return [{
+      ...entry,
+      startAt: clippedStart.toISOString(),
+      endAt: clippedEnd.toISOString(),
+      minutes: minutesBetween(clippedStart, clippedEnd)
+    }];
+  });
+}
+
 function mergeTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] {
   const sorted = [...entries].sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
@@ -217,10 +337,126 @@ function isFulfilledKind(kind: string): boolean {
   return kind === "idealFulfilled" || kind === "leisureFulfilled" || kind === "restFulfilled";
 }
 
+function countObservedPlannedDays({
+  plans,
+  rangeStart,
+  rangeEnd,
+  runtimeNow,
+  startDate,
+  endDate,
+  timezone
+}: {
+  plans: PlanEntry[];
+  rangeStart: Date;
+  rangeEnd: Date;
+  runtimeNow: Date;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+}): number {
+  const observedEnd = new Date(Math.min(runtimeNow.getTime(), rangeEnd.getTime()));
+  if (observedEnd <= rangeStart) {
+    return 0;
+  }
+
+  let count = 0;
+  let cursor = localDateFromKey(startDate);
+  const end = endDate;
+
+  while (formatLocalDate(cursor) <= end) {
+    const next = addLocalDays(cursor, 1);
+    const dayStart = localMidnightToUtc(cursor, timezone);
+    const dayEnd = localMidnightToUtc(next, timezone);
+    const observedDayStart = new Date(Math.max(dayStart.getTime(), rangeStart.getTime()));
+    const observedDayEnd = new Date(Math.min(dayEnd.getTime(), observedEnd.getTime()));
+
+    if (
+      observedDayEnd > observedDayStart &&
+      plans.some((plan) => overlaps(plan, observedDayStart, observedDayEnd))
+    ) {
+      count += 1;
+    }
+
+    cursor = next;
+  }
+
+  return count;
+}
+
+function overlaps(segment: { startAt: string; endAt: string }, startAt: Date, endAt: Date): boolean {
+  const segmentStart = new Date(segment.startAt);
+  const segmentEnd = new Date(segment.endAt);
+  return isFiniteDate(segmentStart) && isFiniteDate(segmentEnd) && segmentStart < endAt && segmentEnd > startAt;
+}
+
+function localDateFromKey(value: string): LocalDate {
+  const [year, month, day] = value.split("-").map(Number);
+  return { year, month, day };
+}
+
+function addLocalDays(date: LocalDate, days: number): LocalDate {
+  const utc = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return {
+    year: utc.getUTCFullYear(),
+    month: utc.getUTCMonth() + 1,
+    day: utc.getUTCDate()
+  };
+}
+
+function localMidnightToUtc(date: LocalDate, timezone: string): Date {
+  const localAsUtc = Date.UTC(date.year, date.month - 1, date.day);
+  let guess = new Date(localAsUtc);
+
+  for (let index = 0; index < 3; index += 1) {
+    const offset = timezoneOffsetMs(guess, timezone);
+    guess = new Date(localAsUtc - offset);
+  }
+
+  return guess;
+}
+
+function timezoneOffsetMs(date: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const zonedAsUtc = Date.UTC(
+    value("year"),
+    value("month") - 1,
+    value("day"),
+    value("hour"),
+    value("minute"),
+    value("second")
+  );
+
+  return zonedAsUtc - date.getTime();
+}
+
+function formatLocalDate(date: LocalDate): string {
+  return `${date.year}-${pad(date.month)}-${pad(date.day)}`;
+}
+
+function pad(value: number): string {
+  return value.toString().padStart(2, "0");
+}
+
 function minutesBetween(startAt: Date, endAt: Date): number {
   return Math.max(0, (endAt.getTime() - startAt.getTime()) / MS_PER_MINUTE);
 }
 
 function isFiniteDate(date: Date): boolean {
   return Number.isFinite(date.getTime());
+}
+
+interface LocalDate {
+  year: number;
+  month: number;
+  day: number;
 }

@@ -17,6 +17,8 @@ export interface RecomputeSummary {
     endAt: string;
     plannedMinutes: number;
     plannedDays: number;
+    observedPlannedMinutes: number;
+    observedPlannedDays: number;
     averagePlannedMinutes: number;
     fulfilledPlanMinutes: number;
     internalFulfilledPlanMinutes: number;
@@ -48,6 +50,8 @@ export function summarizeViews(
           endAt: rangeView.endAt,
           plannedMinutes: rangeView.plannedMinutes,
           plannedDays: rangeView.plannedDays,
+          observedPlannedMinutes: rangeView.observedPlannedMinutes,
+          observedPlannedDays: rangeView.observedPlannedDays,
           averagePlannedMinutes: rangeView.averagePlannedMinutes,
           fulfilledPlanMinutes: rangeView.fulfilledPlanMinutes,
           internalFulfilledPlanMinutes: rangeView.internalFulfilledPlanMinutes,
