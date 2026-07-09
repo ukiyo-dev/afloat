@@ -1,8 +1,9 @@
-import { dayKey, daysBetween, localDayKey, minutesInRange } from "./time";
+import { dayKey, daysBetween, intersection, localDayKey, minutesInRange } from "./time";
 import type {
   FactSegment,
   FeasibilityStatus,
   ParsedEvent,
+  ParsedTitle,
   ThreadDeclaration,
   ThreadGroupView,
   ThreadSource,
@@ -95,47 +96,44 @@ export function buildThreadViews(input: {
   }
 
   const threadAccumulators = [...activeThreads.values(), ...inactiveThreads.values()];
-  const planSegmentsByEventId = new Map(
-    input.cleanPlanSegments.map((segment) => [segment.eventId, segment])
-  );
-
   for (const fact of input.facts) {
     if (fact.startAt >= input.now) {
       continue;
     }
 
-    const threadTitle =
-      (fact.kind === "externalShift" || fact.kind === "internalShift") &&
-      fact.coveredPlanEventId
-        ? planSegmentsByEventId.get(fact.coveredPlanEventId)?.title ?? fact.title
-        : fact.title;
-    const matchingThreads = threadAccumulators.filter(
-      (thread) => thread.group === threadTitle.group && thread.item === threadTitle.item
-    );
+    const attributions = factAttributions(fact, input.cleanPlanSegments);
 
-    for (const thread of matchingThreads) {
-      const ranges = rangesInThreadWindows(thread, fact, input.now);
+    for (const attribution of attributions) {
+      const matchingThreads = threadAccumulators.filter(
+        (thread) =>
+          thread.group === attribution.threadTitle.group &&
+          thread.item === attribution.threadTitle.item
+      );
 
-      for (const range of ranges) {
-        const minutes = minutesInRange(range);
-        if (
-          fact.kind === "idealFulfilled" ||
-          fact.kind === "leisureFulfilled" ||
-          fact.kind === "restFulfilled"
-        ) {
-          thread.fulfilledMinutes += minutes;
-        } else if (fact.kind === "externalShift") {
-          thread.externalShiftMinutes += minutes;
-        } else {
-          thread.internalShiftMinutes += minutes;
+      for (const thread of matchingThreads) {
+        const ranges = rangesInThreadWindows(thread, attribution.range, input.now);
+
+        for (const range of ranges) {
+          const minutes = minutesInRange(range);
+          if (
+            fact.kind === "idealFulfilled" ||
+            fact.kind === "leisureFulfilled" ||
+            fact.kind === "restFulfilled"
+          ) {
+            thread.fulfilledMinutes += minutes;
+          } else if (fact.kind === "externalShift") {
+            thread.externalShiftMinutes += minutes;
+          } else {
+            thread.internalShiftMinutes += minutes;
+          }
+          thread.history.push({
+            ...range,
+            kind: fact.kind,
+            minutes,
+            title: fact.title.rawTitle,
+            source: "fact"
+          });
         }
-        thread.history.push({
-          ...range,
-          kind: fact.kind,
-          minutes,
-          title: fact.title.rawTitle,
-          source: "fact"
-        });
       }
     }
   }
@@ -387,6 +385,25 @@ function toThreadView(
         source: entry.source
       }))
   };
+}
+
+function factAttributions(
+  fact: FactSegment,
+  cleanPlanSegments: TimeSegment[]
+): Array<{
+  threadTitle: ParsedTitle;
+  range: { startAt: Date; endAt: Date };
+}> {
+  if (fact.kind !== "externalShift" && fact.kind !== "internalShift") {
+    return [{ threadTitle: fact.title, range: fact }];
+  }
+
+  const coveredRanges = cleanPlanSegments.flatMap((plan) => {
+    const range = intersection(fact, plan);
+    return range ? [{ threadTitle: plan.title, range }] : [];
+  });
+
+  return coveredRanges.length > 0 ? coveredRanges : [{ threadTitle: fact.title, range: fact }];
 }
 
 function rangesInThreadWindows(

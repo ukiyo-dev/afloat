@@ -113,6 +113,51 @@ describe("buildThreadViews", () => {
     expect(JSON.stringify(threads)).not.toContain("\\u0000");
   });
 
+  it("truncates covered shift history to the overlapped plan range", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "p1",
+        calendarSourceId: "ideal",
+        title: "Afloat：MVP 1",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      },
+      {
+        id: "s1",
+        calendarSourceId: "internal",
+        title: "刷手机",
+        startAt: new Date("2026-05-01T19:30:00Z"),
+        endAt: new Date("2026-05-01T21:30:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-07T12:00:00Z")
+    });
+
+    const afloat = threads.find((thread) => thread.group === "Afloat");
+
+    expect(afloat).toMatchObject({
+      fulfilledMinutes: 0,
+      internalShiftMinutes: 60
+    });
+    expect(afloat?.history).toEqual([
+      expect.objectContaining({
+        source: "fact",
+        kind: "internalShift",
+        startAt: "2026-05-01T20:00:00.000Z",
+        endAt: "2026-05-01T21:00:00.000Z",
+        minutes: 60,
+        title: "刷手机"
+      })
+    ]);
+  });
+
   it("sorts active thread items and groups by nearest deadline first", () => {
     const declarations: ThreadDeclaration[] = [
       {
