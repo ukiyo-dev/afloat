@@ -3,6 +3,7 @@ import type { DashboardData } from "@/server/services/dashboard-service";
 const MS_PER_MINUTE = 60_000;
 
 type TimelineFact = DashboardData["view"]["timeline"][number];
+type PlanEntry = DashboardData["view"]["planTimeline"][number];
 
 export interface MacroDistributionDay {
   date: string;
@@ -24,11 +25,15 @@ interface DateRange {
 
 export function buildMacroDistributionDays({
   timeline,
+  planTimeline = [],
+  now,
   timezone,
   startDate,
   endDate
 }: {
   timeline: DashboardData["view"]["timeline"];
+  planTimeline?: DashboardData["view"]["planTimeline"];
+  now?: string;
   timezone: string;
   startDate: string;
   endDate: string;
@@ -47,22 +52,48 @@ export function buildMacroDistributionDays({
     };
   });
 
-  for (const fact of timeline) {
-    const factRange = {
-      startAt: new Date(fact.startAt),
-      endAt: new Date(fact.endAt)
-    };
+  const nowAt = now ? new Date(now) : null;
+  const validNow = nowAt && Number.isFinite(nowAt.getTime()) ? nowAt : null;
 
-    for (const { day, range } of dayRanges) {
-      const minutes = clippedMinutes(factRange, range);
-      if (minutes <= 0) continue;
-
-      day.total += minutes;
-      day.kinds[fact.kind] = (day.kinds[fact.kind] ?? 0) + minutes;
-    }
+  addSegments(timeline, validNow ? { endAt: validNow } : {}, dayRanges);
+  if (validNow) {
+    addSegments(planTimeline, { startAt: validNow }, dayRanges);
   }
 
   return days;
+}
+
+function addSegments(
+  segments: Array<TimelineFact | PlanEntry>,
+  boundary: { startAt?: Date; endAt?: Date },
+  dayRanges: Array<{ day: MacroDistributionDay; range: DateRange }>
+) {
+  for (const segment of segments) {
+    const segmentRange = {
+      startAt: new Date(
+        Math.max(new Date(segment.startAt).getTime(), boundary.startAt?.getTime() ?? -Infinity)
+      ),
+      endAt: new Date(
+        Math.min(new Date(segment.endAt).getTime(), boundary.endAt?.getTime() ?? Infinity)
+      )
+    };
+
+    if (
+      !Number.isFinite(segmentRange.startAt.getTime()) ||
+      !Number.isFinite(segmentRange.endAt.getTime()) ||
+      segmentRange.endAt <= segmentRange.startAt
+    ) {
+      continue;
+    }
+
+    for (const { day, range } of dayRanges) {
+      const minutes = clippedMinutes(segmentRange, range);
+      if (minutes <= 0) continue;
+
+      day.total += minutes;
+      day.kinds[segment.kind] = (day.kinds[segment.kind] ?? 0) + minutes;
+    }
+  }
 }
 
 function buildDays(startDate: string, endDate: string): MacroDistributionDay[] {

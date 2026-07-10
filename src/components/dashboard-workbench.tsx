@@ -490,7 +490,14 @@ export function DashboardWorkbench({
                       visitorMode={visitorMode}
                     />
                   ) : !isUltraMacro ? (
-                    <MacroDistribution timeline={rangeView.timeline} timezone={rangeView.timezone} startDate={rangeView.startDate} endDate={rangeView.endDate} />
+                    <MacroDistribution
+                      timeline={rangeView.timeline}
+                      planTimeline={view.planTimeline}
+                      now={runtimeNow}
+                      timezone={rangeView.timezone}
+                      startDate={rangeView.startDate}
+                      endDate={rangeView.endDate}
+                    />
                   ) : null}
 
 

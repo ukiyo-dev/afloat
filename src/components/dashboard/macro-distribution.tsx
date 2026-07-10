@@ -5,18 +5,22 @@ import { buildMacroDistributionDays } from "./macro-distribution-utils";
 
 export function MacroDistribution({
   timeline,
+  planTimeline,
+  now,
   timezone,
   startDate,
   endDate
 }: {
   timeline: DashboardData["view"]["timeline"];
+  planTimeline: DashboardData["view"]["planTimeline"];
+  now: string;
   timezone: string;
   startDate: string;
   endDate: string;
 }) {
-  if (timeline.length === 0) return null;
+  if (timeline.length === 0 && planTimeline.length === 0) return null;
 
-  const days = buildMacroDistributionDays({ timeline, timezone, startDate, endDate });
+  const days = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate });
   const visibleLabelDates = new Set(
     days.length <= 7
       ? days.map((day) => day.date)
@@ -32,6 +36,9 @@ export function MacroDistribution({
 
   // Match the visual stack order with the tooltip order, top to bottom.
   const kindOrder = [
+    "ideal",
+    "leisure",
+    "rest",
     "idealFulfilled", 
     "leisureFulfilled", 
     "restFulfilled", 

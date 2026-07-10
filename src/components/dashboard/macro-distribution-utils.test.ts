@@ -46,6 +46,33 @@ describe("buildMacroDistributionDays", () => {
     expect(days[0]?.total).toBe(120);
     expect(days[0]?.kinds.idealFulfilled).toBe(120);
   });
+
+  it("shows facts before now and plans after now", () => {
+    const days = buildMacroDistributionDays({
+      timeline: [
+        fact({
+          startAt: "2026-05-07T10:00:00.000Z",
+          endAt: "2026-05-07T14:00:00.000Z",
+          kind: "idealFulfilled"
+        })
+      ],
+      planTimeline: [
+        fact({
+          startAt: "2026-05-07T10:00:00.000Z",
+          endAt: "2026-05-07T14:00:00.000Z",
+          kind: "ideal"
+        })
+      ],
+      now: "2026-05-07T12:00:00.000Z",
+      timezone: "UTC",
+      startDate: "2026-05-07",
+      endDate: "2026-05-07"
+    });
+
+    expect(days[0]?.total).toBe(240);
+    expect(days[0]?.kinds.idealFulfilled).toBe(120);
+    expect(days[0]?.kinds.ideal).toBe(120);
+  });
 });
 
 function fact(input: {
