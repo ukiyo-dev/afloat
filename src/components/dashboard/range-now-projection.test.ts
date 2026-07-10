@@ -309,4 +309,69 @@ describe("projectRangeViewForNow", () => {
     expect(rangeView.factTotals).toEqual({ idealFulfilled: 120 });
     expect(rangeView.timeline).toHaveLength(1);
   });
+
+  it("does not project time already included by a server range built from a stale view", () => {
+    const input = {
+      view: {
+        generatedAt: "2026-07-05T09:00:00.000Z",
+        observedSemantics: ["ideal"],
+        plannedMinutes: 120,
+        fulfilledPlanMinutes: 120,
+        internalFulfilledPlanMinutes: 120,
+        internalFulfillmentRate: 1,
+        fulfillmentRate: 1,
+        maintenanceRate: 1,
+        factTotals: {},
+        protocolErrors: [],
+        planTimeline: [
+          {
+            startAt: "2026-07-05T09:00:00.000Z",
+            endAt: "2026-07-05T11:00:00.000Z",
+            kind: "ideal",
+            minutes: 120,
+            title: "Afloat: Sync 1",
+            group: "Afloat",
+            item: "Sync"
+          }
+        ],
+        timeline: [],
+        threadGroups: [],
+        threads: [],
+        notes: []
+      },
+      rangeView: {
+        key: "day" as const,
+        quickRange: "day" as const,
+        label: "今天",
+        timezone: "UTC",
+        startDate: "2026-07-05",
+        endDate: "2026-07-05",
+        startAt: "2026-07-05T00:00:00.000Z",
+        endAt: "2026-07-06T00:00:00.000Z",
+        plannedMinutes: 120,
+        plannedDays: 1,
+        observedPlannedMinutes: 90,
+        observedPlannedDays: 1,
+        averagePlannedMinutes: 120,
+        fulfilledPlanMinutes: 90,
+        internalFulfilledPlanMinutes: 90,
+        internalFulfillmentRate: 1,
+        fulfillmentRate: 1,
+        maintenanceRate: 1,
+        runtimeNow: "2026-07-05T10:30:00.000Z",
+        factTotals: { idealFulfilled: 90 },
+        planTotals: { ideal: 120 },
+        shiftComposition: {},
+        protocolErrors: [],
+        timeline: [],
+        notes: []
+      },
+      runtimeNowIso: "2026-07-05T10:30:00.000Z"
+    };
+
+    const rangeView = projectRangeViewForNow(input);
+
+    expect(rangeView.fulfilledPlanMinutes).toBe(90);
+    expect(rangeView.internalFulfillmentRate).toBe(1);
+  });
 });

@@ -35,6 +35,7 @@ export interface DashboardRangeView {
   internalFulfillmentRate: number | null;
   fulfillmentRate: number | null;
   maintenanceRate: number;
+  runtimeNow?: string;
   factTotals: Record<string, number>;
   planTotals: Record<string, number>;
   shiftComposition: Record<string, { internal: number; external: number }>;
@@ -222,6 +223,7 @@ export function buildDashboardRangeView(input: {
       selection,
       observedRange
     ),
+    runtimeNow: now.toISOString(),
     factTotals: totalClippedMinutesByKind(observedTimeline, observedRange),
     planTotals: totalClippedMinutesByKind(planTimeline, range),
     shiftComposition: calculateShiftComposition(observedTimeline, observedPlanTimeline, observedRange),

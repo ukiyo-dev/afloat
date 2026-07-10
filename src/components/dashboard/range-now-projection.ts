@@ -22,7 +22,7 @@ export function projectRangeViewForNow({
   view: PrivateView;
   runtimeNowIso: string;
 }): RangeView {
-  const baseNow = new Date(view.generatedAt);
+  const baseNow = new Date(rangeView.runtimeNow ?? view.generatedAt);
   const runtimeNow = new Date(runtimeNowIso);
   const rangeStart = new Date(rangeView.startAt);
   const rangeEnd = new Date(rangeView.endAt);
