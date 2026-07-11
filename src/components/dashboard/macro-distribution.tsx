@@ -46,6 +46,14 @@ export function MacroDistribution({
     "internalShift", 
     "unmapped"
   ];
+  const segmentGroups = [
+    ["ideal", "idealFulfilled"],
+    ["leisure", "leisureFulfilled"],
+    ["rest", "restFulfilled"],
+    ["externalShift"],
+    ["internalShift"],
+    ["unmapped"]
+  ];
 
   return (
     <div>
@@ -76,16 +84,16 @@ export function MacroDistribution({
                 }`}
                 style={{ height: `${heightPercent}%` }}
               >
-                {kindOrder.map(kind => {
-                  const mins = day.kinds[kind] || 0;
+                {segmentGroups.map(kinds => {
+                  const mins = kinds.reduce((total, kind) => total + (day.kinds[kind] || 0), 0);
                   if (mins === 0) return null;
                   
                   const segHeightPercent = (mins / day.total) * 100;
                   
                   return (
                     <div 
-                      key={kind}
-                      className={`w-full ${semanticColorClass(kind)}`}
+                      key={kinds.join("-")}
+                      className={`w-full ${semanticColorClass(kinds[0])}`}
                       style={{ height: `${segHeightPercent}%` }}
                     />
                   );
