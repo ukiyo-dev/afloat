@@ -35,6 +35,7 @@ export interface DashboardRangeView {
   internalFulfillmentRate: number | null;
   fulfillmentRate: number | null;
   maintenanceRate: number;
+  ruleBreakCount: number;
   runtimeNow?: string;
   factTotals: Record<string, number>;
   planTotals: Record<string, number>;
@@ -223,6 +224,7 @@ export function buildDashboardRangeView(input: {
       selection,
       observedRange
     ),
+    ruleBreakCount: 0,
     runtimeNow: now.toISOString(),
     factTotals: totalClippedMinutesByKind(observedTimeline, observedRange),
     planTotals: totalClippedMinutesByKind(planTimeline, range),

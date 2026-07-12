@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarIcon, UpdateIcon, CheckIcon, DesktopIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons";
 
 import { BrutalDialog } from "@/components/brutal-dialog";
@@ -144,6 +144,7 @@ export function DashboardWorkbench({
   isOwner = false,
   basePath = "/dashboard"
 }: DashboardData & { visitorMode?: boolean; isOwner?: boolean; basePath?: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => parseDashboardTab(searchParams.get("tab")));
   const activeDashboardTab = visitorMode ? "overview" : activeTab;
@@ -174,11 +175,8 @@ export function DashboardWorkbench({
 
   const selectTab = (tab: DashboardTab) => {
     setActiveTab(tab);
-    if (typeof window === "undefined") {
-      return;
-    }
     const nextHref = buildHref({ tab: tab === "overview" ? null : tab });
-    window.history.replaceState(window.history.state, "", nextHref);
+    router.replace(nextHref, { scroll: false });
   };
 
   const runtimeNow = useMinuteNow(view.generatedAt);
@@ -217,12 +215,11 @@ export function DashboardWorkbench({
     }),
     [projectedThreads, threadGroups, view]
   );
-  const urgentThreads = threadGroups.filter((thread) =>
-    ["expired", "stale", "imbalanced", "tightPace", "needsScheduling"].includes(thread.status)
-  );
-  const hasSevereThreadPressure = urgentThreads.some((thread) =>
-    ["expired", "stale", "imbalanced", "tightPace"].includes(thread.status)
-  );
+  const formalRuleCount = personalRules.filter((rule) => rule.commitment === "signed").length;
+  const activeThreads = projectedThreads.filter((item) => (item.activityState ?? "active") === "active");
+  const redActiveThreadCount = activeThreads.filter((item) =>
+    ["expired", "stale", "imbalanced"].includes(item.status)
+  ).length;
   
   const factLayerTitle = getFactLayerTitle(
     projectedRangeView.startDate,
@@ -424,6 +421,13 @@ export function DashboardWorkbench({
               highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
             />
             <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
+            {!visitorMode ? (
+              <Metric
+                label="待规划线程数"
+                value={`${redActiveThreadCount}/${activeThreads.length}`}
+                danger={redActiveThreadCount > 0}
+              />
+            ) : null}
             {projectedRangeView.protocolErrors.length > 0 ? (
               <BrutalDialog
                 title="协议错误详情"
@@ -460,9 +464,9 @@ export function DashboardWorkbench({
               </BrutalDialog>
             ) : null}
             <Metric
-              label="待规划线程"
-              value={`${urgentThreads.length}`}
-              danger={hasSevereThreadPressure}
+              label="违约数"
+              value={`${projectedRangeView.ruleBreakCount}/${formalRuleCount}`}
+              danger={projectedRangeView.ruleBreakCount > 0}
             />
           </section>
 

@@ -27,6 +27,8 @@ export const computedViewKindEnum = pgEnum("computed_view_kind", ["private"]);
 export const syncRunKindEnum = pgEnum("sync_run_kind", ["recent", "recalibrate"]);
 export const syncRunStatusEnum = pgEnum("sync_run_status", ["running", "succeeded", "failed"]);
 export const personalRuleStatusEnum = pgEnum("personal_rule_status", ["active", "archived"]);
+export const personalRuleCommitmentEnum = pgEnum("personal_rule_commitment", ["test", "signed"]);
+export const personalRuleBreakTypeEnum = pgEnum("personal_rule_break_type", ["test_break", "rule_break"]);
 
 export const owners = pgTable("owners", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -172,6 +174,9 @@ export const personalRules = pgTable(
     title: text("title").notNull(),
     content: text("content").notNull(),
     startDate: text("start_date").notNull(),
+    commitment: personalRuleCommitmentEnum("commitment").notNull().default("test"),
+    signedDate: text("signed_date"),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
     status: personalRuleStatusEnum("status").notNull().default("active"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     archiveReason: text("archive_reason"),
@@ -195,6 +200,7 @@ export const personalRuleBreaks = pgTable(
       .notNull()
       .references(() => personalRules.id, { onDelete: "cascade" }),
     brokenDate: text("broken_date").notNull(),
+    type: personalRuleBreakTypeEnum("type").notNull(),
     scene: text("scene").notNull(),
     reason: text("reason").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()

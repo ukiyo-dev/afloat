@@ -4,7 +4,8 @@ import {
   createPersonalRule,
   deleteArchivedPersonalRule,
   insertPersonalRuleBreak,
-  listPersonalRules
+  listPersonalRules,
+  signPersonalRule
 } from "@/server/db/personal-rules";
 import {
   buildPersonalRuleViews,
@@ -12,11 +13,14 @@ import {
 } from "@/server/domain/personal-rules";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
 import { validateNoteDate } from "@/server/services/workbench-validation";
+import { loadSettings } from "@/server/db/settings";
+import { localDayKey } from "@/server/domain/time";
 
 export interface PersonalRuleInput {
   title: string;
   content: string;
   startDate: string;
+  commitment: "test" | "signed";
 }
 
 export interface PersonalRuleBreakInput {
@@ -41,6 +45,9 @@ export async function loadPersonalRuleViews(today: string): Promise<PersonalRule
       title: rule.title,
       content: rule.content,
       startDate: rule.startDate,
+      commitment: rule.commitment,
+      signedDate: rule.signedDate,
+      signedAt: rule.signedAt?.toISOString() ?? null,
       status: rule.status,
       archivedAt: rule.archivedAt?.toISOString() ?? null,
       archiveReason: rule.archiveReason,
@@ -49,6 +56,7 @@ export async function loadPersonalRuleViews(today: string): Promise<PersonalRule
       breaks: rule.breaks.map((ruleBreak) => ({
         id: ruleBreak.id,
         brokenDate: ruleBreak.brokenDate,
+        type: ruleBreak.type,
         scene: ruleBreak.scene,
         reason: ruleBreak.reason,
         createdAt: ruleBreak.createdAt.toISOString()
@@ -64,7 +72,18 @@ export async function savePersonalRule(input: PersonalRuleInput) {
   return createPersonalRule(db, ownerId, {
     title: input.title.trim(),
     content: input.content.trim(),
-    startDate: input.startDate
+    startDate: input.startDate,
+    commitment: input.commitment
+  });
+}
+
+export async function signRule(ruleId: string) {
+  if (ruleId.trim().length === 0) throw new Error("ruleId is required.");
+  const ownerId = await getCurrentOwnerId();
+  const settings = await loadSettings(db, ownerId);
+  return signPersonalRule(db, ownerId, {
+    ruleId,
+    signedDate: localDayKey(new Date(), settings.timezone || "UTC")
   });
 }
 
@@ -105,6 +124,9 @@ function validatePersonalRuleInput(input: PersonalRuleInput): void {
   }
   if (input.content.trim().length === 0) {
     throw new Error("content is required.");
+  }
+  if (input.commitment !== "test" && input.commitment !== "signed") {
+    throw new Error("commitment is invalid.");
   }
 }
 

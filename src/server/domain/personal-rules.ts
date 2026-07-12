@@ -3,6 +3,9 @@ export interface PersonalRuleRecord {
   title: string;
   content: string;
   startDate: string;
+  commitment: "test" | "signed";
+  signedDate: string | null;
+  signedAt: string | null;
   status: "active" | "archived";
   archivedAt: string | null;
   archiveReason: string | null;
@@ -14,6 +17,7 @@ export interface PersonalRuleRecord {
 export interface PersonalRuleBreakRecord {
   id: string;
   brokenDate: string;
+  type: "test_break" | "rule_break";
   scene: string;
   reason: string;
   createdAt: string;
@@ -35,6 +39,22 @@ export function buildPersonalRuleViews(
   today: string
 ): PersonalRuleView[] {
   return rules.map((rule) => buildPersonalRuleView(rule, today));
+}
+
+export function countRuleBreaksInRange(
+  rules: PersonalRuleView[],
+  startDate: string,
+  endDate: string
+): number {
+  return rules.reduce(
+    (count, rule) => count + rule.breaks.filter(
+      (ruleBreak) =>
+        ruleBreak.type === "rule_break" &&
+        ruleBreak.brokenDate >= startDate &&
+        ruleBreak.brokenDate <= endDate
+    ).length,
+    0
+  );
 }
 
 export function buildPersonalRuleView(rule: PersonalRuleRecord, today: string): PersonalRuleView {

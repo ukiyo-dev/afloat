@@ -27,9 +27,12 @@ v1 做一个单用户个人承诺观察系统。
 - 线程历史显示
 - Group 聚合 Item 级 expectedMinutes 与 deadline
 - `expectedMinutes + deadline` 可行性分析
-- 用户刚性规则
+- `TEST` 与 `SIGNED` 用户规则
 - 规则违约记录
 - 规则连续守约 run 计算
+- `TEST` 规则正式签署并延续 run
+- Overview 违约数统计（范围内正式违约数 / 正式规则总数）
+- Overview 待规划线程数统计（红色活跃 Item 数 / 活跃 Item 总数）；红色状态为 `expired`、`stale` 或 `imbalanced`
 
 ## v1 不做什么
 
@@ -88,7 +91,7 @@ v1 可以先按单用户本地或自托管产品实现。
 8. 每次同步后全量重算派生视图。
 9. 用户查看镜像页本人模式。
 10. 用户可在 Afloat 中写每日笔记，并选择私密或公开。
-11. 用户可创建刚性规则，并在违约时记录场景与原因。
+11. 用户可创建 `TEST` 或 `SIGNED` 规则，在违约时记录场景与原因，并将 `TEST` 规则正式签署。
 12. 用户可选择开启镜像页访客模式。
 
 ## MVP 验收
@@ -113,7 +116,10 @@ v1 MVP 至少要能验证：
 - Group 的 deadline 取所有 Item 中最晚的 deadline，预计时间取所有 Item 之和。
 - `expectedMinutes` 只被事实兑现抵扣。
 - 未来计划生成未来承诺与未计划缺口。
-- 用户可以创建规则，记录违约，并看到当前 run、历史 best run 和 break 数量。
+- 用户可以创建 `TEST` 或 `SIGNED` 规则，记录违约，并看到当前 run、历史 best run 和 break 数量。
 - 规则违约当天当前 run 清零，次日本地日期重新开始。
+- `TEST` 签署为 `SIGNED` 时直接复用签署当下的 current run 起点与天数，不重新起算；历史 best 和违约历史继续沿用，既有 `test_break` 不改写为 `rule_break`。
+- Rules 列表不增加承诺状态筛选或分区，在当前过滤范围内先显示 `TEST`，再显示 `SIGNED`。
+- Overview 的日期范围违约指标只统计按 `brokenDate` 落入范围的 `rule_break`，不统计 `test_break`。
 - 停用规则保留历史，但不能继续记录违约。
 - 访客模式复用同一镜像界面，但不展示 Threads 和 Rules 模块。

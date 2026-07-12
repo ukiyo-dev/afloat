@@ -10,6 +10,7 @@ import {
   deletePersonalRuleAction,
   recordPersonalRuleBreakAction,
   savePersonalRuleAction,
+  signPersonalRuleAction,
   stopPersonalRuleAction
 } from "@/app/dashboard/actions";
 import type { DashboardData } from "@/server/services/dashboard-service";
@@ -37,9 +38,13 @@ export function RulePanel({
   const visibleRules = useMemo(() => {
     const filteredByStatus =
       filter === "active" ? activeRules : filter === "disactive" ? disactiveRules : rules;
-    if (!normalizedQuery) return filteredByStatus;
+    const sorted = [...filteredByStatus].sort((left, right) => {
+      if (left.commitment === right.commitment) return 0;
+      return left.commitment === "test" ? -1 : 1;
+    });
+    if (!normalizedQuery) return sorted;
 
-    return filteredByStatus.filter((rule) =>
+    return sorted.filter((rule) =>
       [rule.title, rule.content, rule.archiveReason]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedQuery))
@@ -97,6 +102,13 @@ export function RulePanel({
               <label className="flex flex-col gap-1">
                 <span className="font-mono text-xs font-bold uppercase">Rule</span>
                 <input className="input-brutal w-full" name="title" placeholder="00:30 前睡觉" required />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="font-mono text-xs font-bold uppercase">Commitment</span>
+                <select className="input-brutal w-full" name="commitment" defaultValue="test">
+                  <option value="test">TEST</option>
+                  <option value="signed">SIGNED</option>
+                </select>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="font-mono text-xs font-bold uppercase">Content</span>
@@ -200,10 +212,13 @@ function RuleRow({ rule, today }: { rule: Rule; today: string }) {
       <summary className="grid cursor-pointer grid-cols-1 gap-3 px-3 py-2 transition-colors hover:bg-highlight/20 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="flex min-w-0 items-center gap-3">
           <span className="inline-block w-4 shrink-0 text-center font-mono text-xs transition-transform group-open:rotate-90">▶</span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate font-serif text-lg font-bold">{rule.title}</h3>
-              <RuleStatusBadge status={rule.runStatus} />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <h3 className="min-w-0 flex-1 truncate font-serif text-lg font-bold">{rule.title}</h3>
+              <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+                <CommitmentBadge commitment={rule.commitment} />
+                <RuleStatusBadge status={rule.runStatus} />
+              </div>
             </div>
             <p className="truncate font-mono text-xs text-ink-light">{rule.content}</p>
           </div>
@@ -234,12 +249,12 @@ function RuleRow({ rule, today }: { rule: Rule; today: string }) {
                 {rule.breaks.length > 0 ? (
                   rule.breaks.map((ruleBreak) => (
                     <div
-                      className="grid grid-cols-1 gap-2 border border-ink/30 bg-surface px-2 py-2 font-mono text-xs md:grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)]"
+                      className="grid grid-cols-1 gap-2 border border-ink/30 bg-surface px-2 py-2 font-mono text-xs md:grid-cols-[90px_minmax(0,1fr)_minmax(0,2fr)]"
                       key={ruleBreak.id}
                     >
                       <strong>{ruleBreak.brokenDate}</strong>
                       <span className="truncate">{ruleBreak.scene}</span>
-                      <span className="truncate text-ink-light">{ruleBreak.reason}</span>
+                      <span className="truncate text-ink-light">{ruleBreak.type === "test_break" ? "TEST BREAK" : "RULE BREAK"} · {ruleBreak.reason}</span>
                     </div>
                   ))
                 ) : (
@@ -250,6 +265,12 @@ function RuleRow({ rule, today }: { rule: Rule; today: string }) {
           </div>
 
           <div className="flex flex-col gap-4 border-t-2 border-ink pt-4 lg:border-l-2 lg:border-t-0 lg:pl-4 lg:pt-0">
+            {rule.status === "active" && rule.commitment === "test" ? (
+              <ActionForm action={signPersonalRuleAction} confirmMessage="正式签署这条规则？当前 run 和违约历史将继续保留。">
+                <input type="hidden" name="ruleId" value={rule.id} />
+                <SubmitButton className="btn-brutal h-[38px] w-full" pendingText="SIGNING...">SIGN RULE</SubmitButton>
+              </ActionForm>
+            ) : null}
             {rule.status === "active" ? (
               <ActionForm className="flex flex-col gap-3" action={recordPersonalRuleBreakAction} resetOnSuccess>
                 <input type="hidden" name="ruleId" value={rule.id} />
@@ -292,7 +313,11 @@ function RuleRow({ rule, today }: { rule: Rule; today: string }) {
             )}
 
             {rule.status === "active" ? (
-              <ActionForm className="flex flex-col gap-2 border-t border-dashed border-ink/40 pt-3" action={stopPersonalRuleAction}>
+              <ActionForm
+                className="flex flex-col gap-2 border-t border-dashed border-ink/40 pt-3"
+                action={stopPersonalRuleAction}
+                confirmMessage="停用这条规则？run 和违约历史将保留，但不能再记录违约。"
+              >
                 <input type="hidden" name="ruleId" value={rule.id} />
                 <label className="flex flex-col gap-1">
                   <span className="font-mono text-xs font-bold uppercase">Stop Reason</span>
@@ -310,6 +335,14 @@ function RuleRow({ rule, today }: { rule: Rule; today: string }) {
   );
 }
 
+function CommitmentBadge({ commitment }: { commitment: Rule["commitment"] }) {
+  return (
+    <span className="inline-block w-[58px] bg-ledger px-2 py-0.5 text-center font-mono text-[10px] font-black uppercase text-ledger-foreground">
+      {commitment}
+    </span>
+  );
+}
+
 function RuleStatusBadge({ status }: { status: Rule["runStatus"] }) {
   const labels: Record<Rule["runStatus"], string> = {
     active: "ACTIVE",
@@ -320,9 +353,7 @@ function RuleStatusBadge({ status }: { status: Rule["runStatus"] }) {
   const className =
     status === "brokenToday"
       ? "bg-danger text-ink-fixed"
-      : status === "archived"
-        ? "bg-ink/20"
-        : "bg-ledger text-ledger-foreground";
+      : "bg-ledger text-ledger-foreground";
 
   return <span className={`px-2 py-0.5 font-mono text-[10px] font-black uppercase ${className}`}>{labels[status]}</span>;
 }

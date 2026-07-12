@@ -50,6 +50,13 @@
       "when": 1783477791906,
       "tag": "0006_tired_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783857705028,
+      "tag": "0007_opposite_rocket_raccoon",
+      "breakpoints": true
     }
   ]
 }

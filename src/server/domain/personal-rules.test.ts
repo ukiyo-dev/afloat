@@ -7,6 +7,9 @@ const baseRule: PersonalRuleRecord = {
   title: "00:30 before sleep",
   content: "Awake after 00:30 is a break.",
   startDate: "2026-07-01",
+  commitment: "test",
+  signedDate: null,
+  signedAt: null,
   status: "active",
   archivedAt: null,
   archiveReason: null,
@@ -31,6 +34,7 @@ describe("personal rule runs", () => {
         {
           id: "break-1",
           brokenDate: "2026-07-04",
+          type: "test_break",
           scene: "Phone in bed",
           reason: "No cutoff",
           createdAt: "2026-07-04T15:00:00.000Z"
@@ -56,6 +60,7 @@ describe("personal rule runs", () => {
         {
           id: "break-1",
           brokenDate: "2026-07-04",
+          type: "test_break",
           scene: "Phone in bed",
           reason: "No cutoff",
           createdAt: "2026-07-04T15:00:00.000Z"
@@ -63,6 +68,7 @@ describe("personal rule runs", () => {
         {
           id: "break-2",
           brokenDate: "2026-07-08",
+          type: "rule_break",
           scene: "Late coffee",
           reason: "Could not sleep",
           createdAt: "2026-07-08T15:00:00.000Z"

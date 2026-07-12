@@ -37,6 +37,7 @@ export async function createPersonalRule(
     title: string;
     content: string;
     startDate: string;
+    commitment: "test" | "signed";
   }
 ) {
   const [row] = await database
@@ -45,7 +46,10 @@ export async function createPersonalRule(
       ownerId,
       title: input.title,
       content: input.content,
-      startDate: input.startDate
+      startDate: input.startDate,
+      commitment: input.commitment,
+      signedDate: input.commitment === "signed" ? input.startDate : null,
+      signedAt: input.commitment === "signed" ? sql`now()` : null
     })
     .returning();
 
@@ -84,7 +88,11 @@ export async function insertPersonalRuleBreak(
       ruleId: input.ruleId,
       brokenDate: input.brokenDate,
       scene: input.scene,
-      reason: input.reason
+      reason: input.reason,
+      type:
+        rule.commitment === "signed" && rule.signedDate && input.brokenDate >= rule.signedDate
+          ? "rule_break"
+          : "test_break"
     })
     .returning();
 
@@ -92,6 +100,31 @@ export async function insertPersonalRuleBreak(
     throw new Error("Failed to record personal rule break.");
   }
 
+  return row;
+}
+
+export async function signPersonalRule(
+  database: Database,
+  ownerId: string,
+  input: { ruleId: string; signedDate: string }
+) {
+  const [row] = await database
+    .update(personalRules)
+    .set({
+      commitment: "signed",
+      signedDate: input.signedDate,
+      signedAt: sql`now()`,
+      updatedAt: sql`now()`
+    })
+    .where(and(
+      eq(personalRules.id, input.ruleId),
+      eq(personalRules.ownerId, ownerId),
+      eq(personalRules.status, "active"),
+      eq(personalRules.commitment, "test")
+    ))
+    .returning();
+
+  if (!row) throw new Error("Active test rule not found.");
   return row;
 }
 

@@ -15,6 +15,7 @@ import {
   deletePersonalRule,
   recordPersonalRuleBreak,
   savePersonalRule,
+  signRule,
   stopPersonalRule
 } from "@/server/services/personal-rule-service";
 import { recomputeCurrentOwnerViews } from "@/server/services/view-service";
@@ -97,16 +98,25 @@ export async function savePersonalRuleAction(formData: FormData) {
   const title = formData.get("title");
   const content = formData.get("content");
   const startDate = formData.get("startDate");
+  const commitment = formData.get("commitment");
 
   if (
     typeof title !== "string" ||
     typeof content !== "string" ||
-    typeof startDate !== "string"
+    typeof startDate !== "string" ||
+    (commitment !== "test" && commitment !== "signed")
   ) {
     throw new Error("Invalid personal rule form data.");
   }
 
-  await savePersonalRule({ title, content, startDate });
+  await savePersonalRule({ title, content, startDate, commitment });
+  revalidatePath("/dashboard");
+}
+
+export async function signPersonalRuleAction(formData: FormData) {
+  const ruleId = formData.get("ruleId");
+  if (typeof ruleId !== "string") throw new Error("Invalid personal rule sign form data.");
+  await signRule(ruleId);
   revalidatePath("/dashboard");
 }
 
