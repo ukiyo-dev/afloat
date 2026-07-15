@@ -10,6 +10,7 @@ import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, formatGeneratedAt, percent, statusLabel, timeRange, kindLabel } from "../view-formatters";
 import { MetricItem } from "./metric-card";
 import { semanticTagColorClass } from "../semantic-colors";
+import { compactActivityTitle } from "./activity-title";
 import { groupThreads, threadSourceLabel } from "./utils";
 
 type ThreadActivityFilter = "active" | "inactive" | "all";
@@ -339,6 +340,7 @@ export function ThreadPanel({
                           <div className="flex flex-col gap-1 mt-2">
                             {(thread.history ?? []).map((entry: any, entryIndex: number) => {
                               const previous = (thread.history ?? [])[entryIndex - 1];
+                              const compactTitle = compactActivityTitle(entry.title);
                               const showDivider = previous && previous.source !== entry.source;
                               const showEpisodeDivider =
                                 previous &&
@@ -356,7 +358,10 @@ export function ThreadPanel({
                                       <span>{timeRange(entry.startAt, entry.endAt, rangeView.timezone)}</span>
                                     </span>
                                     <span className={`font-bold w-16 truncate px-1 text-center border ${semanticTagColorClass(entry.kind)}`}>{kindLabel(entry.kind)}</span>
-                                    <span className="flex-1 truncate mx-2">{entry.title}</span>
+                                    <span className="flex-1 min-w-0 mx-2" title={entry.title}>
+                                      <span className="md:hidden">{compactTitle}</span>
+                                      <span className="hidden truncate md:block">{entry.title}</span>
+                                    </span>
                                     <span className="font-bold">{formatDuration(entry.minutes)}</span>
                                   </div>
                                 </div>
