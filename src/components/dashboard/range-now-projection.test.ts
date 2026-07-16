@@ -3,6 +3,88 @@ import { describe, expect, it } from "vitest";
 import { projectRangeViewForNow } from "./range-now-projection";
 
 describe("projectRangeViewForNow", () => {
+  it("does not mutate the server timeline across minute projections", () => {
+    const rangeView = {
+      key: "day" as const,
+      quickRange: "day" as const,
+      label: "今天",
+      timezone: "UTC",
+      runtimeNow: "2026-07-05T10:00:00.000Z",
+      startAt: "2026-07-05T00:00:00.000Z",
+      endAt: "2026-07-06T00:00:00.000Z",
+      startDate: "2026-07-05",
+      endDate: "2026-07-05",
+      plannedMinutes: 90,
+      plannedDays: 1,
+      observedPlannedMinutes: 60,
+      observedPlannedDays: 1,
+      averagePlannedMinutes: 90,
+      fulfilledPlanMinutes: 30,
+      internalFulfilledPlanMinutes: 30,
+      internalFulfillmentRate: 0.5,
+      fulfillmentRate: 0.5,
+      maintenanceRate: 1,
+      ruleBreakCount: 0,
+      factTotals: { idealFulfilled: 30 },
+      planTotals: { ideal: 90 },
+      shiftComposition: {},
+      protocolErrors: [],
+      timeline: [
+        {
+          startAt: "2026-07-05T09:30:00.000Z",
+          endAt: "2026-07-05T10:00:00.000Z",
+          kind: "idealFulfilled",
+          minutes: 30,
+          title: "Focused work",
+          group: "Focus",
+          item: "Work"
+        }
+      ],
+      notes: []
+    };
+    const view = {
+      generatedAt: "2026-07-05T10:00:00.000Z",
+      observedSemantics: ["ideal"],
+      plannedMinutes: 90,
+      fulfilledPlanMinutes: 30,
+      internalFulfilledPlanMinutes: 30,
+      internalFulfillmentRate: 0.5,
+      fulfillmentRate: 0.5,
+      maintenanceRate: 1,
+      factTotals: { idealFulfilled: 30 },
+      protocolErrors: [],
+      planTimeline: [
+        {
+          startAt: "2026-07-05T09:30:00.000Z",
+          endAt: "2026-07-05T11:00:00.000Z",
+          kind: "ideal",
+          minutes: 90,
+          title: "Focused work",
+          group: "Focus",
+          item: "Work"
+        }
+      ],
+      timeline: [],
+      threadGroups: [],
+      threads: [],
+      notes: []
+    };
+    const snapshot = structuredClone(rangeView.timeline);
+
+    projectRangeViewForNow({
+      rangeView,
+      view,
+      runtimeNowIso: "2026-07-05T10:01:00.000Z"
+    });
+    projectRangeViewForNow({
+      rangeView,
+      view,
+      runtimeNowIso: "2026-07-05T10:02:00.000Z"
+    });
+
+    expect(rangeView.timeline).toEqual(snapshot);
+  });
+
   it("adds elapsed plan minutes after the server snapshot to range facts", () => {
     const rangeView = projectRangeViewForNow({
       view: {

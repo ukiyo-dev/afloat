@@ -301,7 +301,10 @@ function clipTimelineToRange(
 }
 
 function mergeTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] {
-  const sorted = [...entries].sort(
+  // The projection is recomputed every minute. Clone each entry before merging so
+  // extending a projected segment never mutates the server snapshot passed in
+  // through rangeView.timeline.
+  const sorted = entries.map((entry) => ({ ...entry })).sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
   );
   const merged: TimelineEntry[] = [];
