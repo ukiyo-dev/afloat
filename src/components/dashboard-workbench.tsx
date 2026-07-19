@@ -221,6 +221,7 @@ export function DashboardWorkbench({
     ["expired", "stale", "imbalanced"].includes(item.status)
   ).length;
   const plannedActiveThreadCount = activeThreads.length - redActiveThreadCount;
+  const unfulfilledRuleCount = formalRuleCount - projectedRangeView.fulfilledRuleCount;
   
   const factLayerTitle = getFactLayerTitle(
     projectedRangeView.startDate,
@@ -424,9 +425,9 @@ export function DashboardWorkbench({
             <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
             {!visitorMode && activeThreads.length > 0 ? (
               <Metric
-                label="已规划线程"
-                value={`${plannedActiveThreadCount}/${activeThreads.length}`}
-                danger={plannedActiveThreadCount < activeThreads.length}
+                label={redActiveThreadCount > 0 ? "待规划线程" : "已规划线程"}
+                value={redActiveThreadCount > 0 ? `${redActiveThreadCount}` : `${plannedActiveThreadCount}/${activeThreads.length}`}
+                danger={redActiveThreadCount > 0}
               />
             ) : null}
             {projectedRangeView.protocolErrors.length > 0 ? (
@@ -466,9 +467,9 @@ export function DashboardWorkbench({
             ) : null}
             {formalRuleCount > 0 ? (
               <Metric
-                label="履约数"
-                value={`${projectedRangeView.fulfilledRuleCount}/${formalRuleCount}`}
-                danger={projectedRangeView.fulfilledRuleCount < formalRuleCount}
+                label={unfulfilledRuleCount > 0 ? "违约数" : "履约数"}
+                value={unfulfilledRuleCount > 0 ? `${unfulfilledRuleCount}` : `${projectedRangeView.fulfilledRuleCount}/${formalRuleCount}`}
+                danger={unfulfilledRuleCount > 0}
               />
             ) : null}
           </section>
