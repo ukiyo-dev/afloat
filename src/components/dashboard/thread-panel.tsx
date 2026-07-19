@@ -75,7 +75,7 @@ export function ThreadPanel({
     <section className="mb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b-4 border-ink pb-2">
         <div>
-          <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Plans</p>
+          <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Threads</p>
           <h2 className="font-serif text-4xl md:text-5xl font-black uppercase">线程追踪</h2>
         </div>
         <div className="mt-4 flex max-w-full items-stretch md:mt-0">

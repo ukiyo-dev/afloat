@@ -12,8 +12,8 @@ import {
   refreshMappedCalendarSources
 } from "@/server/db/calendar-sources";
 import { finishSyncRun, startSyncRun } from "@/server/db/sync-runs";
-import { addDays } from "@/server/domain/time";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
+import { recentSyncRange } from "@/server/services/recent-sync-range";
 import {
   addYears,
   recalibrationRangesForDirection
@@ -68,11 +68,7 @@ export async function listCalDavCalendars(): Promise<
 }
 
 export async function syncRecent(): Promise<SyncResult> {
-  const now = new Date();
-  return runCalDavSync("recent", {
-    startAt: addDays(now, -30),
-    endAt: addDays(now, 30)
-  });
+  return runCalDavSync("recent", recentSyncRange(new Date()));
 }
 
 export async function syncRecalibrate(): Promise<SyncResult> {
