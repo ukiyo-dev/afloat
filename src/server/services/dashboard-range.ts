@@ -2,7 +2,7 @@ import { intersection, minutesInRange, overlaps } from "@/server/domain/time";
 import type { DateRange } from "@/server/domain/types";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
 
-export type DashboardRange = "yesterday" | "day" | string; // e.g. "7d", "30d", "90d"
+export type DashboardRange = "yesterday" | "day" | string; // e.g. "7d", "14d", "30d"
 export type DashboardRangeKey = DashboardRange | "custom";
 export interface DashboardDefaultRange {
   startOffsetDays: number;
@@ -35,7 +35,7 @@ export interface DashboardRangeView {
   internalFulfillmentRate: number | null;
   fulfillmentRate: number | null;
   maintenanceRate: number;
-  ruleBreakCount: number;
+  fulfilledRuleCount: number;
   runtimeNow?: string;
   factTotals: Record<string, number>;
   planTotals: Record<string, number>;
@@ -224,7 +224,7 @@ export function buildDashboardRangeView(input: {
       selection,
       observedRange
     ),
-    ruleBreakCount: 0,
+    fulfilledRuleCount: 0,
     runtimeNow: now.toISOString(),
     factTotals: totalClippedMinutesByKind(observedTimeline, observedRange),
     planTotals: totalClippedMinutesByKind(planTimeline, range),

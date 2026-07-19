@@ -29,6 +29,10 @@ describe("dashboard range", () => {
       startOffsetDays: -7,
       endOffsetDays: -1
     });
+    expect(parseDashboardDefaultRange("14d")).toEqual({
+      startOffsetDays: -14,
+      endOffsetDays: -1
+    });
     expect(describeDashboardDefaultRange({ startOffsetDays: -1, endOffsetDays: -1 })).toBe(
       "当前 -1 天至当前 -1 天"
     );

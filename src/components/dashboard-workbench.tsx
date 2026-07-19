@@ -220,6 +220,7 @@ export function DashboardWorkbench({
   const redActiveThreadCount = activeThreads.filter((item) =>
     ["expired", "stale", "imbalanced"].includes(item.status)
   ).length;
+  const plannedActiveThreadCount = activeThreads.length - redActiveThreadCount;
   
   const factLayerTitle = getFactLayerTitle(
     projectedRangeView.startDate,
@@ -388,8 +389,8 @@ export function DashboardWorkbench({
                   label="今天"
                 />
                 <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="7 天" />
+                <RangeLink active={!isDefaultView && rangeView.key === "14d"} href={buildHref({ range: "14d", date: null, start: null, end: null })} label="14 天" />
                 <RangeLink active={!isDefaultView && rangeView.key === "30d"} href={buildHref({ range: "30d", date: null, start: null, end: null })} label="30 天" />
-                <RangeLink active={!isDefaultView && rangeView.key === "90d"} href={buildHref({ range: "90d", date: null, start: null, end: null })} label="90 天" />
               </div>
             </nav>
 
@@ -421,11 +422,11 @@ export function DashboardWorkbench({
               highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
             />
             <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
-            {!visitorMode ? (
+            {!visitorMode && activeThreads.length > 0 ? (
               <Metric
-                label="待规划线程数"
-                value={`${redActiveThreadCount}/${activeThreads.length}`}
-                danger={redActiveThreadCount > 0}
+                label="已规划线程"
+                value={`${plannedActiveThreadCount}/${activeThreads.length}`}
+                danger={plannedActiveThreadCount < activeThreads.length}
               />
             ) : null}
             {projectedRangeView.protocolErrors.length > 0 ? (
@@ -463,11 +464,13 @@ export function DashboardWorkbench({
                 )}
               </BrutalDialog>
             ) : null}
-            <Metric
-              label="违约数"
-              value={`${projectedRangeView.ruleBreakCount}/${formalRuleCount}`}
-              danger={projectedRangeView.ruleBreakCount > 0}
-            />
+            {formalRuleCount > 0 ? (
+              <Metric
+                label="履约数"
+                value={`${projectedRangeView.fulfilledRuleCount}/${formalRuleCount}`}
+                danger={projectedRangeView.fulfilledRuleCount < formalRuleCount}
+              />
+            ) : null}
           </section>
 
           {/* Main Grid Content */}

@@ -16,7 +16,7 @@ import { loadPrivateView } from "@/server/services/view-service";
 import { loadPrivateViewForOwner } from "@/server/services/view-service";
 import { localDayKey } from "@/server/domain/time";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
-import { countRuleBreaksInRange, type PersonalRuleView } from "@/server/domain/personal-rules";
+import { countFulfilledRulesInRange, type PersonalRuleView } from "@/server/domain/personal-rules";
 
 export type { DashboardRangeRequest } from "@/server/services/dashboard-range";
 
@@ -57,7 +57,7 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
     fallbackRange: settings.defaultDashboardRange,
     timezone
   });
-  rangeView.ruleBreakCount = countRuleBreaksInRange(
+  rangeView.fulfilledRuleCount = countFulfilledRulesInRange(
     personalRules,
     rangeView.startDate,
     rangeView.endDate
