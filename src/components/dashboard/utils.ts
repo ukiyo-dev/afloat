@@ -154,3 +154,30 @@ export function addLocalDaysKey(value: string, days: number) {
     String(date.getUTCDate()).padStart(2, "0")
   ].join("-");
 }
+
+export function shiftedRangeParams(startDate: string, endDate: string, direction: -1 | 1) {
+  const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+  const windowDays =
+    Math.round(
+      (Date.UTC(endYear, endMonth - 1, endDay) - Date.UTC(startYear, startMonth - 1, startDay)) /
+        86_400_000
+    ) + 1;
+
+  if (windowDays === 1) {
+    return {
+      range: "day",
+      date: addLocalDaysKey(startDate, direction),
+      start: null,
+      end: null
+    };
+  }
+
+  const offset = windowDays * direction;
+  return {
+    range: "custom",
+    date: null,
+    start: addLocalDaysKey(startDate, offset),
+    end: addLocalDaysKey(endDate, offset)
+  };
+}

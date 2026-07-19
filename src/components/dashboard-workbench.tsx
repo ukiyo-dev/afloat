@@ -31,7 +31,7 @@ import {
   groupThreads,
   protocolErrorLabel, 
   todayKey, 
-  addLocalDaysKey,
+  shiftedRangeParams,
   syncStatusLabel
 } from "./dashboard/utils";
 import { projectThreadsForNow } from "./dashboard/thread-now-projection";
@@ -366,9 +366,9 @@ export function DashboardWorkbench({
               <div className="flex flex-wrap gap-2">
                 <RangeLink
                   active={false}
-                  href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, -1), start: null, end: null })}
+                  href={buildHref(shiftedRangeParams(rangeView.startDate, rangeView.endDate, -1))}
                   label="Prev"
-                  title="上一天"
+                  title={daysCount === 1 ? "上一天" : `前移 ${daysCount} 天`}
                 />
                 <RangeLink
                   active={isDefaultView}
@@ -378,9 +378,9 @@ export function DashboardWorkbench({
                 />
                 <RangeLink
                   active={false}
-                  href={buildHref({ range: "day", date: addLocalDaysKey(rangeView.startDate, 1), start: null, end: null })}
+                  href={buildHref(shiftedRangeParams(rangeView.startDate, rangeView.endDate, 1))}
                   label="Next"
-                  title="下一天"
+                  title={daysCount === 1 ? "下一天" : `后移 ${daysCount} 天`}
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2">
