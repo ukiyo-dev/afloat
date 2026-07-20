@@ -10,46 +10,67 @@ export function ThreadCommitmentFields({
   defaultStart,
   defaultDeadline = "",
   expectedMinutes = null,
+  defaultDailyMinutes = null,
   today
 }: {
   defaultStart: string;
   defaultDeadline?: string | null;
   expectedMinutes?: number | null;
+  defaultDailyMinutes?: number | null;
   today: string;
 }) {
   const [start, setStart] = useState(defaultStart);
   const [deadline, setDeadline] = useState(defaultDeadline ?? "");
-  const [amount, setAmount] = useState(
-    expectedMinutes === null ? "" : String(expectedMinutes)
-  );
+  const [fixedDaily, setFixedDaily] = useState(defaultDailyMinutes !== null);
+  const [amount, setAmount] = useState(String(defaultDailyMinutes ?? expectedMinutes ?? ""));
   const parsedAmount = parseDurationPreview(amount);
   const effectiveStart = start > today ? start : today;
   const days = inclusiveDays(effectiveStart, deadline);
-  const derivedDaily = days && parsedAmount !== null ? parsedAmount / days : null;
+  const derivedDaily = days && parsedAmount !== null ? (fixedDaily ? parsedAmount : parsedAmount / days) : null;
+  const derivedTarget = fixedDaily && days && parsedAmount !== null ? parsedAmount * days : parsedAmount;
 
   return (
     <>
       <div className={`grid grid-cols-1 gap-4 ${derivedDaily !== null ? "sm:grid-cols-2" : ""}`}>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-xs font-bold uppercase">Target</span>
+          <span className="font-mono text-xs font-bold uppercase">{fixedDaily ? "Daily" : "Target"}</span>
           <input
             className="input-brutal w-full"
             name="commitmentAmount"
             inputMode="text"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            placeholder="120 / 2h30m"
+            placeholder={fixedDaily ? "30 / 45m" : "120 / 2h30m"}
           />
         </label>
         {derivedDaily !== null ? (
           <div className="flex flex-col justify-end border-b-2 border-ink pb-2 font-mono">
-            <span className="text-[10px] font-bold uppercase text-ink-light">Daily</span>
-            <strong>{formatDuration(Math.round(derivedDaily))} / {days} DAY</strong>
+            <span className="text-[10px] font-bold uppercase text-ink-light">{fixedDaily ? "Derived Target" : "Daily"}</span>
+            <strong>{formatDuration(Math.round(fixedDaily ? derivedTarget! : derivedDaily))} / {days} DAY</strong>
           </div>
         ) : null}
       </div>
 
-      <input type="hidden" name="expectedMinutes" value={parsedAmount === null ? "" : String(Math.round(parsedAmount))} />
+      <input type="hidden" name="expectedMinutes" value={derivedTarget === null ? "" : String(Math.round(derivedTarget))} />
+      <input type="hidden" name="dailyMinutes" value={fixedDaily && parsedAmount !== null ? String(Math.round(parsedAmount)) : ""} />
+
+      <label className="inline-flex w-fit items-center gap-2 font-mono text-xs font-bold uppercase">
+        <input
+          type="checkbox"
+          name="fixedDaily"
+          value="true"
+          checked={fixedDaily}
+          onChange={(event) => {
+            const nextFixed = event.target.checked;
+            if (parsedAmount !== null && days) {
+              setAmount(String(Math.round((nextFixed ? parsedAmount / days : parsedAmount * days) * 10) / 10));
+            }
+            setFixedDaily(nextFixed);
+          }}
+          disabled={!deadline}
+        />
+        Fixed Daily
+      </label>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
@@ -59,9 +80,12 @@ export function ThreadCommitmentFields({
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-xs font-bold uppercase">Deadline</span>
-            {deadline ? <button type="button" className="font-mono text-xs font-bold text-danger hover:underline" onClick={() => setDeadline("")}>清空</button> : null}
+            {deadline ? <button type="button" className="font-mono text-xs font-bold text-danger hover:underline" onClick={() => { setDeadline(""); setFixedDaily(false); }}>清空</button> : null}
           </div>
-          <input className="input-brutal w-full" name="deadline" type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} />
+          <input className="input-brutal w-full" name="deadline" type="date" value={deadline} onChange={(event) => {
+            setDeadline(event.target.value);
+            if (!event.target.value) setFixedDaily(false);
+          }} />
         </div>
       </div>
     </>

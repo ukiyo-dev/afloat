@@ -141,6 +141,30 @@
   details > summary::-webkit-details-marker {
     display: none;
   }
+
+  .load-fixed {
+    height: var(--load-fixed);
+  }
+
+  .load-flex {
+    bottom: var(--load-fixed);
+    height: var(--load-to);
+  }
+
+  .thread-load-strip[open] .load-flex {
+    animation: settle-thread-load 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes settle-thread-load {
+    from { height: var(--load-from); }
+    to { height: var(--load-to); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .thread-load-strip[open] .load-flex {
+      animation: none;
+    }
+  }
 }
 
 @layer components {

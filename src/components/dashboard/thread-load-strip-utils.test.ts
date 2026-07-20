@@ -13,15 +13,15 @@ function thread(overrides: Record<string, unknown>) {
 }
 
 describe("buildThreadLoadSegments", () => {
-  it("splits the strip at future starts and the day after deadlines", () => {
+  it("moves flexible load earlier to level the total across overlapping windows", () => {
     const result = buildThreadLoadSegments([
       thread({ key: "a", factGapMinutes: 600 }),
       thread({ key: "b", item: "Later", start: "2026-07-25", deadline: "2026-07-29", factGapMinutes: 300 })
     ], "2026-07-20");
 
-    expect(result.map(({ start, end, dailyMinutes }) => ({ start, end, dailyMinutes }))).toEqual([
-      { start: "2026-07-20", end: "2026-07-24", dailyMinutes: 60 },
-      { start: "2026-07-25", end: "2026-07-29", dailyMinutes: 120 }
+    expect(result.map(({ start, end, dailyMinutes, originalDailyMinutes }) => ({ start, end, dailyMinutes, originalDailyMinutes }))).toEqual([
+      { start: "2026-07-20", end: "2026-07-24", dailyMinutes: 90, originalDailyMinutes: 60 },
+      { start: "2026-07-25", end: "2026-07-29", dailyMinutes: 90, originalDailyMinutes: 120 }
     ]);
   });
 
@@ -30,6 +30,25 @@ describe("buildThreadLoadSegments", () => {
       thread({ factGapMinutes: 600, unscheduledGapMinutes: 100, futureMinutes: 500 })
     ], "2026-07-20");
 
+    expect(result[0]?.dailyMinutes).toBe(60);
+  });
+
+  it("keeps declared fixed daily load constant across its active window", () => {
+    const result = buildThreadLoadSegments([
+      thread({ factGapMinutes: 120, declaredDailyMinutes: 45 })
+    ], "2026-07-20");
+
+    expect(result[0]?.dailyMinutes).toBe(45);
+  });
+
+  it("levels flexible work on top of fixed daily load", () => {
+    const result = buildThreadLoadSegments([
+      thread({ key: "fixed", factGapMinutes: 1, declaredDailyMinutes: 30 }),
+      thread({ key: "flex", factGapMinutes: 300 })
+    ], "2026-07-20");
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.fixedDailyMinutes).toBe(30);
     expect(result[0]?.dailyMinutes).toBe(60);
   });
 

@@ -11,6 +11,7 @@ export interface ThreadDeclarationInput {
   group: string;
   item: string;
   expectedMinutes: number | null;
+  dailyMinutes?: number | null;
   start: Date | null;
   deadline: Date | null;
 }
@@ -18,7 +19,7 @@ export interface ThreadDeclarationInput {
 export async function saveThreadDeclaration(input: ThreadDeclarationInput) {
   validateThreadDeclaration(input);
   const ownerId = await getCurrentOwnerId();
-  return upsertThreadDeclaration(db, ownerId, input);
+  return upsertThreadDeclaration(db, ownerId, { ...input, dailyMinutes: input.dailyMinutes ?? null });
 }
 
 export async function deleteEmptyThreadDeclaration(group: string, item: string): Promise<void> {

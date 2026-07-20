@@ -1,5 +1,5 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { formatDuration } from "../view-formatters";
 import { buildThreadLoadSegments } from "./thread-load-strip-utils";
 
@@ -13,10 +13,10 @@ export function ThreadLoadStrip({
   headerEnd: ReactNode;
 }) {
   const segments = buildThreadLoadSegments(threads, today);
-  const peak = Math.max(...segments.map((segment) => segment.dailyMinutes), 1);
+  const peak = Math.max(...segments.flatMap((segment) => [segment.dailyMinutes, segment.originalDailyMinutes]), 1);
 
   return (
-    <details suppressHydrationWarning className="group/strip mb-6">
+    <details suppressHydrationWarning className="thread-load-strip group/strip mb-6">
       <summary className="block cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
         <span className="flex flex-col items-stretch gap-2 md:flex-row md:items-end md:justify-between md:gap-4">
           <span>
@@ -42,7 +42,14 @@ export function ThreadLoadStrip({
         <div className="inline-flex min-w-max items-start bg-paper align-top">
           {segments.map((segment, index) => {
             const change = index === 0 ? null : segment.dailyMinutes - segments[index - 1]!.dailyMinutes;
-            const fill = segment.dailyMinutes === 0 ? 0 : Math.max(12, (segment.dailyMinutes / peak) * 100);
+            const fixedFill = (segment.fixedDailyMinutes / peak) * 100;
+            const originalFlexibleFill = ((segment.originalDailyMinutes - segment.fixedDailyMinutes) / peak) * 100;
+            const levelledFlexibleFill = ((segment.dailyMinutes - segment.fixedDailyMinutes) / peak) * 100;
+            const loadStyle = {
+              "--load-fixed": `${fixedFill}%`,
+              "--load-from": `${Math.max(0, originalFlexibleFill)}%`,
+              "--load-to": `${Math.max(0, levelledFlexibleFill)}%`
+            } as CSSProperties;
 
             return (
               <details
@@ -51,11 +58,8 @@ export function ThreadLoadStrip({
                 key={segment.start}
               >
                 <summary className="relative block h-28 cursor-pointer list-none overflow-hidden p-3 select-none [&::-webkit-details-marker]:hidden">
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-0 bottom-0 bg-highlight transition-[height,filter] group-hover/load:brightness-95"
-                    style={{ height: `${fill}%` }}
-                  />
+                  <span aria-hidden="true" className="load-fixed absolute inset-x-0 bottom-0 bg-highlight" style={loadStyle} />
+                  <span aria-hidden="true" className="load-flex absolute inset-x-0 bg-highlight group-hover/load:brightness-95" style={loadStyle} />
                   <span className="relative z-10 flex h-full flex-col justify-between">
                     <span className="flex items-start justify-between gap-3 font-mono text-[10px] font-bold uppercase tabular-nums">
                       <span>{index === 0 ? "Today" : shortDate(segment.start)}</span>
@@ -64,7 +68,7 @@ export function ThreadLoadStrip({
                       ) : null}
                     </span>
                     <strong className="font-mono text-xl tabular-nums">
-                      {segment.dailyMinutes > 0 ? formatDuration(Math.round(segment.dailyMinutes)) : "—"}
+                      {segment.dailyMinutes > 0 ? formatDuration(Math.ceil(segment.dailyMinutes)) : "—"}
                       <span className="ml-1 text-[10px] font-bold">/ {segment.days} DAY</span>
                     </strong>
                   </span>

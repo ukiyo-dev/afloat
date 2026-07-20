@@ -236,7 +236,14 @@ export function ThreadPanel({
 
                 <div className="lg:col-span-8 p-0 bg-surface">
                   {group.items.map((thread: any, idx: number) => (
-                    <section className={`p-6 ${idx !== group.items.length - 1 ? 'border-b-2 border-ink' : ''}`} key={thread.key}>
+                    <section className={`relative p-6 ${idx !== group.items.length - 1 ? 'border-b-2 border-ink' : ''}`} key={thread.key}>
+                      {thread.declaredDailyMinutes != null ? (
+                        <span
+                          aria-label="Fixed daily load"
+                          className="absolute left-0 top-0 h-0 w-0 border-r-[18px] border-t-[18px] border-r-transparent border-t-ink"
+                          title="Fixed daily load"
+                        />
+                      ) : null}
                       <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
                         <div className="min-w-0">
                           <h4 className="font-serif text-xl font-bold mb-1">{thread.item}</h4>
@@ -309,6 +316,7 @@ export function ThreadPanel({
                               defaultStart={thread.start ?? defaultStart}
                               defaultDeadline={thread.deadline}
                               expectedMinutes={thread.expectedMinutes}
+                              defaultDailyMinutes={thread.declaredDailyMinutes}
                               today={defaultStart}
                             />
                             <div className="flex justify-end mt-4">

@@ -55,6 +55,12 @@ export function validateThreadDeclaration(input: ThreadDeclarationInput): void {
   ) {
     throw new Error("expectedMinutes must be a non-negative integer.");
   }
+  if (input.dailyMinutes != null && (!Number.isInteger(input.dailyMinutes) || input.dailyMinutes <= 0)) {
+    throw new Error("dailyMinutes must be a positive integer.");
+  }
+  if (input.dailyMinutes != null && !input.deadline) {
+    throw new Error("Fixed Daily load requires a deadline.");
+  }
   if (input.start && input.deadline && input.start > input.deadline) {
     throw new Error("start must be on or before deadline.");
   }

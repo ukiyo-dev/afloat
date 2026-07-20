@@ -1,0 +1,1 @@
+ALTER TABLE "thread_declarations" ADD COLUMN "daily_minutes" integer;
