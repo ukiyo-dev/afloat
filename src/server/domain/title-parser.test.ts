@@ -19,4 +19,16 @@ describe("parseTitle", () => {
     expect(parsed.item).toBe("写作");
     expect(parsed.sequence).toBe(2);
   });
+
+  it("preserves a trailing number on the reserved item without parsing sequence semantics", () => {
+    const parsed = parseTitle("写作：--- 27");
+
+    expect(parsed).toMatchObject({
+      rawTitle: "写作：--- 27",
+      titleBody: "写作：---",
+      group: "写作",
+      item: "---",
+      sequence: null
+    });
+  });
 });

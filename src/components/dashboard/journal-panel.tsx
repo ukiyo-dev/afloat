@@ -108,7 +108,7 @@ export function JournalPanel({
                   {(close) => (
                     <div className="flex flex-col gap-4">
                       <ActionForm className="flex flex-col gap-4" action={saveNoteAction} onSuccess={close}>
-                        <input type="hidden" name="originalDate" value={note.date} />
+                        <input type="hidden" name="id" value={note.id} />
                         <div className="grid grid-cols-2 gap-4">
                           <label className="flex flex-col gap-1">
                             <span className="font-mono text-xs font-bold uppercase">Date</span>
@@ -148,7 +148,7 @@ export function JournalPanel({
                         className="hidden"
                         confirmMessage="Delete this journal entry?"
                       >
-                        <input type="hidden" name="date" value={note.date} />
+                        <input type="hidden" name="id" value={note.id} />
                       </ActionForm>
                     </div>
                   )}

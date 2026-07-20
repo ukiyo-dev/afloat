@@ -1,4 +1,4 @@
-import { dayKey, daysBetween, intersection, localDayKey, minutesInRange } from "./time";
+import { dayKey, intersection, localDayKey, minutesInRange } from "./time";
 import type {
   FactSegment,
   FeasibilityStatus,
@@ -14,7 +14,7 @@ import type {
 interface ThreadAccumulator {
   group: string;
   item: string;
-  activityState: "active" | "inactive";
+  activityState: "active" | "inactive" | "untracked";
   declared: boolean;
   auto: boolean;
   declaration?: ThreadDeclaration;
@@ -51,6 +51,9 @@ export function buildThreadViews(input: {
 }): ThreadView[] {
   const activeThreads = new Map<string, ThreadAccumulator>();
   const inactiveThreads = new Map<string, ThreadAccumulator>();
+  const untrackedThreads = new Map<string, ThreadAccumulator>();
+  const untrackedPlanEventIds = new Set<string>();
+  const inactiveTailPlanEventIds = new Set<string>();
   const activeKeysByGroup = new Map<string, Set<string>>();
   const timeline = buildThreadTimeline(input.declarations, input.parsedEvents);
 
@@ -70,6 +73,11 @@ export function buildThreadViews(input: {
     const event = entry.event;
     const key = threadKey(event.title.group, event.title.item);
     if (event.title.sequence === null) {
+      const hasExplicitGroupItem = event.title.titleBody.includes("：");
+      if (hasExplicitGroupItem && event.title.item === "---") {
+        untrackedPlanEventIds.add(event.id);
+        continue;
+      }
       const thread = activeThreads.get(key);
       const activeKeys = activeKeysByGroup.get(event.title.group);
       if (thread && activeKeys?.has(key)) {
@@ -80,6 +88,20 @@ export function buildThreadViews(input: {
           activeKeys.delete(key);
           activeThreads.delete(key);
           mergeClosedThread(inactiveThreads, thread);
+        }
+      } else if (event.endAt <= input.now) {
+        const inactiveThread = inactiveThreads.get(key);
+        if (inactiveThread?.auto && inactiveThread.sequences.size > 0) {
+          extendClosedAutoThreadWindow(inactiveThread, event.endAt);
+        } else if (hasExplicitGroupItem) {
+          untrackedPlanEventIds.add(event.id);
+        }
+      } else {
+        const inactiveThread = inactiveThreads.get(key);
+        if (inactiveThread?.auto && inactiveThread.sequences.size > 0) {
+          inactiveTailPlanEventIds.add(event.id);
+        } else if (hasExplicitGroupItem) {
+          untrackedPlanEventIds.add(event.id);
         }
       }
       continue;
@@ -96,12 +118,32 @@ export function buildThreadViews(input: {
   }
 
   const threadAccumulators = [...activeThreads.values(), ...inactiveThreads.values()];
+  const trackedGroups = new Set(threadAccumulators.map((thread) => thread.group));
   for (const fact of input.facts) {
     if (fact.startAt >= input.now) {
       continue;
     }
 
     const attributions = factAttributions(fact, input.cleanPlanSegments);
+
+    for (const attribution of attributions) {
+      if (!attribution.planEventId || !untrackedPlanEventIds.has(attribution.planEventId)) {
+        continue;
+      }
+      if (!trackedGroups.has(attribution.threadTitle.group)) {
+        continue;
+      }
+      const thread = ensureThread(
+        untrackedThreads,
+        attribution.threadTitle.group,
+        "---",
+        "untracked"
+      );
+      const historicalRange = rangeBeforeNow(attribution.range, input.now);
+      if (historicalRange) {
+        addFactRange(thread, fact, historicalRange);
+      }
+    }
 
     for (const attribution of attributions) {
       const matchingThreads = threadAccumulators.filter(
@@ -114,25 +156,7 @@ export function buildThreadViews(input: {
         const ranges = rangesInThreadWindows(thread, attribution.range, input.now);
 
         for (const range of ranges) {
-          const minutes = minutesInRange(range);
-          if (
-            fact.kind === "idealFulfilled" ||
-            fact.kind === "leisureFulfilled" ||
-            fact.kind === "restFulfilled"
-          ) {
-            thread.fulfilledMinutes += minutes;
-          } else if (fact.kind === "externalShift") {
-            thread.externalShiftMinutes += minutes;
-          } else {
-            thread.internalShiftMinutes += minutes;
-          }
-          thread.history.push({
-            ...range,
-            kind: fact.kind,
-            minutes,
-            title: fact.title.rawTitle,
-            source: "fact"
-          });
+          addFactRange(thread, fact, range);
         }
       }
     }
@@ -143,7 +167,29 @@ export function buildThreadViews(input: {
       continue;
     }
 
-    const thread = activeThreads.get(threadKey(segment.title.group, segment.title.item));
+    const key = threadKey(segment.title.group, segment.title.item);
+    if (untrackedPlanEventIds.has(segment.eventId)) {
+      if (trackedGroups.has(segment.title.group)) {
+        const untrackedThread = ensureThread(
+          untrackedThreads,
+          segment.title.group,
+          "---",
+          "untracked"
+        );
+        addFutureRange(untrackedThread, segment, input.now);
+      }
+      continue;
+    }
+    if (inactiveTailPlanEventIds.has(segment.eventId)) {
+      const inactiveThread = inactiveThreads.get(key);
+      if (inactiveThread) {
+        addElapsedPlanRange(inactiveThread, segment, input.now);
+        addFutureRange(inactiveThread, segment, input.now);
+      }
+      continue;
+    }
+
+    const thread = activeThreads.get(key);
     if (!thread) {
       continue;
     }
@@ -164,23 +210,78 @@ export function buildThreadViews(input: {
     if (!isRangeInOpenThreadWindow(thread, range)) {
       continue;
     }
-    const minutes = minutesInRange(range);
-    thread.futureMinutes += minutes;
-    thread.history.push({
-      ...range,
-      kind: segment.kind,
-      minutes,
-      title: segment.title.rawTitle,
-      source: "futurePlan"
-    });
+    addFutureRange(thread, segment, input.now, range.startAt);
   }
 
   const recentDailyCapacity = recentFulfilledDailyCapacity(input.facts, input.now);
   const timezone = input.timezone ?? "UTC";
 
-  return threadAccumulators
+  return [...threadAccumulators, ...untrackedThreads.values()]
     .map((thread) => toThreadView(thread, input.now, recentDailyCapacity, timezone))
     .sort(compareThreadViews);
+}
+
+function rangeBeforeNow(
+  range: { startAt: Date; endAt: Date },
+  now: Date
+): { startAt: Date; endAt: Date } | null {
+  const endAt = new Date(Math.min(range.endAt.getTime(), now.getTime()));
+  return endAt > range.startAt ? { startAt: range.startAt, endAt } : null;
+}
+
+function addElapsedPlanRange(
+  thread: ThreadAccumulator,
+  segment: TimeSegment,
+  now: Date
+): void {
+  const range = rangeBeforeNow(segment, now);
+  if (!range) {
+    return;
+  }
+  const minutes = minutesInRange(range);
+  thread.fulfilledMinutes += minutes;
+  thread.history.push({
+    ...range,
+    kind: fulfilledPlanKind(segment.kind),
+    minutes,
+    title: segment.title.rawTitle,
+    source: "fact"
+  });
+}
+
+function fulfilledPlanKind(kind: string): string {
+  return kind === "ideal"
+    ? "idealFulfilled"
+    : kind === "leisure"
+      ? "leisureFulfilled"
+      : kind === "rest"
+        ? "restFulfilled"
+        : kind;
+}
+
+function addFutureRange(
+  thread: ThreadAccumulator,
+  segment: TimeSegment,
+  now: Date,
+  effectiveStartAt?: Date
+): void {
+  const range = {
+    startAt:
+      effectiveStartAt ?? new Date(Math.max(segment.startAt.getTime(), now.getTime())),
+    endAt: segment.endAt
+  };
+  if (range.endAt <= range.startAt) {
+    return;
+  }
+  const minutes = minutesInRange(range);
+  thread.futureMinutes += minutes;
+  thread.history.push({
+    ...range,
+    kind: segment.kind,
+    minutes,
+    title: segment.title.rawTitle,
+    source: "futurePlan"
+  });
 }
 
 export function buildThreadGroupViews(
@@ -202,7 +303,7 @@ function ensureThread(
   threads: Map<string, ThreadAccumulator>,
   group: string,
   item: string,
-  activityState: "active" | "inactive"
+  activityState: "active" | "inactive" | "untracked"
 ): ThreadAccumulator {
   const key = threadKey(group, item);
   const existing = threads.get(key);
@@ -230,6 +331,32 @@ function ensureThread(
   return created;
 }
 
+function addFactRange(
+  thread: ThreadAccumulator,
+  fact: FactSegment,
+  range: { startAt: Date; endAt: Date }
+): void {
+  const minutes = minutesInRange(range);
+  if (
+    fact.kind === "idealFulfilled" ||
+    fact.kind === "leisureFulfilled" ||
+    fact.kind === "restFulfilled"
+  ) {
+    thread.fulfilledMinutes += minutes;
+  } else if (fact.kind === "externalShift") {
+    thread.externalShiftMinutes += minutes;
+  } else {
+    thread.internalShiftMinutes += minutes;
+  }
+  thread.history.push({
+    ...range,
+    kind: fact.kind,
+    minutes,
+    title: fact.title.rawTitle,
+    source: "fact"
+  });
+}
+
 function ensureOpenWindow(thread: ThreadAccumulator, startAt: Date): void {
   if (thread.windows.length === 0) {
     thread.windows.push({ startAt });
@@ -239,6 +366,20 @@ function ensureOpenWindow(thread: ThreadAccumulator, startAt: Date): void {
 function closeOpenWindow(thread: ThreadAccumulator, endAt: Date): void {
   const window = thread.windows.at(-1);
   if (window && !window.endAt) {
+    window.endAt = endAt;
+  }
+}
+
+function extendClosedAutoThreadWindow(
+  thread: ThreadAccumulator | undefined,
+  endAt: Date
+): void {
+  if (!thread?.auto || thread.sequences.size === 0) {
+    return;
+  }
+
+  const window = thread.windows.at(-1);
+  if (window?.endAt && endAt > window.endAt) {
     window.endAt = endAt;
   }
 }
@@ -309,9 +450,50 @@ function toThreadView(
   recentDailyCapacity: number,
   timezone: string
 ): ThreadView {
+  if (thread.activityState === "untracked") {
+    const lastActivityAt = latestFactActivityAt(thread);
+    return {
+      key: `${publicThreadKey(thread.group, thread.item)}?state=untracked`,
+      group: thread.group,
+      item: "---",
+      activityState: "untracked",
+      source: "untracked",
+      fulfilledMinutes: thread.fulfilledMinutes,
+      futureMinutes: thread.futureMinutes,
+      externalShiftMinutes: thread.externalShiftMinutes,
+      internalShiftMinutes: thread.internalShiftMinutes,
+      expectedMinutes: null,
+      start: null,
+      deadline: null,
+      lastActivityAt: lastActivityAt?.toISOString() ?? null,
+      factGapMinutes: null,
+      unscheduledGapMinutes: null,
+      planCoverageRate: null,
+      dailyRequiredMinutes: null,
+      remainingDays: null,
+      status: "untracked",
+      canDelete: false,
+      closed: false,
+      sequences: [],
+      history: thread.history
+        .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
+        .map((entry) => ({
+          startAt: entry.startAt.toISOString(),
+          endAt: entry.endAt.toISOString(),
+          kind: entry.kind,
+          minutes: entry.minutes,
+          title: entry.title,
+          source: entry.source
+        }))
+    };
+  }
   const source: ThreadSource =
     thread.declared && thread.auto ? "both" : thread.declared ? "declared" : "auto";
   const expectedMinutes = thread.declaration?.expectedMinutes ?? null;
+  const fallbackStart = thread.declaration?.createdAt ?? thread.generationStartAt ?? now;
+  const start = thread.declaration?.start
+    ? dayKey(thread.declaration.start)
+    : localDayKey(fallbackStart, timezone);
   const deadline = thread.declaration?.deadline ?? null;
   const factGapMinutes =
     expectedMinutes === null
@@ -329,12 +511,16 @@ function toThreadView(
     factGapMinutes === null || factGapMinutes === 0
       ? null
       : thread.futureMinutes / factGapMinutes;
-  const daysLeft = deadline ? daysBetween(now, deadline) : null;
+  const today = localDayKey(now, timezone);
+  const deadlineKey = deadline ? dayKey(deadline) : null;
+  const daysLeft = deadlineKey
+    ? inclusiveDaysBetween(laterDayKey(today, start), deadlineKey)
+    : null;
   const dailyRequiredMinutes =
     unscheduledGapMinutes !== null && deadline && daysLeft !== null && daysLeft > 0
       ? unscheduledGapMinutes / daysLeft
       : null;
-  const lastActivityAt = latestFactActivityAt(thread) ?? thread.declaration?.createdAt ?? null;
+  const lastActivityAt = latestFactActivityAt(thread);
 
   return {
     key:
@@ -350,17 +536,20 @@ function toThreadView(
     externalShiftMinutes: thread.externalShiftMinutes,
     internalShiftMinutes: thread.internalShiftMinutes,
     expectedMinutes,
+    start,
     deadline: deadline ? deadline.toISOString().slice(0, 10) : null,
     lastActivityAt: lastActivityAt ? lastActivityAt.toISOString() : null,
     factGapMinutes,
     unscheduledGapMinutes,
     planCoverageRate,
     dailyRequiredMinutes,
+    remainingDays: daysLeft,
     status: feasibilityStatus({
       factGapMinutes,
       unscheduledGapMinutes,
       dailyRequiredMinutes,
       fulfilledByClosure: thread.fulfilledByClosure,
+      start,
       deadline,
       now,
       timezone,
@@ -393,14 +582,15 @@ function factAttributions(
 ): Array<{
   threadTitle: ParsedTitle;
   range: { startAt: Date; endAt: Date };
+  planEventId?: string;
 }> {
   if (fact.kind !== "externalShift" && fact.kind !== "internalShift") {
-    return [{ threadTitle: fact.title, range: fact }];
+    return [{ threadTitle: fact.title, range: fact, planEventId: fact.sourceEventId }];
   }
 
   const coveredRanges = cleanPlanSegments.flatMap((plan) => {
     const range = intersection(fact, plan);
-    return range ? [{ threadTitle: plan.title, range }] : [];
+    return range ? [{ threadTitle: plan.title, range, planEventId: plan.eventId }] : [];
   });
 
   return coveredRanges.length > 0 ? coveredRanges : [{ threadTitle: fact.title, range: fact }];
@@ -445,6 +635,7 @@ function feasibilityStatus(input: {
   unscheduledGapMinutes: number | null;
   dailyRequiredMinutes: number | null;
   fulfilledByClosure?: boolean;
+  start: string | null;
   deadline: Date | null;
   now: Date;
   timezone: string;
@@ -452,6 +643,9 @@ function feasibilityStatus(input: {
 }): FeasibilityStatus {
   if (input.fulfilledByClosure) {
     return "fulfilled";
+  }
+  if (input.start && localDayKey(input.now, input.timezone) < input.start) {
+    return "upcoming";
   }
   if (input.factGapMinutes === null || input.unscheduledGapMinutes === null) {
     return "untracked";
@@ -492,32 +686,52 @@ function toThreadGroupView(
   now: Date,
   timezone: string
 ): ThreadGroupView {
-  const expectedValues = items
+  const commitmentItems = items.filter((item) => item.activityState !== "untracked");
+  const expectedValues = commitmentItems
     .map((item) => item.expectedMinutes)
     .filter((value): value is number => value !== null);
   const expectedMinutes =
     expectedValues.length > 0 ? expectedValues.reduce((total, value) => total + value, 0) : null;
-  const deadline = latestDeadline(items.map((item) => item.deadline));
+  const deadline = latestDeadline(commitmentItems.map((item) => item.deadline));
+  const start = earliestStart(
+    commitmentItems.map((item) => item.start).filter((value): value is string => Boolean(value))
+  );
   const fulfilledMinutes = sum(items.map((item) => item.fulfilledMinutes));
   const futureMinutes = sum(items.map((item) => item.futureMinutes));
   const externalShiftMinutes = sum(items.map((item) => item.externalShiftMinutes));
   const internalShiftMinutes = sum(items.map((item) => item.internalShiftMinutes));
-  const factGapMinutes = sumNullable(items.map((item) => item.factGapMinutes));
-  const unscheduledGapMinutes = sumNullable(items.map((item) => item.unscheduledGapMinutes));
+  const factGapMinutes = sumNullable(commitmentItems.map((item) => item.factGapMinutes));
+  const unscheduledGapMinutes = sumNullable(commitmentItems.map((item) => item.unscheduledGapMinutes));
   const coveredFutureMinutes = sum(
-    items.map((item) =>
+    commitmentItems.map((item) =>
       item.factGapMinutes === null ? 0 : Math.min(item.futureMinutes, item.factGapMinutes)
     )
   );
   const planCoverageRate =
     factGapMinutes === null || factGapMinutes === 0 ? null : coveredFutureMinutes / factGapMinutes;
   const deadlineDate = deadline ? new Date(`${deadline}T00:00:00.000Z`) : null;
-  const dailyRequiredMinutes = sumNullable(items.map((item) => item.dailyRequiredMinutes));
+  const dailyRequiredMinutes = sumNullable(commitmentItems.map((item) => item.dailyRequiredMinutes));
+  const allItemsInactive = items.every(
+    (item) => item.activityState === "inactive" || item.activityState === "untracked"
+  );
+  const computedStatus = feasibilityStatus({
+    factGapMinutes,
+    unscheduledGapMinutes,
+    dailyRequiredMinutes,
+    fulfilledByClosure:
+      commitmentItems.length > 0 && commitmentItems.every((item) => item.status === "fulfilled"),
+    start,
+    deadline: deadlineDate,
+    now,
+    timezone,
+    recentDailyCapacity: 0
+  });
 
   return {
     key: encodeURIComponent(group),
     group,
     expectedMinutes,
+    start,
     deadline,
     fulfilledMinutes,
     futureMinutes,
@@ -527,18 +741,13 @@ function toThreadGroupView(
     unscheduledGapMinutes,
     planCoverageRate,
     dailyRequiredMinutes,
-    status: feasibilityStatus({
-      factGapMinutes,
-      unscheduledGapMinutes,
-      dailyRequiredMinutes,
-      fulfilledByClosure: items.every((item) => item.status === "fulfilled"),
-      deadline: deadlineDate,
-      now,
-      timezone,
-      recentDailyCapacity: 0
-    }),
+    status: computedStatus === "fulfilled" && !allItemsInactive ? "untracked" : computedStatus,
     items: [...items].sort((a, b) => statusRank(a.status) - statusRank(b.status))
   };
+}
+
+function earliestStart(starts: string[]): string | null {
+  return [...starts].sort((a, b) => a.localeCompare(b))[0] ?? null;
 }
 
 function latestDeadline(deadlines: Array<string | null>): string | null {
@@ -580,28 +789,82 @@ function statusRank(status: FeasibilityStatus): number {
     needsScheduling: 4,
     scheduled: 5,
     fulfilled: 6,
-    untracked: 7
+    untracked: 7,
+    upcoming: 8
   };
   return ranks[status];
 }
 
+function laterDayKey(a: string, b: string): string {
+  return a > b ? a : b;
+}
+
+function inclusiveDaysBetween(start: string, end: string): number {
+  const startMs = Date.parse(`${start}T00:00:00.000Z`);
+  const endMs = Date.parse(`${end}T00:00:00.000Z`);
+  return endMs < startMs ? 0 : Math.round((endMs - startMs) / 86_400_000) + 1;
+}
+
 function activityStateRank(state: ThreadView["activityState"]): number {
-  return state === "inactive" ? 1 : 0;
+  return state === "active" || state === undefined ? 0 : state === "untracked" ? 1 : 2;
 }
 
 function compareThreadViews(a: ThreadView, b: ThreadView): number {
+  if (a.activityState !== "inactive" && b.activityState !== "inactive") {
+    const activeOrder = compareActiveThreadSchedule(a, b);
+    if (activeOrder !== 0) {
+      return activeOrder;
+    }
+  }
+
   return (
     activityStateRank(a.activityState) - activityStateRank(b.activityState) ||
     deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
+    startRank(a.start) - startRank(b.start) ||
     statusRank(a.status) - statusRank(b.status)
   );
 }
 
 function compareThreadGroupViews(a: ThreadGroupView, b: ThreadGroupView): number {
+  return compareActiveThreadSchedule(a, b) || statusRank(a.status) - statusRank(b.status);
+}
+
+function compareActiveThreadSchedule(
+  a: Pick<ThreadView, "start" | "deadline" | "status">,
+  b: Pick<ThreadView, "start" | "deadline" | "status">
+): number {
+  const upcomingOrder = Number(a.status === "upcoming") - Number(b.status === "upcoming");
+  if (upcomingOrder !== 0) {
+    return upcomingOrder;
+  }
+
+  if (a.status === "upcoming" && b.status === "upcoming") {
+    return (
+      startRank(a.start) - startRank(b.start) ||
+      statusRank(a.status) - statusRank(b.status) ||
+      deadlineRank(a.deadline) - deadlineRank(b.deadline)
+    );
+  }
+
+  const deadlinePresenceOrder = Number(a.deadline === null) - Number(b.deadline === null);
+  if (deadlinePresenceOrder !== 0) {
+    return deadlinePresenceOrder;
+  }
+  if (a.deadline && b.deadline) {
+    return (
+      deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
+      statusRank(a.status) - statusRank(b.status) ||
+      startRank(a.start) - startRank(b.start)
+    );
+  }
   return (
-    deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
+    startRank(a.start) - startRank(b.start) ||
     statusRank(a.status) - statusRank(b.status)
   );
+}
+
+function startRank(start: string | null | undefined): number {
+  return start ? Date.parse(`${start}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
 }
 
 function deadlineRank(deadline: string | null): number {

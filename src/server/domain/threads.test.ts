@@ -158,13 +158,14 @@ describe("buildThreadViews", () => {
     ]);
   });
 
-  it("sorts active thread items and groups by nearest deadline first", () => {
+  it("sorts started active threads by deadline, then undated threads by oldest Start", () => {
     const declarations: ThreadDeclaration[] = [
       {
         id: "later",
         group: "B",
         item: "later",
         expectedMinutes: 60,
+        start: new Date("2026-05-01T00:00:00Z"),
         deadline: new Date("2026-05-20T00:00:00Z")
       },
       {
@@ -172,6 +173,7 @@ describe("buildThreadViews", () => {
         group: "C",
         item: "none",
         expectedMinutes: 60,
+        start: new Date("2026-05-03T00:00:00Z"),
         deadline: null
       },
       {
@@ -179,6 +181,7 @@ describe("buildThreadViews", () => {
         group: "A",
         item: "soon",
         expectedMinutes: 60,
+        start: new Date("2026-05-02T00:00:00Z"),
         deadline: new Date("2026-05-10T00:00:00Z")
       }
     ];
@@ -326,6 +329,290 @@ describe("buildThreadViews", () => {
         fulfilledMinutes: 120
       })
     ]);
+  });
+
+  it("attributes repeated unnumbered endings to the previously sequenced thread", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "seq",
+        calendarSourceId: "ideal",
+        title: "写作：长篇 7",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      },
+      {
+        id: "close-1",
+        calendarSourceId: "ideal",
+        title: "写作：长篇",
+        startAt: new Date("2026-05-02T20:00:00Z"),
+        endAt: new Date("2026-05-02T21:00:00Z")
+      },
+      {
+        id: "close-2",
+        calendarSourceId: "ideal",
+        title: "写作：长篇",
+        startAt: new Date("2026-05-03T20:00:00Z"),
+        endAt: new Date("2026-05-03T21:30:00Z")
+      },
+      {
+        id: "standalone",
+        calendarSourceId: "ideal",
+        title: "写作：随笔",
+        startAt: new Date("2026-05-04T20:00:00Z"),
+        endAt: new Date("2026-05-04T21:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-07T12:00:00Z")
+    });
+
+    expect(threads).toHaveLength(2);
+    const closedThread = threads.find((thread) => thread.item === "长篇");
+    expect(closedThread).toMatchObject({
+      group: "写作",
+      item: "长篇",
+      activityState: "inactive",
+      fulfilledMinutes: 210
+    });
+    expect(closedThread?.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: "写作：长篇 7", minutes: 60 }),
+        expect.objectContaining({ title: "写作：长篇", minutes: 60 }),
+        expect.objectContaining({ title: "写作：长篇", minutes: 90 })
+      ])
+    );
+    expect(threads.find((thread) => thread.item === "---")).toMatchObject({
+      activityState: "untracked",
+      fulfilledMinutes: 60
+    });
+  });
+
+  it("keeps future unnumbered tail plans on an inactive sequenced thread", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "seq",
+        calendarSourceId: "ideal",
+        title: "写作：长篇 7",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      },
+      {
+        id: "close",
+        calendarSourceId: "ideal",
+        title: "写作：长篇",
+        startAt: new Date("2026-05-02T20:00:00Z"),
+        endAt: new Date("2026-05-02T21:00:00Z")
+      },
+      {
+        id: "future-tail-1",
+        calendarSourceId: "ideal",
+        title: "写作：长篇",
+        startAt: new Date("2026-05-10T20:00:00Z"),
+        endAt: new Date("2026-05-10T21:00:00Z")
+      },
+      {
+        id: "future-tail-2",
+        calendarSourceId: "ideal",
+        title: "写作：长篇",
+        startAt: new Date("2026-05-11T20:00:00Z"),
+        endAt: new Date("2026-05-11T21:30:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const now = new Date("2026-05-07T12:00:00Z");
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now
+    });
+
+    expect(threads).toHaveLength(1);
+    expect(threads[0]).toMatchObject({
+      activityState: "inactive",
+      futureMinutes: 150,
+      factGapMinutes: null,
+      unscheduledGapMinutes: null,
+      status: "fulfilled"
+    });
+    expect(threads[0]?.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: "futurePlan", title: "写作：长篇", minutes: 60 }),
+        expect.objectContaining({ source: "futurePlan", title: "写作：长篇", minutes: 90 })
+      ])
+    );
+  });
+
+  it("splits an in-progress inactive tail from its real plan start", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "seq",
+        calendarSourceId: "ideal",
+        title: "AFLOAT V1：改进 3",
+        startAt: new Date("2026-07-09T08:00:00Z"),
+        endAt: new Date("2026-07-09T09:00:00Z")
+      },
+      {
+        id: "close",
+        calendarSourceId: "ideal",
+        title: "AFLOAT V1：改进",
+        startAt: new Date("2026-07-12T18:30:00Z"),
+        endAt: new Date("2026-07-12T19:45:00Z")
+      },
+      {
+        id: "in-progress-tail",
+        calendarSourceId: "ideal",
+        title: "AFLOAT V1：改进",
+        startAt: new Date("2026-07-20T14:00:00Z"),
+        endAt: new Date("2026-07-20T15:30:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-07-20T15:00:00Z")
+    });
+
+    expect(threads[0]?.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "fact",
+          startAt: "2026-07-20T14:00:00.000Z",
+          endAt: "2026-07-20T15:00:00.000Z",
+          minutes: 60
+        }),
+        expect.objectContaining({
+          source: "futurePlan",
+          startAt: "2026-07-20T15:00:00.000Z",
+          endAt: "2026-07-20T15:30:00.000Z",
+          minutes: 30
+        })
+      ])
+    );
+  });
+
+  it("groups standalone unnumbered activities under the reserved --- item", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "loose-1",
+        calendarSourceId: "ideal",
+        title: "写作：随笔",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      },
+      {
+        id: "loose-2",
+        calendarSourceId: "ideal",
+        title: "写作：--- 12",
+        startAt: new Date("2026-05-02T20:00:00Z"),
+        endAt: new Date("2026-05-02T21:30:00Z")
+      },
+      {
+        id: "item-only",
+        calendarSourceId: "ideal",
+        title: "散步",
+        startAt: new Date("2026-05-02T22:00:00Z"),
+        endAt: new Date("2026-05-02T23:00:00Z")
+      },
+      {
+        id: "threaded",
+        calendarSourceId: "ideal",
+        title: "写作：小说 1",
+        startAt: new Date("2026-05-03T20:00:00Z"),
+        endAt: new Date("2026-05-03T21:00:00Z")
+      },
+      {
+        id: "loose-future",
+        calendarSourceId: "ideal",
+        title: "写作：随笔",
+        startAt: new Date("2026-05-10T20:00:00Z"),
+        endAt: new Date("2026-05-10T20:45:00Z")
+      }
+    ];
+    const declarations: ThreadDeclaration[] = [
+      {
+        id: "novel",
+        group: "写作",
+        item: "小说",
+        expectedMinutes: 120,
+        start: new Date("2026-05-01T00:00:00Z"),
+        deadline: null
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const now = new Date("2026-05-07T12:00:00Z");
+    const threads = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now
+    });
+    const groups = buildThreadGroupViews(threads, now);
+
+    expect(threads.find((thread) => thread.item === "---")).toMatchObject({
+      activityState: "untracked",
+      source: "untracked",
+      fulfilledMinutes: 150,
+      futureMinutes: 45,
+      expectedMinutes: null,
+      start: null,
+      deadline: null,
+      status: "untracked",
+      sequences: []
+    });
+    expect(threads.find((thread) => thread.item === "---")?.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: "写作：随笔", minutes: 60 }),
+        expect.objectContaining({ title: "写作：--- 12", minutes: 90 }),
+        expect.objectContaining({ title: "写作：随笔", minutes: 45, source: "futurePlan" })
+      ])
+    );
+    expect(threads.some((thread) => thread.group === "散步")).toBe(false);
+    expect(groups[0]).toMatchObject({
+      group: "写作",
+      fulfilledMinutes: 210,
+      futureMinutes: 45,
+      expectedMinutes: 120,
+      factGapMinutes: 60,
+      status: "needsScheduling"
+    });
+  });
+
+  it("does not create --- as the only item in a group", () => {
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "loose-only",
+        calendarSourceId: "ideal",
+        title: "生活：散步",
+        startAt: new Date("2026-05-01T20:00:00Z"),
+        endAt: new Date("2026-05-01T21:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const threads = buildThreadViews({
+      declarations: [],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-07T12:00:00Z")
+    });
+
+    expect(threads).toEqual([]);
   });
 
   it("treats a same-name item after closure as a new active generation", () => {
@@ -581,14 +868,14 @@ describe("buildThreadViews", () => {
 
     expect(threads.filter((thread) => thread.group === "Afloat")).toEqual([
       expect.objectContaining({
-        item: "同步闭环",
-        activityState: "inactive",
-        fulfilledMinutes: 120
-      }),
-      expect.objectContaining({
         item: "手动项",
         activityState: "inactive",
         fulfilledMinutes: 60
+      }),
+      expect.objectContaining({
+        item: "同步闭环",
+        activityState: "inactive",
+        fulfilledMinutes: 120
       })
     ]);
   });
@@ -763,7 +1050,72 @@ describe("buildThreadViews", () => {
     });
     const groups = buildThreadGroupViews(threads, now);
 
-    expect(groups[0]?.dailyRequiredMinutes).toBe(60);
+    // Both the current date and deadline date are available planning days.
+    expect(groups[0]?.dailyRequiredMinutes).toBe(44);
+  });
+
+  it("keeps future-start threads upcoming and uses an inclusive start/deadline window", () => {
+    const declarations: ThreadDeclaration[] = [
+      {
+        id: "future",
+        group: "Future",
+        item: "Research",
+        expectedMinutes: 60,
+        start: new Date("2026-05-08T00:00:00Z"),
+        deadline: new Date("2026-05-10T00:00:00Z"),
+        createdAt: new Date("2026-05-01T00:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, []);
+    const factLayer = buildFactLayer(parsedEvents);
+
+    const [beforeStart] = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-07T12:00:00Z")
+    });
+    const [onStart] = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-08T23:59:00Z")
+    });
+
+    expect(beforeStart).toMatchObject({
+      start: "2026-05-08",
+      status: "upcoming",
+      dailyRequiredMinutes: 20
+    });
+    expect(onStart).toMatchObject({
+      status: "needsScheduling",
+      dailyRequiredMinutes: 20
+    });
+  });
+
+  it("uses createdAt as the effective start for historical declarations without Start", () => {
+    const parsedEvents = parseCalendarEvents(sources, []);
+    const factLayer = buildFactLayer(parsedEvents);
+    const [thread] = buildThreadViews({
+      declarations: [
+        {
+          id: "legacy",
+          group: "Legacy",
+          item: "Item",
+          expectedMinutes: null,
+          deadline: null,
+          createdAt: new Date("2026-04-03T00:00:00Z")
+        }
+      ],
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-08T12:00:00Z")
+    });
+
+    expect(thread?.start).toBe("2026-04-03");
   });
 
   it("does not mark unfinished threads expired on the deadline date", () => {

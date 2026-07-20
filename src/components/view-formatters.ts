@@ -160,6 +160,7 @@ export function kindLabel(kind: string) {
 
 export function statusLabel(status: string) {
   const labels: Record<string, string> = {
+    upcoming: "即将到来",
     fulfilled: "已兑现",
     scheduled: "已安排",
     stale: "需要关注",

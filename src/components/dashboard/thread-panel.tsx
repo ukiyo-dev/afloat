@@ -11,7 +11,7 @@ import { formatDuration, formatGeneratedAt, percent, statusLabel, timeRange, kin
 import { MetricItem } from "./metric-card";
 import { semanticTagColorClass } from "../semantic-colors";
 import { compactActivityTitle } from "./activity-title";
-import { groupThreads, threadSourceLabel } from "./utils";
+import { groupThreads, threadSourceLabel, todayKey } from "./utils";
 
 type ThreadActivityFilter = "active" | "inactive" | "all";
 
@@ -27,14 +27,31 @@ export function ThreadPanel({
   const [query, setQuery] = useState("");
   const [activityFilter, setActivityFilter] = useState<ThreadActivityFilter>("active");
   const normalizedQuery = query.trim().toLowerCase();
+  const defaultStart = todayKey(rangeView.timezone);
   const activityFilteredThreads = useMemo(() => {
     if (activityFilter === "all") return combineThreadRowsForAll(view.threads);
-    return view.threads.filter((thread: any) => (thread.activityState ?? "active") === activityFilter);
+    return view.threads.filter((thread: any) =>
+      (thread.activityState ?? "active") === activityFilter ||
+      (activityFilter === "inactive" && thread.activityState === "untracked")
+    );
   }, [activityFilter, view.threads]);
-  const activityThreadGroups = useMemo(
-    () => groupThreads(activityFilteredThreads as DashboardData["view"]["threads"]),
-    [activityFilteredThreads]
-  );
+  const activityThreadGroups = useMemo(() => {
+    const fullGroupStatus = new Map(
+      groupThreads(view.threads).map((group) => [group.group, group.status] as const)
+    );
+    const groups = groupThreads(activityFilteredThreads as DashboardData["view"]["threads"])
+      .map((group) => {
+        const completeStatus = fullGroupStatus.get(group.group) ?? group.status;
+        return {
+          ...group,
+          status:
+            activityFilter === "inactive" && completeStatus !== "fulfilled"
+              ? "untracked" as const
+              : completeStatus
+        };
+      });
+    return sortThreadGroupsForFilter(groups, activityFilter);
+  }, [activityFilter, activityFilteredThreads, view.threads]);
   const filteredThreadGroups = useMemo(() => {
     if (!normalizedQuery) return activityThreadGroups;
 
@@ -54,12 +71,16 @@ export function ThreadPanel({
       .filter(Boolean);
   }, [activityThreadGroups, normalizedQuery]);
   const activeItemCount = view.threads.filter((thread: any) => (thread.activityState ?? "active") === "active").length;
-  const inactiveItemCount = view.threads.filter((thread: any) => thread.activityState === "inactive").length;
+  const inactiveItemCount = view.threads.filter(
+    (thread: any) => thread.activityState === "inactive" || thread.activityState === "untracked"
+  ).length;
   const activeGroupCount = groupThreads(
     view.threads.filter((thread: any) => (thread.activityState ?? "active") === "active") as DashboardData["view"]["threads"]
   ).length;
   const inactiveGroupCount = groupThreads(
-    view.threads.filter((thread: any) => thread.activityState === "inactive") as DashboardData["view"]["threads"]
+    view.threads.filter(
+      (thread: any) => thread.activityState === "inactive" || thread.activityState === "untracked"
+    ) as DashboardData["view"]["threads"]
   ).length;
   const allGroupCount = groupThreads(view.threads).length;
   const currentFilterLabel =
@@ -116,11 +137,11 @@ export function ThreadPanel({
         >
           {(close) => (
             <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} resetOnSuccess onSuccess={close}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1">
-                  <span className="font-mono text-xs font-bold uppercase">Group</span>
-                  <input className="input-brutal w-full" name="group" placeholder="Group Name" required />
-                </label>
+              <label className="flex flex-col gap-1">
+                <span className="font-mono text-xs font-bold uppercase">Group</span>
+                <input className="input-brutal w-full" name="group" placeholder="Group Name" required />
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1">
                   <span className="font-mono text-xs font-bold uppercase">Item</span>
                   <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
@@ -128,6 +149,12 @@ export function ThreadPanel({
                 <label className="flex flex-col gap-1">
                   <span className="font-mono text-xs font-bold uppercase">Target</span>
                   <input className="input-brutal w-full" name="expectedMinutes" inputMode="text" placeholder="120 / 2h30m" />
+                </label>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1">
+                  <span className="font-mono text-xs font-bold uppercase">Start</span>
+                  <input className="input-brutal w-full" name="start" type="date" defaultValue={defaultStart} required />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="font-mono text-xs font-bold uppercase">Deadline</span>
@@ -156,9 +183,9 @@ export function ThreadPanel({
 
       <div className="grid grid-cols-1 gap-6">
         {filteredThreadGroups.map((group: any) => {
-          const dangerBorder = ['expired', 'stale', 'imbalanced'].includes(group.status);
-          const warnBorder = ['tightPace', 'needsScheduling'].includes(group.status);
-          const showGroupStatus = group.status !== "untracked";
+          const dangerBorder = activityFilter !== "inactive" && ['expired', 'stale', 'imbalanced'].includes(group.status);
+          const warnBorder = activityFilter !== "inactive" && ['tightPace', 'needsScheduling'].includes(group.status);
+          const showGroupStatus = !["untracked", "needsScheduling"].includes(group.status);
           
           return (
             <details 
@@ -182,20 +209,26 @@ export function ThreadPanel({
                     </span>
                   ) : null}
                 </div>
-                <span className="font-mono text-sm opacity-80">{group.items.length} Items</span>
+                <span className="ml-auto text-right font-mono text-sm opacity-80">
+                  {group.fulfilledMinutes > 0 ? (
+                    <>
+                      <span>{formatDuration(group.fulfilledMinutes)} Done</span>
+                      <span className="mx-2 opacity-50">/</span>
+                    </>
+                  ) : null}
+                  <span>{group.items.length} Items</span>
+                </span>
               </summary>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 border-t-2 border-ink">
                 <div className="lg:col-span-4 p-6 border-b-2 lg:border-b-0 lg:border-r-2 border-ink bg-paper/50 flex flex-col justify-between">
                    <dl className="grid grid-cols-2 gap-x-4 gap-y-6 mb-6">
-                      <MetricItem compact label="预计投入" value={formatDuration(group.expectedMinutes)} />
-                      <MetricItem compact label="已兑现" value={formatDuration(group.fulfilledMinutes)} />
-                      <MetricItem compact label="未来计划" value={formatDuration(group.futureMinutes)} />
-                      <MetricItem compact label="未计划缺口" value={formatDuration(group.unscheduledGapMinutes)} />
-                      <MetricItem compact label="事实缺口" value={formatDuration(group.factGapMinutes)} />
-                      <MetricItem compact label="Deadline" value={group.deadline ?? "---"} />
-                      <MetricItem compact label="计划覆盖率" value={group.planCoverageRate === null ? "---" : percent(group.planCoverageRate)} />
-                      <MetricItem compact label="每日需安排" value={formatDuration(group.dailyRequiredMinutes ? Math.round(group.dailyRequiredMinutes) : null)} />
+                      {group.expectedMinutes !== null ? <MetricItem compact label="Target" value={formatDuration(group.expectedMinutes)} /> : null}
+                      <MetricItem compact label="Done" value={formatDuration(group.fulfilledMinutes)} />
+                      {group.futureMinutes > 0 ? <MetricItem compact label="Plan" value={formatDuration(group.futureMinutes)} /> : null}
+                      {group.factGapMinutes !== null ? <MetricItem compact label="Remaining" value={formatDuration(group.factGapMinutes)} /> : null}
+                      {group.deadline !== null ? <MetricItem compact label="Deadline" value={group.deadline} /> : null}
+                      {group.dailyRequiredMinutes !== null ? <MetricItem compact label="Daily" value={formatDuration(Math.round(group.dailyRequiredMinutes))} /> : null}
                    </dl>
                    
                    <BrutalDialog
@@ -209,14 +242,20 @@ export function ThreadPanel({
                      {(close) => (
                        <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} resetOnSuccess onSuccess={close}>
                           <input type="hidden" name="group" value={group.group} />
-                          <label className="flex flex-col gap-1">
-                            <span className="font-mono text-xs font-bold uppercase">Item</span>
-                            <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
-                          </label>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label className="flex flex-col gap-1">
+                              <span className="font-mono text-xs font-bold uppercase">Item</span>
+                              <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
+                            </label>
                             <label className="flex flex-col gap-1">
                               <span className="font-mono text-xs font-bold uppercase">Target</span>
                               <input className="input-brutal w-full" name="expectedMinutes" inputMode="text" placeholder="120 / 2h30m" />
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label className="flex flex-col gap-1">
+                              <span className="font-mono text-xs font-bold uppercase">Start</span>
+                              <input className="input-brutal w-full" name="start" type="date" defaultValue={defaultStart} required />
                             </label>
                             <label className="flex flex-col gap-1">
                               <span className="font-mono text-xs font-bold uppercase">Deadline</span>
@@ -244,20 +283,20 @@ export function ThreadPanel({
                                 <span>•</span>
                               </>
                             ) : null}
-                            <span className="bg-ink/10 px-1">{statusLabel(thread.status)}</span>
-                            <span>•</span>
+                            {thread.activityState !== "untracked" &&
+                            !(
+                              activityFilter === "inactive" &&
+                              ["expired", "stale", "imbalanced", "tightPace", "needsScheduling"].includes(thread.status)
+                            ) ? (
+                              <><span className="bg-ink/10 px-1">{statusLabel(thread.status)}</span><span>•</span></>
+                            ) : null}
                             <span>{threadSourceLabel(thread.source)}</span>
                           </span>
                         </div>
                         
                         <div className="min-w-0 max-w-full">
                           <dl className="flex flex-wrap gap-x-4 gap-y-2 font-mono text-sm">
-                            <div><dt className="text-ink-light text-xs">Target</dt><dd className="font-bold">{formatDuration(thread.expectedMinutes)}</dd></div>
-                            <div><dt className="text-ink-light text-xs">Done</dt><dd className="font-bold">{formatDuration(thread.fulfilledMinutes)}</dd></div>
-                            <div><dt className="text-ink-light text-xs">Future</dt><dd className="font-bold">{formatDuration(thread.futureMinutes)}</dd></div>
-                            <div><dt className="text-ink-light text-xs">Deadline</dt><dd className="font-bold">{thread.deadline ?? "---"}</dd></div>
-                            <div><dt className="text-ink-light text-xs">Daily</dt><dd className="font-bold">{formatDuration(thread.dailyRequiredMinutes)}</dd></div>
-                            {threadProgressLabel(thread) ? (
+                            {thread.activityState !== "untracked" && threadProgressLabel(thread) ? (
                               <div>
                                 <dt className="text-ink-light text-xs">Progress</dt>
                                 <dd
@@ -271,11 +310,24 @@ export function ThreadPanel({
                                 </dd>
                               </div>
                             ) : null}
+                            {thread.activityState !== "untracked" && thread.expectedMinutes !== null ? <div><dt className="text-ink-light text-xs">Target</dt><dd className="font-bold">{formatDuration(thread.expectedMinutes)}</dd></div> : null}
+                            <div><dt className="text-ink-light text-xs">Done</dt><dd className="font-bold">{formatDuration(thread.fulfilledMinutes)}</dd></div>
+                            {thread.futureMinutes > 0 ? <div><dt className="text-ink-light text-xs">Plan</dt><dd className="font-bold">{formatDuration(thread.futureMinutes)}</dd></div> : null}
+                            {thread.activityState !== "untracked" && thread.start ? <div><dt className="text-ink-light text-xs">Start</dt><dd className="font-bold">{thread.start}</dd></div> : null}
+                            {thread.activityState !== "untracked" && thread.deadline ? <div><dt className="text-ink-light text-xs">Deadline</dt><dd className="font-bold">{thread.deadline}</dd></div> : null}
+                            {thread.activityState !== "untracked" && thread.deadline ? <div>
+                              <dt className="text-ink-light text-xs">Daily</dt>
+                              <dd className="font-bold">
+                                {thread.deadline
+                                  ? `${formatDuration(thread.dailyRequiredMinutes)}/${thread.remainingDays ?? "---"}`
+                                  : "---"}
+                              </dd>
+                            </div> : null}
                           </dl>
                         </div>
                       </div>
 
-                      <BrutalDialog
+                      {thread.activityState !== "untracked" ? <BrutalDialog
                         title={`Edit ${thread.item}`}
                         trigger={
                           <button type="button" className="font-mono text-xs cursor-pointer hover:text-highlight inline-flex items-center gap-1 select-none opacity-60 hover:opacity-100 transition-opacity mb-4 text-left">
@@ -288,15 +340,25 @@ export function ThreadPanel({
                             <input type="hidden" name="group" value={thread.group} />
                             <input type="hidden" name="item" value={thread.item} />
                             
-                            <div className="grid grid-cols-2 gap-4">
+                            <label className="flex flex-col gap-1">
+                              <span className="font-mono text-xs font-bold uppercase">Target</span>
+                              <input
+                                className="input-brutal w-full"
+                                name="expectedMinutes"
+                                inputMode="text"
+                                defaultValue={thread.expectedMinutes ?? ""}
+                                placeholder="120 / 2h30m"
+                              />
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <label className="flex flex-col gap-1">
-                                <span className="font-mono text-xs font-bold uppercase">Target</span>
+                                <span className="font-mono text-xs font-bold uppercase">Start</span>
                                 <input
                                   className="input-brutal w-full"
-                                  name="expectedMinutes"
-                                  inputMode="text"
-                                  defaultValue={thread.expectedMinutes ?? ""}
-                                  placeholder="120 / 2h30m"
+                                  name="start"
+                                  type="date"
+                                  defaultValue={thread.start ?? defaultStart}
+                                  required
                                 />
                               </label>
                               <div className="flex flex-col gap-1">
@@ -330,7 +392,7 @@ export function ThreadPanel({
                             </div>
                           </ActionForm>
                         )}
-                      </BrutalDialog>
+                      </BrutalDialog> : null}
 
                       {(thread.history ?? []).length > 0 ? (
                         <details suppressHydrationWarning className="group/history mt-4 pt-4 border-t border-dashed border-ink/30">
@@ -346,7 +408,9 @@ export function ThreadPanel({
                                 previous &&
                                 !showDivider &&
                                 entry.source === "fact" &&
-                                isUnnumberedActivityTitle(entry.title);
+                                thread.activityState !== "untracked" &&
+                                isUnnumberedActivityTitle(previous.title) &&
+                                !isUnnumberedActivityTitle(entry.title);
 
                               return (
                                 <div key={`${entry.source}-${entry.startAt}-${entry.endAt}-${entry.kind}`}>
@@ -416,6 +480,32 @@ function combineThreadRowsForAll(threads: DashboardData["view"]["threads"]): Das
   return [...byIdentity.values()];
 }
 
+function sortThreadGroupsForFilter(
+  groups: DashboardData["view"]["threadGroups"],
+  filter: ThreadActivityFilter
+): DashboardData["view"]["threadGroups"] {
+  if (filter === "active") {
+    return groups;
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: [...group.items].sort(
+        (a, b) => descendingStartRank(a.start) - descendingStartRank(b.start)
+      )
+    }))
+    .sort((a, b) => latestGroupStartRank(a.items) - latestGroupStartRank(b.items));
+}
+
+function descendingStartRank(start: string | null | undefined): number {
+  return start ? -Date.parse(`${start}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
+}
+
+function latestGroupStartRank(items: DashboardData["view"]["threads"]): number {
+  return Math.min(...items.map((item) => descendingStartRank(item.start)));
+}
+
 function combineThreadRows(
   a: DashboardData["view"]["threads"][number],
   b: DashboardData["view"]["threads"][number]
@@ -437,6 +527,10 @@ function combineThreadRows(
     externalShiftMinutes: a.externalShiftMinutes + b.externalShiftMinutes,
     internalShiftMinutes: a.internalShiftMinutes + b.internalShiftMinutes,
     expectedMinutes: sumNullable([a.expectedMinutes, b.expectedMinutes]),
+    start:
+      [a.start, b.start]
+        .filter((start): start is string => Boolean(start))
+        .sort((left, right) => right.localeCompare(left))[0] ?? null,
     deadline: latestDeadline([a.deadline, b.deadline]),
     factGapMinutes,
     unscheduledGapMinutes: sumNullable([a.unscheduledGapMinutes, b.unscheduledGapMinutes]),

@@ -38,8 +38,13 @@ export function projectThreadsForNow(
     return threads;
   }
 
-  const projectionNow = runtimeNow > baseNow ? runtimeNow : baseNow;
+  const minuteRuntimeNow = floorToMinute(runtimeNow);
+  const projectionNow = minuteRuntimeNow > baseNow ? minuteRuntimeNow : baseNow;
   return threads.map((thread) => projectThreadForNow(thread, baseNow, projectionNow, timezone, staleDays));
+}
+
+function floorToMinute(value: Date): Date {
+  return new Date(Math.floor(value.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
 }
 
 export function projectThreadGroupsForNow(
@@ -65,11 +70,15 @@ function projectThreadForNow(
     internalShiftMinutes: 0,
     totalMinutes: 0
   };
-  const history = mergeAdjacentHistoryEntries(thread.history.flatMap((entry) => {
+  const projectedHistory = thread.history.flatMap((entry) => {
     const projected = projectHistoryEntryForNow(entry, baseNow, runtimeNow);
     addElapsedProjection(elapsed, projected);
     return projected.entries;
-  }));
+  });
+  const history =
+    thread.activityState === "untracked"
+      ? projectedHistory
+      : mergeAdjacentHistoryEntries(projectedHistory);
 
   const fulfilledMinutes = thread.fulfilledMinutes + elapsed.fulfilledMinutes;
   const externalShiftMinutes = thread.externalShiftMinutes + elapsed.externalShiftMinutes;
@@ -85,8 +94,22 @@ function projectThreadForNow(
     factGapMinutes === null || factGapMinutes === 0 ? null : futureMinutes / factGapMinutes;
   const dailyRequiredMinutes =
     unscheduledGapMinutes !== null && thread.deadline
-      ? dailyRequired(unscheduledGapMinutes, thread.deadline, runtimeNow)
+      ? dailyRequired(
+          unscheduledGapMinutes,
+          thread.start ?? localDayKey(runtimeNow, timezone),
+          thread.deadline,
+          runtimeNow,
+          timezone
+        )
       : null;
+  const remainingDays = thread.deadline
+    ? inclusiveDaysBetween(
+        [localDayKey(runtimeNow, timezone), thread.start ?? localDayKey(runtimeNow, timezone)]
+          .sort()
+          .at(-1)!,
+        thread.deadline
+      )
+    : null;
   const sortedHistory = history.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
   const lastActivityAt = latestFactActivityAt(sortedHistory) ?? thread.lastActivityAt ?? null;
 
@@ -100,12 +123,14 @@ function projectThreadForNow(
     unscheduledGapMinutes,
     planCoverageRate,
     dailyRequiredMinutes,
+    remainingDays,
     status: projectedStatus({
       previousStatus: thread.status,
       activityState: thread.activityState ?? "active",
       factGapMinutes,
       unscheduledGapMinutes,
       dailyRequiredMinutes,
+      start: thread.start ?? localDayKey(runtimeNow, timezone),
       deadline: thread.deadline,
       lastActivityAt,
       runtimeNow,
@@ -246,11 +271,13 @@ function minutesBetween(startAt: Date, endAt: Date): number {
 
 function dailyRequired(
   unscheduledGapMinutes: number,
+  start: string,
   deadline: string,
-  runtimeNow: Date
+  runtimeNow: Date,
+  timezone: string
 ): number | null {
-  const deadlineDate = new Date(`${deadline}T00:00:00.000Z`);
-  const daysLeft = Math.max(0, Math.ceil((deadlineDate.getTime() - runtimeNow.getTime()) / MS_PER_DAY));
+  const effectiveStart = [localDayKey(runtimeNow, timezone), start].sort().at(-1)!;
+  const daysLeft = inclusiveDaysBetween(effectiveStart, deadline);
   return daysLeft > 0 ? unscheduledGapMinutes / daysLeft : null;
 }
 
@@ -260,6 +287,7 @@ function projectedStatus(input: {
   factGapMinutes: number | null;
   unscheduledGapMinutes: number | null;
   dailyRequiredMinutes: number | null;
+  start: string;
   deadline: string | null;
   lastActivityAt: string | null;
   runtimeNow: Date;
@@ -268,6 +296,9 @@ function projectedStatus(input: {
 }): Thread["status"] {
   if (input.previousStatus === "fulfilled") {
     return "fulfilled";
+  }
+  if (localDayKey(input.runtimeNow, input.timezone) < input.start) {
+    return "upcoming";
   }
   if (
     input.deadline &&
@@ -279,7 +310,14 @@ function projectedStatus(input: {
   }
   if (
     input.activityState === "active" &&
-    isStale(input.lastActivityAt, input.runtimeNow, input.staleDays)
+    isStale(
+      input.lastActivityAt
+        ? localDayKey(new Date(input.lastActivityAt), input.timezone)
+        : input.start,
+      input.runtimeNow,
+      input.timezone,
+      input.staleDays
+    )
   ) {
     return "stale";
   }
@@ -301,15 +339,30 @@ function latestFactActivityAt(history: ThreadHistoryEntry[]): string | null {
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
 }
 
-function isStale(lastActivityAt: string | null, runtimeNow: Date, staleDays: number): boolean {
-  if (!lastActivityAt || !Number.isFinite(staleDays) || staleDays < 1) {
+function isStale(
+  referenceDay: string | null,
+  runtimeNow: Date,
+  timezone: string,
+  staleDays: number
+): boolean {
+  if (!referenceDay || !Number.isFinite(staleDays) || staleDays < 1) {
     return false;
   }
-  const lastActivityMs = new Date(lastActivityAt).getTime();
-  if (!Number.isFinite(lastActivityMs)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(referenceDay)) {
     return false;
   }
-  return runtimeNow.getTime() - lastActivityMs > staleDays * MS_PER_DAY;
+  return dayDifference(referenceDay, localDayKey(runtimeNow, timezone)) >= staleDays;
+}
+
+function inclusiveDaysBetween(start: string, end: string): number {
+  const difference = dayDifference(start, end);
+  return difference < 0 ? 0 : difference + 1;
+}
+
+function dayDifference(start: string, end: string): number {
+  const startMs = Date.parse(`${start}T00:00:00.000Z`);
+  const endMs = Date.parse(`${end}T00:00:00.000Z`);
+  return Math.round((endMs - startMs) / MS_PER_DAY);
 }
 
 function localDayKey(date: Date, timezone: string): string {

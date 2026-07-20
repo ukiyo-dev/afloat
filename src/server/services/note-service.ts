@@ -1,35 +1,36 @@
 import { db } from "@/server/db/client";
-import { deleteNote, upsertNote, type NoteVisibility } from "@/server/db/notes";
+import { createNote, deleteNote, updateNote, type NoteVisibility } from "@/server/db/notes";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
-import { validateNote, validateNoteDate } from "@/server/services/workbench-validation";
+import { validateNote } from "@/server/services/workbench-validation";
 
 export interface NoteInput {
   date: string;
   body: string;
   visibility: NoteVisibility;
-  originalDate?: string | null;
+  id?: string | null;
 }
 
 export async function saveNote(input: NoteInput) {
   validateNote(input);
-  if (input.originalDate) {
-    validateNoteDate(input.originalDate);
-  }
 
   const ownerId = await getCurrentOwnerId();
-  if (input.originalDate && input.originalDate !== input.date) {
-    await deleteNote(db, ownerId, input.originalDate);
-  }
-
-  return upsertNote(db, ownerId, {
+  const values = {
     date: input.date,
     body: input.body,
     visibility: input.visibility
-  });
+  };
+
+  if (input.id) {
+    return updateNote(db, ownerId, input.id, values);
+  }
+
+  return createNote(db, ownerId, values);
 }
 
-export async function deleteNoteByDate(date: string): Promise<void> {
-  validateNoteDate(date);
+export async function deleteNoteById(noteId: string): Promise<void> {
+  if (noteId.trim().length === 0) {
+    throw new Error("noteId is required.");
+  }
   const ownerId = await getCurrentOwnerId();
-  await deleteNote(db, ownerId, date);
+  await deleteNote(db, ownerId, noteId);
 }

@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -136,7 +137,8 @@ export const threadDeclarations = pgTable(
     group: text("group_name").notNull(),
     item: text("item_name").notNull(),
     expectedMinutes: integer("expected_minutes"),
-    deadline: timestamp("deadline", { withTimezone: true }),
+    start: date("start_date", { mode: "date" }),
+    deadline: date("deadline", { mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
   },
@@ -160,7 +162,7 @@ export const notes = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [
-    uniqueIndex("notes_owner_date_idx_unique").on(table.ownerId, table.date)
+    index("notes_owner_date_idx").on(table.ownerId, table.date)
   ]
 );
 

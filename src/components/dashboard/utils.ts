@@ -10,30 +10,41 @@ export function groupThreads(threads: DashboardData["view"]["threads"]): Dashboa
   }
 
   return [...byGroup.entries()].map(([group, items]) => {
-    const expectedValues = items
+    const commitmentItems = items.filter((item) => item.activityState !== "untracked");
+    const expectedValues = commitmentItems
       .map((item) => item.expectedMinutes)
       .filter((value): value is number => value !== null);
     const expectedMinutes =
       expectedValues.length > 0 ? expectedValues.reduce((total, value) => total + value, 0) : null;
     const fulfilledMinutes = sum(items.map((item) => item.fulfilledMinutes));
     const futureMinutes = sum(items.map((item) => item.futureMinutes));
-    const factGapMinutes = sumNullable(items.map((item) => item.factGapMinutes));
-    const unscheduledGapMinutes = sumNullable(items.map((item) => item.unscheduledGapMinutes));
+    const factGapMinutes = sumNullable(commitmentItems.map((item) => item.factGapMinutes));
+    const unscheduledGapMinutes = sumNullable(commitmentItems.map((item) => item.unscheduledGapMinutes));
     const coveredFutureMinutes = sum(
-      items.map((item) =>
+      commitmentItems.map((item) =>
         item.factGapMinutes === null ? 0 : Math.min(item.futureMinutes, item.factGapMinutes)
       )
     );
     const planCoverageRate =
       factGapMinutes === null || factGapMinutes === 0 ? null : coveredFutureMinutes / factGapMinutes;
 
+    const allItemsInactive = items.every(
+      (item) => item.activityState === "inactive" || item.activityState === "untracked"
+    );
+    const computedStatus = highestRiskStatus(commitmentItems.map((item) => item.status));
+
     return {
       key: encodeURIComponent(group),
       group,
       expectedMinutes,
+      start:
+        items
+          .flatMap((item) => item.activityState === "untracked" ? [] : [item.start])
+          .filter((start): start is string => Boolean(start))
+          .sort((a, b) => a.localeCompare(b))[0] ?? null,
       deadline:
         items
-          .map((item) => item.deadline)
+          .flatMap((item) => item.activityState === "untracked" ? [] : [item.deadline])
           .filter((deadline): deadline is string => deadline !== null)
           .sort((a, b) => b.localeCompare(a))[0] ?? null,
       fulfilledMinutes,
@@ -44,10 +55,45 @@ export function groupThreads(threads: DashboardData["view"]["threads"]): Dashboa
       unscheduledGapMinutes,
       planCoverageRate,
       dailyRequiredMinutes: null,
-      status: highestRiskStatus(items.map((item) => item.status)),
-      items
+      status: computedStatus === "fulfilled" && !allItemsInactive ? "untracked" : computedStatus,
+      items: [...items].sort(compareActiveSchedule)
     };
-  });
+  }).sort(compareActiveSchedule);
+}
+
+function compareActiveSchedule(
+  a: { start?: string | null; deadline: string | null; status: ThreadStatus },
+  b: { start?: string | null; deadline: string | null; status: ThreadStatus }
+): number {
+  const upcomingOrder = Number(a.status === "upcoming") - Number(b.status === "upcoming");
+  if (upcomingOrder !== 0) return upcomingOrder;
+
+  if (a.status === "upcoming" && b.status === "upcoming") {
+    return (
+      startRank(a.start) - startRank(b.start) ||
+      statusRank(a.status) - statusRank(b.status) ||
+      deadlineRank(a.deadline) - deadlineRank(b.deadline)
+    );
+  }
+
+  const deadlinePresenceOrder = Number(a.deadline === null) - Number(b.deadline === null);
+  if (deadlinePresenceOrder !== 0) return deadlinePresenceOrder;
+  if (a.deadline && b.deadline) {
+    return (
+      deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
+      statusRank(a.status) - statusRank(b.status) ||
+      startRank(a.start) - startRank(b.start)
+    );
+  }
+  return startRank(a.start) - startRank(b.start) || statusRank(a.status) - statusRank(b.status);
+}
+
+function startRank(start: string | null | undefined): number {
+  return start ? Date.parse(`${start}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
+}
+
+function deadlineRank(deadline: string | null): number {
+  return deadline ? Date.parse(`${deadline}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
 }
 
 function highestRiskStatus(statuses: ThreadStatus[]): ThreadStatus {
@@ -63,7 +109,8 @@ function statusRank(status: ThreadStatus): number {
     needsScheduling: 4,
     scheduled: 5,
     fulfilled: 6,
-    untracked: 7
+    untracked: 7,
+    upcoming: 8
   };
   return ranks[status] ?? 8;
 }
@@ -114,7 +161,8 @@ export function threadSourceLabel(source: string) {
   const labels: Record<string, string> = {
     declared: "主动",
     auto: "自动",
-    both: "主动+自动"
+    both: "主动+自动",
+    untracked: "不追踪"
   };
   return labels[source] ?? source;
 }

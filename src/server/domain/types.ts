@@ -76,13 +76,15 @@ export interface ThreadDeclaration {
   group: string;
   item: string;
   expectedMinutes?: number | null;
+  start?: Date | null;
   deadline?: Date | null;
   createdAt?: Date | null;
 }
 
-export type ThreadSource = "declared" | "auto" | "both";
+export type ThreadSource = "declared" | "auto" | "both" | "untracked";
 
 export type FeasibilityStatus =
+  | "upcoming"
   | "fulfilled"
   | "scheduled"
   | "stale"
@@ -96,19 +98,21 @@ export interface ThreadView {
   key: string;
   group: string;
   item: string;
-  activityState?: "active" | "inactive";
+  activityState?: "active" | "inactive" | "untracked";
   source: ThreadSource;
   fulfilledMinutes: number;
   futureMinutes: number;
   externalShiftMinutes: number;
   internalShiftMinutes: number;
   expectedMinutes: number | null;
+  start?: string | null;
   deadline: string | null;
   lastActivityAt?: string | null;
   factGapMinutes: number | null;
   unscheduledGapMinutes: number | null;
   planCoverageRate: number | null;
   dailyRequiredMinutes: number | null;
+  remainingDays?: number | null;
   status: FeasibilityStatus;
   canDelete: boolean;
   closed: boolean;
@@ -120,6 +124,7 @@ export interface ThreadGroupView {
   key: string;
   group: string;
   expectedMinutes: number | null;
+  start?: string | null;
   deadline: string | null;
   fulfilledMinutes: number;
   futureMinutes: number;

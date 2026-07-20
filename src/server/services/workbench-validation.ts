@@ -46,10 +46,16 @@ export function validateThreadDeclaration(input: ThreadDeclarationInput): void {
   if (input.group.trim().length === 0 || input.item.trim().length === 0) {
     throw new Error("group and item are required.");
   }
+  if (input.item.trim() === "---") {
+    throw new Error("--- is reserved for untracked group activities.");
+  }
   if (
     input.expectedMinutes !== null &&
     (!Number.isInteger(input.expectedMinutes) || input.expectedMinutes < 0)
   ) {
     throw new Error("expectedMinutes must be a non-negative integer.");
+  }
+  if (input.start && input.deadline && input.start > input.deadline) {
+    throw new Error("start must be on or before deadline.");
   }
 }

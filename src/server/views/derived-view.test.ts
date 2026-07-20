@@ -14,6 +14,7 @@ describe("buildDerivedViews", () => {
     expect(views.private.timeline).toHaveLength(2);
     expect(views.private.notes.map((note) => note.id)).toEqual([
       "newer-private",
+      "newer-public",
       "older-public"
     ]);
   });
@@ -79,6 +80,12 @@ function sampleInput(): DerivedViewInput {
         date: "2026-05-08",
         body: "hidden from visitors",
         visibility: "private"
+      },
+      {
+        id: "newer-public",
+        date: "2026-05-08",
+        body: "second entry on the same day",
+        visibility: "public"
       }
     ]
   };

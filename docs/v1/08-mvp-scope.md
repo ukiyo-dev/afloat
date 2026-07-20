@@ -25,8 +25,8 @@ v1 做一个单用户个人承诺观察系统。
 - 线程自动发现
 - 空线程删除
 - 线程历史显示
-- Group 聚合 Item 级 expectedMinutes 与 deadline
-- `expectedMinutes + deadline` 可行性分析
+- Group 聚合 Item 级 expectedMinutes、start 与 deadline
+- `expectedMinutes + start + deadline` 可行性分析
 - `TEST` 与 `SIGNED` 用户规则
 - 规则违约记录
 - 规则连续守约 run 计算
@@ -111,11 +111,14 @@ v1 MVP 至少要能验证：
 - 镜像页主视图可以按自定义开始日与结束日统计，且范围包含两端日期。若结束日早于开始日，则按结束日单日统计。
 - 镜像页主视图提供最近 7d、14d 和 30d 的范围统计快捷入口。
 - 线程能从带序号事件自动发现。
+- 已有正式 Item 的 Group 可以派生 `---` 不追踪 Item，用于汇总明确 `Group：Item` 结构的无序号活动；`---` 不能单独形成 Threads Group，也不参与承诺可行性。
+- 已收束 Item 的后续同名无序号事实与 Future 继续归入终止尾部，但不重新激活 Item，也不恢复 Target、Deadline 或可行性计算。
 - 主动线程能在没有事实推进时显示为未启动。
 - 用户可以在已有 Group 下独立添加 Item。
-- Group 的 deadline 取所有 Item 中最晚的 deadline，预计时间取所有 Item 之和。
+- Group 的 start 取所有 Item 中最早的 start，deadline 取最晚的 deadline，预计时间取所有 Item 之和。
 - `expectedMinutes` 只被事实兑现抵扣。
 - 未来计划生成未来承诺与未计划缺口。
+- 跨越当前时刻的计划在 Thread Recent Activities 中按当前完整分钟拆为过去事实与剩余 Future，不生成 `0m` 片段。
 - 用户可以创建 `TEST` 或 `SIGNED` 规则，记录违约，并看到当前 run、历史 best run 和 break 数量。
 - 规则违约当天当前 run 清零，次日本地日期重新开始。
 - `TEST` 签署为 `SIGNED` 时直接复用签署当下的 current run 起点与天数，不重新起算；历史 best 和违约历史继续沿用，既有 `test_break` 不改写为 `rule_break`。

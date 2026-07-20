@@ -11,6 +11,7 @@ export interface ThreadDeclarationInput {
   group: string;
   item: string;
   expectedMinutes: number | null;
+  start: Date | null;
   deadline: Date | null;
 }
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { saveCalendarSourceMapping } from "@/server/services/calendar-source-service";
 import { isCalendarMappingValue } from "@/server/services/calendar-source-validation";
-import { deleteNoteByDate, saveNote } from "@/server/services/note-service";
+import { deleteNoteById, saveNote } from "@/server/services/note-service";
 import { syncRecent, syncRecalibrate } from "@/server/services/sync-service";
 import { parseDurationInput } from "@/server/services/duration-input";
 import {
@@ -62,6 +62,7 @@ export async function saveThreadDeclarationAction(formData: FormData) {
   const group = formData.get("group");
   const item = formData.get("item");
   const expectedMinutes = formData.get("expectedMinutes");
+  const start = formData.get("start");
   const deadline = formData.get("deadline");
 
   if (typeof group !== "string" || typeof item !== "string") {
@@ -72,6 +73,10 @@ export async function saveThreadDeclarationAction(formData: FormData) {
     group,
     item,
     expectedMinutes: parseDurationInput(expectedMinutes),
+    start:
+      typeof start === "string" && start.trim() !== ""
+        ? new Date(`${start}T00:00:00.000Z`)
+        : null,
     deadline:
       typeof deadline === "string" && deadline.trim() !== ""
         ? new Date(`${deadline}T00:00:00.000Z`)
@@ -166,8 +171,8 @@ export async function deletePersonalRuleAction(formData: FormData) {
 }
 
 export async function saveNoteAction(formData: FormData) {
+  const id = formData.get("id");
   const date = formData.get("date");
-  const originalDate = formData.get("originalDate");
   const body = formData.get("body");
   const visibility = formData.get("visibility");
 
@@ -183,20 +188,20 @@ export async function saveNoteAction(formData: FormData) {
     date,
     body,
     visibility,
-    originalDate: typeof originalDate === "string" && originalDate.trim() !== "" ? originalDate : null
+    id: typeof id === "string" && id.trim() !== "" ? id : null
   });
   await recomputeCurrentOwnerViews();
   revalidatePath("/dashboard");
 }
 
 export async function deleteNoteAction(formData: FormData) {
-  const date = formData.get("date");
+  const id = formData.get("id");
 
-  if (typeof date !== "string") {
+  if (typeof id !== "string") {
     throw new Error("Invalid note deletion form data.");
   }
 
-  await deleteNoteByDate(date);
+  await deleteNoteById(id);
   await recomputeCurrentOwnerViews();
   revalidatePath("/dashboard");
 }

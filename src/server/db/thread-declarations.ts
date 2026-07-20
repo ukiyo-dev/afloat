@@ -10,6 +10,7 @@ export async function upsertThreadDeclaration(
     group: string;
     item: string;
     expectedMinutes: number | null;
+    start: Date | null;
     deadline: Date | null;
   }
 ) {
@@ -20,12 +21,14 @@ export async function upsertThreadDeclaration(
       group: input.group,
       item: input.item,
       expectedMinutes: input.expectedMinutes,
+      start: input.start,
       deadline: input.deadline
     })
     .onConflictDoUpdate({
       target: [threadDeclarations.ownerId, threadDeclarations.group, threadDeclarations.item],
       set: {
         expectedMinutes: sql`excluded.expected_minutes`,
+        start: sql`excluded.start_date`,
         deadline: sql`excluded.deadline`,
         updatedAt: sql`now()`
       }

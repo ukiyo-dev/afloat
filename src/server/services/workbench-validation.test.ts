@@ -75,6 +75,7 @@ describe("workbench validation", () => {
         group: "Afloat",
         item: "同步闭环",
         expectedMinutes: 120,
+        start: new Date("2026-05-01T00:00:00.000Z"),
         deadline: new Date("2026-05-15T00:00:00.000Z")
       })
     ).not.toThrow();
@@ -83,8 +84,18 @@ describe("workbench validation", () => {
         group: "",
         item: "同步闭环",
         expectedMinutes: null,
+        start: null,
         deadline: null
       })
     ).toThrow("group and item are required");
+    expect(() =>
+      validateThreadDeclaration({
+        group: "Afloat",
+        item: "Future",
+        expectedMinutes: 60,
+        start: new Date("2026-05-16T00:00:00.000Z"),
+        deadline: new Date("2026-05-15T00:00:00.000Z")
+      })
+    ).toThrow("start must be on or before deadline");
   });
 });

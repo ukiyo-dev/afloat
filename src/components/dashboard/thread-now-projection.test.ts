@@ -3,6 +3,51 @@ import { describe, expect, it } from "vitest";
 import { projectThreadGroupsForNow, projectThreadsForNow } from "./thread-now-projection";
 
 describe("projectThreadsForNow", () => {
+  it("does not apply the attention threshold before Start and activates on the Start date", () => {
+    const thread = {
+      key: "future",
+      group: "Future",
+      item: "Item",
+      activityState: "active" as const,
+      source: "declared" as const,
+      fulfilledMinutes: 0,
+      futureMinutes: 0,
+      externalShiftMinutes: 0,
+      internalShiftMinutes: 0,
+      expectedMinutes: null,
+      start: "2026-07-10",
+      deadline: null,
+      lastActivityAt: "2026-07-10T00:00:00.000Z",
+      factGapMinutes: null,
+      unscheduledGapMinutes: null,
+      planCoverageRate: null,
+      dailyRequiredMinutes: null,
+      status: "upcoming" as const,
+      canDelete: true,
+      closed: false,
+      sequences: [],
+      history: []
+    };
+
+    const [beforeStart] = projectThreadsForNow(
+      [thread],
+      "2026-07-09T23:00:00.000Z",
+      "UTC",
+      "2026-07-09T00:00:00.000Z",
+      7
+    );
+    const [onStart] = projectThreadsForNow(
+      [thread],
+      "2026-07-10T23:59:59.000Z",
+      "UTC",
+      "2026-07-09T00:00:00.000Z",
+      7
+    );
+
+    expect(beforeStart?.status).toBe("upcoming");
+    expect(onStart?.status).toBe("untracked");
+  });
+
   it("marks active items stale when last activity exceeds the configured threshold", () => {
     const [active, inactive] = projectThreadsForNow(
       [
@@ -405,5 +450,102 @@ describe("projectThreadsForNow", () => {
     expect(second?.fulfilledMinutes).toBe(125);
     expect(first?.history.find((entry) => entry.source === "fact")?.minutes).toBe(125);
     expect(second?.history.find((entry) => entry.source === "fact")?.minutes).toBe(125);
+  });
+
+  it("keeps adjacent repeated untracked activities as separate history entries", () => {
+    const [thread] = projectThreadsForNow(
+      [
+        {
+          key: "writing-untracked",
+          group: "写作",
+          item: "---",
+          activityState: "untracked" as const,
+          source: "untracked" as const,
+          fulfilledMinutes: 120,
+          futureMinutes: 0,
+          externalShiftMinutes: 0,
+          internalShiftMinutes: 0,
+          expectedMinutes: null,
+          start: null,
+          deadline: null,
+          factGapMinutes: null,
+          unscheduledGapMinutes: null,
+          planCoverageRate: null,
+          dailyRequiredMinutes: null,
+          status: "untracked" as const,
+          canDelete: false,
+          closed: false,
+          sequences: [],
+          history: [
+            {
+              startAt: "2026-07-05T10:00:00.000Z",
+              endAt: "2026-07-05T11:00:00.000Z",
+              kind: "idealFulfilled",
+              minutes: 60,
+              title: "写作：随笔",
+              source: "fact" as const
+            },
+            {
+              startAt: "2026-07-05T11:00:00.000Z",
+              endAt: "2026-07-05T12:00:00.000Z",
+              kind: "idealFulfilled",
+              minutes: 60,
+              title: "写作：随笔",
+              source: "fact" as const
+            }
+          ]
+        }
+      ],
+      "2026-07-06T00:00:00.000Z",
+      "UTC",
+      "2026-07-06T00:00:00.000Z"
+    );
+
+    expect(thread?.history).toHaveLength(2);
+  });
+
+  it("does not create a zero-minute fact projection during the first partial minute", () => {
+    const [thread] = projectThreadsForNow(
+      [
+        {
+          key: "afloat-improvements",
+          group: "AFLOAT V1",
+          item: "改进",
+          source: "auto" as const,
+          fulfilledMinutes: 0,
+          futureMinutes: 30,
+          externalShiftMinutes: 0,
+          internalShiftMinutes: 0,
+          expectedMinutes: null,
+          deadline: null,
+          factGapMinutes: null,
+          unscheduledGapMinutes: null,
+          planCoverageRate: null,
+          dailyRequiredMinutes: null,
+          status: "untracked" as const,
+          canDelete: false,
+          closed: false,
+          sequences: [1],
+          history: [
+            {
+              startAt: "2026-07-20T15:00:00.000Z",
+              endAt: "2026-07-20T15:30:00.000Z",
+              kind: "ideal",
+              minutes: 30,
+              title: "AFLOAT V1：改进",
+              source: "futurePlan" as const
+            }
+          ]
+        }
+      ],
+      "2026-07-20T15:00:20.000Z",
+      "UTC",
+      "2026-07-20T14:59:00.000Z"
+    );
+
+    expect(thread?.history).toEqual([
+      expect.objectContaining({ source: "futurePlan", minutes: 30 })
+    ]);
+    expect(thread?.history.some((entry) => entry.source === "fact")).toBe(false);
   });
 });

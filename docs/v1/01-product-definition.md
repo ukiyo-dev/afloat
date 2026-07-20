@@ -76,7 +76,9 @@ Afloat 不创建任务，不管理 checklist，不判断完成失败。
 
 紧急事项应优先进入日历计划层，由用户大胆安排到具体时间窗口中；如果现实执行中发生变化，再由偏移层记录改写。它不需要先作为 Thread Item 长期追踪。不重要事项不应进入 Afloat，否则 Threads 会退化为 checklist。
 
-线程可以承载主题承诺，也可以承载 `To Do`、`Relax List`、`Explore List` 这类开放分类。Deadline 不是催促工具，而是承诺型线程的时间边界。可行性分析不是预测用户能否做到，而是呈现当前未来计划是否足以承载承诺。
+线程可以承载主题承诺，也可以承载 `To Do`、`Relax List`、`Explore List` 这类开放分类。Start 与 Deadline 以日期级闭区间定义承诺观察窗口，使 Thread 可以提前声明更远未来的事项；Deadline 不是催促工具。可行性分析不是预测用户能否做到，而是呈现当前未来计划是否足以承载承诺。
+
+已有正式 Item 的 Group 可以通过派生保留 Item `---` 收纳“不追踪”活动。它补全 Group 的事实与信息性 Future，但不成为新的承诺，不参与 Active、Target、Deadline 或可行性判断，也不能单独形成 Threads Group。
 
 ## 不是习惯养成
 

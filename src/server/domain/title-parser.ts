@@ -12,13 +12,14 @@ export function parseTitle(rawTitle: string): ParsedTitle {
     : body.trim();
 
   const [group, item] = splitGroupItem(titleBody);
+  const reservedUntrackedItem = item === "---";
 
   return {
     rawTitle,
     titleBody,
     group,
     item,
-    sequence,
+    sequence: reservedUntrackedItem ? null : sequence,
     quality
   };
 }

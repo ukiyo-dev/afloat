@@ -1,11 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { Database } from "./client";
 import { notes } from "./schema";
 
 export type NoteVisibility = "private" | "public";
 
-export async function upsertNote(
+export async function createNote(
   database: Database,
   ownerId: string,
   input: { date: string; body: string; visibility: NoteVisibility }
@@ -18,14 +18,6 @@ export async function upsertNote(
       body: input.body,
       visibility: input.visibility
     })
-    .onConflictDoUpdate({
-      target: [notes.ownerId, notes.date],
-      set: {
-        body: sql`excluded.body`,
-        visibility: sql`excluded.visibility`,
-        updatedAt: sql`now()`
-      }
-    })
     .returning();
 
   if (!row) {
@@ -35,8 +27,32 @@ export async function upsertNote(
   return row;
 }
 
-export async function deleteNote(database: Database, ownerId: string, date: string): Promise<void> {
-  await database.delete(notes).where(sql`${notes.ownerId} = ${ownerId} and ${notes.date} = ${date}`);
+export async function updateNote(
+  database: Database,
+  ownerId: string,
+  noteId: string,
+  input: { date: string; body: string; visibility: NoteVisibility }
+) {
+  const [row] = await database
+    .update(notes)
+    .set({
+      date: input.date,
+      body: input.body,
+      visibility: input.visibility,
+      updatedAt: new Date()
+    })
+    .where(and(eq(notes.ownerId, ownerId), eq(notes.id, noteId)))
+    .returning();
+
+  if (!row) {
+    throw new Error("Note not found.");
+  }
+
+  return row;
+}
+
+export async function deleteNote(database: Database, ownerId: string, noteId: string): Promise<void> {
+  await database.delete(notes).where(and(eq(notes.ownerId, ownerId), eq(notes.id, noteId)));
 }
 
 export async function loadNotes(database: Database, ownerId: string) {

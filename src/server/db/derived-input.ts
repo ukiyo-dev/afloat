@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import type { CalendarSource, Note, RawCalendarEvent, ThreadDeclaration } from "@/server/domain/types";
 import type { DerivedViewInput } from "@/server/views/derived-view";
@@ -24,7 +24,11 @@ export async function loadDerivedViewInput(
       .select()
       .from(threadDeclarations)
       .where(eq(threadDeclarations.ownerId, ownerId)),
-    database.select().from(notes).where(eq(notes.ownerId, ownerId)),
+    database
+      .select()
+      .from(notes)
+      .where(eq(notes.ownerId, ownerId))
+      .orderBy(desc(notes.date), desc(notes.createdAt)),
     database.query.settings.findFirst({ where: eq(settings.ownerId, ownerId) })
   ]);
 
@@ -56,6 +60,7 @@ export async function loadDerivedViewInput(
         group: thread.group,
         item: thread.item,
         expectedMinutes: thread.expectedMinutes,
+        start: thread.start,
         deadline: thread.deadline,
         createdAt: thread.createdAt
       })
