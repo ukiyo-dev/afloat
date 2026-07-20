@@ -12,6 +12,8 @@ import { MetricItem } from "./metric-card";
 import { semanticTagColorClass } from "../semantic-colors";
 import { compactActivityTitle } from "./activity-title";
 import { groupThreads, threadSourceLabel, todayKey } from "./utils";
+import { ThreadLoadStrip } from "./thread-load-strip";
+import { ThreadCommitmentFields } from "./thread-commitment-fields";
 
 type ThreadActivityFilter = "active" | "inactive" | "all";
 
@@ -94,12 +96,10 @@ export function ThreadPanel({
 
   return (
     <section className="mb-12">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b-4 border-ink pb-2">
-        <div>
-          <p className="font-mono text-xs font-bold tracking-widest uppercase mb-1">Threads</p>
-          <h2 className="font-serif text-4xl md:text-5xl font-black uppercase">线程追踪</h2>
-        </div>
-        <div className="mt-4 flex max-w-full items-stretch md:mt-0">
+      <ThreadLoadStrip
+        threads={view.threads}
+        today={defaultStart}
+        headerEnd={<div className="flex max-w-full items-stretch md:mt-0">
           <div className="inline-flex border border-ledger bg-ledger">
             <ThreadViewIconButton
               active={activityFilter === "active"}
@@ -123,8 +123,8 @@ export function ThreadPanel({
           <span className="bg-ledger px-2 py-1 font-mono text-sm text-ledger-foreground">
             {currentFilterLabel}
           </span>
-        </div>
-      </div>
+        </div>}
+      />
 
       <div className="mb-8 flex items-center gap-3">
         <BrutalDialog 
@@ -141,26 +141,8 @@ export function ThreadPanel({
                 <span className="font-mono text-xs font-bold uppercase">Group</span>
                 <input className="input-brutal w-full" name="group" placeholder="Group Name" required />
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1">
-                  <span className="font-mono text-xs font-bold uppercase">Item</span>
-                  <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="font-mono text-xs font-bold uppercase">Target</span>
-                  <input className="input-brutal w-full" name="expectedMinutes" inputMode="text" placeholder="120 / 2h30m" />
-                </label>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1">
-                  <span className="font-mono text-xs font-bold uppercase">Start</span>
-                  <input className="input-brutal w-full" name="start" type="date" defaultValue={defaultStart} required />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="font-mono text-xs font-bold uppercase">Deadline</span>
-                  <input className="input-brutal w-full" name="deadline" type="date" />
-                </label>
-              </div>
+              <label className="flex flex-col gap-1"><span className="font-mono text-xs font-bold uppercase">Item</span><input className="input-brutal w-full" name="item" placeholder="Item Name" required /></label>
+              <ThreadCommitmentFields defaultStart={defaultStart} today={defaultStart} />
               <div className="flex justify-end mt-4">
                 <SubmitButton className="btn-brutal h-[40px] whitespace-nowrap" pendingText="CREATING...">创建线程</SubmitButton>
               </div>
@@ -242,26 +224,8 @@ export function ThreadPanel({
                      {(close) => (
                        <ActionForm className="flex flex-col gap-4" action={saveThreadDeclarationAction} resetOnSuccess onSuccess={close}>
                           <input type="hidden" name="group" value={group.group} />
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <label className="flex flex-col gap-1">
-                              <span className="font-mono text-xs font-bold uppercase">Item</span>
-                              <input className="input-brutal w-full" name="item" placeholder="Item Name" required />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="font-mono text-xs font-bold uppercase">Target</span>
-                              <input className="input-brutal w-full" name="expectedMinutes" inputMode="text" placeholder="120 / 2h30m" />
-                            </label>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <label className="flex flex-col gap-1">
-                              <span className="font-mono text-xs font-bold uppercase">Start</span>
-                              <input className="input-brutal w-full" name="start" type="date" defaultValue={defaultStart} required />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="font-mono text-xs font-bold uppercase">Deadline</span>
-                              <input className="input-brutal w-full" name="deadline" type="date" />
-                            </label>
-                          </div>
+                          <label className="flex flex-col gap-1"><span className="font-mono text-xs font-bold uppercase">Item</span><input className="input-brutal w-full" name="item" placeholder="Item Name" required /></label>
+                          <ThreadCommitmentFields defaultStart={defaultStart} today={defaultStart} />
                           <div className="flex justify-end mt-4">
                             <SubmitButton className="btn-brutal text-sm py-2" pendingText="ADDING...">添加 Item</SubmitButton>
                           </div>
@@ -340,53 +304,13 @@ export function ThreadPanel({
                             <input type="hidden" name="group" value={thread.group} />
                             <input type="hidden" name="item" value={thread.item} />
                             
-                            <label className="flex flex-col gap-1">
-                              <span className="font-mono text-xs font-bold uppercase">Target</span>
-                              <input
-                                className="input-brutal w-full"
-                                name="expectedMinutes"
-                                inputMode="text"
-                                defaultValue={thread.expectedMinutes ?? ""}
-                                placeholder="120 / 2h30m"
-                              />
-                            </label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <label className="flex flex-col gap-1">
-                                <span className="font-mono text-xs font-bold uppercase">Start</span>
-                                <input
-                                  className="input-brutal w-full"
-                                  name="start"
-                                  type="date"
-                                  defaultValue={thread.start ?? defaultStart}
-                                  required
-                                />
-                              </label>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-mono text-xs font-bold uppercase">Deadline</span>
-                                  {thread.deadline ? (
-                                    <button
-                                      type="button"
-                                      className="font-mono text-xs font-bold text-danger hover:underline"
-                                      onClick={(event) => {
-                                        const input = event.currentTarget.form?.elements.namedItem("deadline");
-                                        if (input instanceof HTMLInputElement) {
-                                          input.value = "";
-                                        }
-                                      }}
-                                    >
-                                      清空
-                                    </button>
-                                  ) : null}
-                                </div>
-                                <input
-                                  className="input-brutal w-full"
-                                  name="deadline"
-                                  type="date"
-                                  defaultValue={thread.deadline ?? ""}
-                                />
-                              </div>
-                            </div>
+                            <ThreadCommitmentFields
+                              key={`${thread.key}-${thread.start}-${thread.deadline}-${thread.expectedMinutes}`}
+                              defaultStart={thread.start ?? defaultStart}
+                              defaultDeadline={thread.deadline}
+                              expectedMinutes={thread.expectedMinutes}
+                              today={defaultStart}
+                            />
                             <div className="flex justify-end mt-4">
                               <SubmitButton className="btn-brutal text-sm py-2" pendingText="UPDATING...">更新</SubmitButton>
                             </div>
