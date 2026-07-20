@@ -76,7 +76,7 @@ export interface ThreadDeclaration {
   group: string;
   item: string;
   expectedMinutes?: number | null;
-  dailyMinutes?: number | null;
+  steadyDaily?: boolean;
   start?: Date | null;
   deadline?: Date | null;
   createdAt?: Date | null;
@@ -106,7 +106,7 @@ export interface ThreadView {
   externalShiftMinutes: number;
   internalShiftMinutes: number;
   expectedMinutes: number | null;
-  declaredDailyMinutes?: number | null;
+  steadyDaily?: boolean;
   start?: string | null;
   deadline: string | null;
   lastActivityAt?: string | null;

@@ -14,7 +14,7 @@ export interface ThreadLoadSegment {
   days: number;
   dailyMinutes: number;
   originalDailyMinutes: number;
-  fixedDailyMinutes: number;
+  steadyDailyMinutes: number;
   contributions: ThreadLoadContribution[];
 }
 
@@ -24,7 +24,7 @@ interface LoadItem {
   minutes: number;
   startIndex: number;
   endIndex: number;
-  fixedDailyMinutes: number | null;
+  steady: boolean;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -40,16 +40,17 @@ export function buildThreadLoadSegments(
   const lastDay = eligible.map((thread) => thread.deadline!).sort().at(-1)!;
   const dates = dayKeys(today, lastDay);
   const items = eligible.map((thread) => toLoadItem(thread, today, dates));
-  const fixed = Array(dates.length).fill(0) as number[];
+  const steadyBase = Array(dates.length).fill(0) as number[];
   const allocations = new Map<string, number[]>();
   const originalAllocations = new Map<string, number[]>();
 
   for (const item of items) {
     const allocation = Array(dates.length).fill(0) as number[];
-    if (item.fixedDailyMinutes !== null) {
+    if (item.steady) {
+      const daily = item.minutes / (item.endIndex - item.startIndex + 1);
       for (let day = item.startIndex; day <= item.endIndex; day += 1) {
-        allocation[day] = item.fixedDailyMinutes;
-        fixed[day] += item.fixedDailyMinutes;
+        allocation[day] = daily;
+        steadyBase[day] += daily;
       }
     } else {
       const daily = item.minutes / (item.endIndex - item.startIndex + 1);
@@ -59,7 +60,7 @@ export function buildThreadLoadSegments(
     originalAllocations.set(item.key, allocation);
   }
 
-  levelFlexibleLoads(items, allocations, fixed);
+  levelFlexibleLoads(items, allocations, steadyBase);
 
   const days = dates.map((date, day) => {
     const contributions = items
@@ -75,7 +76,7 @@ export function buildThreadLoadSegments(
       days: 1,
       dailyMinutes: contributions.reduce((sum, item) => sum + item.dailyMinutes, 0),
       originalDailyMinutes,
-      fixedDailyMinutes: fixed[day]!,
+      steadyDailyMinutes: steadyBase[day]!,
       contributions
     };
   });
@@ -83,27 +84,41 @@ export function buildThreadLoadSegments(
   return compressDays(days);
 }
 
-function levelFlexibleLoads(items: LoadItem[], allocations: Map<string, number[]>, fixed: number[]): void {
-  const flexible = items.filter((item) => item.fixedDailyMinutes === null);
-  if (flexible.length === 0) return;
+function levelFlexibleLoads(items: LoadItem[], allocations: Map<string, number[]>, steadyBase: number[]): void {
+  const cohorts = groupFlexibleItems(items).sort((a, b) =>
+    windowDays(a[0]!) - windowDays(b[0]!) ||
+    a[0]!.endIndex - b[0]!.endIndex ||
+    a[0]!.startIndex - b[0]!.startIndex
+  );
+  if (cohorts.length === 0) return;
 
-  const totals = [...fixed];
-  for (const item of flexible) addInto(totals, allocations.get(item.key)!, 1);
+  const totals = [...steadyBase];
+  for (const cohort of cohorts) {
+    const first = cohort[0]!;
+    const cohortMinutes = cohort.reduce((sum, item) => sum + item.minutes, 0);
+    const cohortAllocation = waterFill(totals, first.startIndex, first.endIndex, cohortMinutes);
 
-  for (let iteration = 0; iteration < 100; iteration += 1) {
-    let largestChange = 0;
-    for (const item of flexible) {
-      const previous = allocations.get(item.key)!;
-      addInto(totals, previous, -1);
-      const next = waterFill(totals, item.startIndex, item.endIndex, item.minutes);
-      for (let day = item.startIndex; day <= item.endIndex; day += 1) {
-        largestChange = Math.max(largestChange, Math.abs(next[day]! - previous[day]!));
-      }
-      allocations.set(item.key, next);
-      addInto(totals, next, 1);
+    for (const item of cohort) {
+      const share = cohortMinutes === 0 ? 0 : item.minutes / cohortMinutes;
+      allocations.set(item.key, cohortAllocation.map((minutes) => minutes * share));
     }
-    if (largestChange < EPSILON) break;
+    addInto(totals, cohortAllocation, 1);
   }
+}
+
+function groupFlexibleItems(items: LoadItem[]): LoadItem[][] {
+  const cohorts = new Map<string, LoadItem[]>();
+  for (const item of items.filter((candidate) => !candidate.steady)) {
+    const key = `${item.startIndex}:${item.endIndex}`;
+    const cohort = cohorts.get(key) ?? [];
+    cohort.push(item);
+    cohorts.set(key, cohort);
+  }
+  return [...cohorts.values()].map((cohort) => cohort.sort((a, b) => a.key.localeCompare(b.key)));
+}
+
+function windowDays(item: LoadItem): number {
+  return item.endIndex - item.startIndex + 1;
 }
 
 function waterFill(base: number[], start: number, end: number, minutes: number): number[] {
@@ -132,7 +147,6 @@ function waterFill(base: number[], start: number, end: number, minutes: number):
 function isEligible(thread: Thread, today: string): boolean {
   if ((thread.activityState ?? "active") !== "active" || thread.source === "untracked" || !thread.deadline || thread.deadline < today) return false;
   if ([today, thread.start ?? today].sort().at(-1)! > thread.deadline) return false;
-  if (thread.declaredDailyMinutes !== null && thread.declaredDailyMinutes !== undefined) return thread.declaredDailyMinutes > 0;
   return thread.factGapMinutes !== null && thread.factGapMinutes > 0;
 }
 
@@ -144,7 +158,7 @@ function toLoadItem(thread: Thread, today: string, dates: string[]): LoadItem {
     minutes: thread.factGapMinutes ?? 0,
     startIndex: dates.indexOf(start),
     endIndex: dates.indexOf(thread.deadline!),
-    fixedDailyMinutes: thread.declaredDailyMinutes ?? null
+    steady: thread.steadyDaily ?? false
   };
 }
 

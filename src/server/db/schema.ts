@@ -137,7 +137,7 @@ export const threadDeclarations = pgTable(
     group: text("group_name").notNull(),
     item: text("item_name").notNull(),
     expectedMinutes: integer("expected_minutes"),
-    dailyMinutes: integer("daily_minutes"),
+    steadyDaily: boolean("steady_daily").notNull().default(false),
     start: date("start_date", { mode: "date" }),
     deadline: date("deadline", { mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

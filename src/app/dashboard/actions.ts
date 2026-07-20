@@ -62,8 +62,7 @@ export async function saveThreadDeclarationAction(formData: FormData) {
   const group = formData.get("group");
   const item = formData.get("item");
   const expectedMinutes = formData.get("expectedMinutes");
-  const dailyMinutes = formData.get("dailyMinutes");
-  const fixedDaily = formData.get("fixedDaily") === "true";
+  const steadyDaily = formData.get("steadyDaily") === "true";
   const start = formData.get("start");
   const deadline = formData.get("deadline");
 
@@ -75,7 +74,7 @@ export async function saveThreadDeclarationAction(formData: FormData) {
     group,
     item,
     expectedMinutes: parseDurationInput(expectedMinutes),
-    dailyMinutes: fixedDaily ? parseDurationInput(dailyMinutes) : null,
+    steadyDaily,
     start:
       typeof start === "string" && start.trim() !== ""
         ? new Date(`${start}T00:00:00.000Z`)

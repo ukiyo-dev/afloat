@@ -42,9 +42,9 @@ export function ThreadLoadStrip({
         <div className="inline-flex min-w-max items-start bg-paper align-top">
           {segments.map((segment, index) => {
             const change = index === 0 ? null : segment.dailyMinutes - segments[index - 1]!.dailyMinutes;
-            const fixedFill = (segment.fixedDailyMinutes / peak) * 100;
-            const originalFlexibleFill = ((segment.originalDailyMinutes - segment.fixedDailyMinutes) / peak) * 100;
-            const levelledFlexibleFill = ((segment.dailyMinutes - segment.fixedDailyMinutes) / peak) * 100;
+            const fixedFill = (segment.steadyDailyMinutes / peak) * 100;
+            const originalFlexibleFill = ((segment.originalDailyMinutes - segment.steadyDailyMinutes) / peak) * 100;
+            const levelledFlexibleFill = ((segment.dailyMinutes - segment.steadyDailyMinutes) / peak) * 100;
             const loadStyle = {
               "--load-fixed": `${fixedFill}%`,
               "--load-from": `${Math.max(0, originalFlexibleFill)}%`,

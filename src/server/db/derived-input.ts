@@ -60,7 +60,7 @@ export async function loadDerivedViewInput(
         group: thread.group,
         item: thread.item,
         expectedMinutes: thread.expectedMinutes,
-        dailyMinutes: thread.dailyMinutes,
+        steadyDaily: thread.steadyDaily,
         start: thread.start,
         deadline: thread.deadline,
         createdAt: thread.createdAt

@@ -33,23 +33,55 @@ describe("buildThreadLoadSegments", () => {
     expect(result[0]?.dailyMinutes).toBe(60);
   });
 
-  it("keeps declared fixed daily load constant across its active window", () => {
+  it("keeps steady daily load even across its remaining window", () => {
     const result = buildThreadLoadSegments([
-      thread({ factGapMinutes: 120, declaredDailyMinutes: 45 })
+      thread({ factGapMinutes: 450, steadyDaily: true })
     ], "2026-07-20");
 
     expect(result[0]?.dailyMinutes).toBe(45);
   });
 
-  it("levels flexible work on top of fixed daily load", () => {
+  it("levels flexible work on top of steady daily load", () => {
     const result = buildThreadLoadSegments([
-      thread({ key: "fixed", factGapMinutes: 1, declaredDailyMinutes: 30 }),
+      thread({ key: "steady", factGapMinutes: 300, steadyDaily: true }),
       thread({ key: "flex", factGapMinutes: 300 })
     ], "2026-07-20");
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.fixedDailyMinutes).toBe(30);
+    expect(result[0]?.steadyDailyMinutes).toBe(30);
     expect(result[0]?.dailyMinutes).toBe(60);
+  });
+
+  it("keeps item allocation deterministic regardless of input order", () => {
+    const items = [
+      thread({ key: "wide", item: "Wide", factGapMinutes: 600 }),
+      thread({ key: "late", item: "Late", start: "2026-07-25", factGapMinutes: 300 }),
+      thread({ key: "early", item: "Early", deadline: "2026-07-24", factGapMinutes: 150 })
+    ];
+
+    expect(buildThreadLoadSegments(items, "2026-07-20")).toEqual(
+      buildThreadLoadSegments([...items].reverse(), "2026-07-20")
+    );
+  });
+
+  it("shares levelling proportionally between items with the same window", () => {
+    const result = buildThreadLoadSegments([
+      thread({ key: "steady", item: "Steady", factGapMinutes: 500, steadyDaily: true, start: "2026-07-25" }),
+      thread({ key: "large", item: "Large", factGapMinutes: 600 }),
+      thread({ key: "small", item: "Small", factGapMinutes: 300 })
+    ], "2026-07-20");
+
+    const early = result.find((segment) => segment.start === "2026-07-20")!;
+    const late = result.find((segment) => segment.start === "2026-07-25")!;
+    const earlyLarge = early.contributions.find((item) => item.key === "large")!.dailyMinutes;
+    const earlySmall = early.contributions.find((item) => item.key === "small")!.dailyMinutes;
+    const lateLarge = late.contributions.find((item) => item.key === "large")!.dailyMinutes;
+    const lateSmall = late.contributions.find((item) => item.key === "small")!.dailyMinutes;
+
+    expect(earlyLarge / earlySmall).toBeCloseTo(2);
+    expect(lateLarge / lateSmall).toBeCloseTo(2);
+    expect(earlyLarge).toBeGreaterThan(lateLarge);
+    expect(earlySmall).toBeGreaterThan(lateSmall);
   });
 
   it("excludes expired, unbounded, fulfilled, and inactive items", () => {
