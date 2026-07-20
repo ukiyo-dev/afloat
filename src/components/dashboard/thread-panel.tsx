@@ -224,7 +224,7 @@ export function ThreadPanel({
                 <div className="lg:col-span-4 p-6 border-b-2 lg:border-b-0 lg:border-r-2 border-ink bg-paper/50 flex flex-col justify-between">
                    <dl className="grid grid-cols-2 gap-x-4 gap-y-6 mb-6">
                       {group.expectedMinutes !== null ? <MetricItem compact label="Target" value={formatDuration(group.expectedMinutes)} /> : null}
-                      <MetricItem compact label="Done" value={formatDuration(group.fulfilledMinutes)} />
+                      {group.fulfilledMinutes > 0 ? <MetricItem compact label="Done" value={formatDuration(group.fulfilledMinutes)} /> : null}
                       {group.futureMinutes > 0 ? <MetricItem compact label="Plan" value={formatDuration(group.futureMinutes)} /> : null}
                       {group.factGapMinutes !== null ? <MetricItem compact label="Remaining" value={formatDuration(group.factGapMinutes)} /> : null}
                       {group.deadline !== null ? <MetricItem compact label="Deadline" value={group.deadline} /> : null}
@@ -311,7 +311,7 @@ export function ThreadPanel({
                               </div>
                             ) : null}
                             {thread.activityState !== "untracked" && thread.expectedMinutes !== null ? <div><dt className="text-ink-light text-xs">Target</dt><dd className="font-bold">{formatDuration(thread.expectedMinutes)}</dd></div> : null}
-                            <div><dt className="text-ink-light text-xs">Done</dt><dd className="font-bold">{formatDuration(thread.fulfilledMinutes)}</dd></div>
+                            {thread.fulfilledMinutes > 0 ? <div><dt className="text-ink-light text-xs">Done</dt><dd className="font-bold">{formatDuration(thread.fulfilledMinutes)}</dd></div> : null}
                             {thread.futureMinutes > 0 ? <div><dt className="text-ink-light text-xs">Plan</dt><dd className="font-bold">{formatDuration(thread.futureMinutes)}</dd></div> : null}
                             {thread.activityState !== "untracked" && thread.start ? <div><dt className="text-ink-light text-xs">Start</dt><dd className="font-bold">{thread.start}</dd></div> : null}
                             {thread.activityState !== "untracked" && thread.deadline ? <div><dt className="text-ink-light text-xs">Deadline</dt><dd className="font-bold">{thread.deadline}</dd></div> : null}
@@ -621,7 +621,12 @@ function threadProgressLabel(thread: {
   futureMinutes: number;
   status: string;
 }): string | null {
-  if (thread.expectedMinutes === null || thread.expectedMinutes <= 0 || thread.status === "fulfilled") {
+  if (
+    thread.expectedMinutes === null ||
+    thread.expectedMinutes <= 0 ||
+    thread.fulfilledMinutes + thread.futureMinutes <= 0 ||
+    thread.status === "fulfilled"
+  ) {
     return null;
   }
 
