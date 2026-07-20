@@ -19,17 +19,19 @@ export function ThreadLoadStrip({
     <details suppressHydrationWarning className="group/strip mb-6">
       <summary className="block cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
         <span className="flex flex-col items-stretch gap-2 md:flex-row md:items-end md:justify-between md:gap-4">
-          <span className="flex items-end gap-3 sm:gap-5">
+          <span>
             <span>
-              <span className="mb-1 block font-mono text-xs font-bold uppercase tracking-widest">Threads</span>
+              <span className="mb-1 flex items-center gap-3 font-mono text-xs font-bold uppercase tracking-widest">
+                <span>Threads</span>
+                {segments.length > 0 ? (
+                  <span className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+                    <span className="transition-transform group-open/strip:rotate-90">▶</span>
+                    Daily Load
+                  </span>
+                ) : null}
+              </span>
               <span className="block font-serif text-4xl font-black uppercase md:text-5xl">线程追踪</span>
             </span>
-            {segments.length > 0 ? (
-              <span className="mb-1 flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-[10px] font-bold uppercase tracking-widest sm:text-xs">
-                <span className="transition-transform group-open/strip:rotate-90">▶</span>
-                Daily Load
-              </span>
-            ) : null}
           </span>
           <span onClick={(event) => event.stopPropagation()}>{headerEnd}</span>
         </span>
