@@ -39,7 +39,7 @@ export function ThreadLoadStrip({
       </summary>
 
       {segments.length > 0 ? <div className="mt-4 w-full overflow-x-auto brutal-scrollbar pb-3">
-        <div className="inline-flex min-w-max border-2 border-ink bg-paper align-top">
+        <div className="inline-flex min-w-max items-start bg-paper align-top">
           {segments.map((segment, index) => {
             const change = index === 0 ? null : segment.dailyMinutes - segments[index - 1]!.dailyMinutes;
             const fill = segment.dailyMinutes === 0 ? 0 : Math.max(12, (segment.dailyMinutes / peak) * 100);
@@ -47,7 +47,7 @@ export function ThreadLoadStrip({
             return (
               <details
                 suppressHydrationWarning
-                className="group/load relative w-44 shrink-0 border-r-2 border-ink last:border-r-0"
+                className="group/load relative -ml-0.5 w-44 shrink-0 border-2 border-ink first:ml-0"
                 key={segment.start}
               >
                 <summary className="relative block h-28 cursor-pointer list-none overflow-hidden p-3 select-none [&::-webkit-details-marker]:hidden">
