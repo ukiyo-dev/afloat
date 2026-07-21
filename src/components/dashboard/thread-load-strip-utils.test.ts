@@ -145,6 +145,32 @@ describe("buildThreadLoadSegments", () => {
     expect(today.contributions.find((item) => item.key === "two")?.dailyMinutes).toBeCloseTo(60);
   });
 
+  it("shares each day's exchange by remaining deficits across deadline layers", () => {
+    const declarations = [
+      thread({
+        key: "donor", item: "Donor", expectedMinutes: 300, factGapMinutes: 300, steadyDaily: true
+      }),
+      thread({
+        key: "near", item: "Near", expectedMinutes: 300, factGapMinutes: 300,
+        deadline: "2026-07-24", steadyDaily: true
+      }),
+      thread({ key: "far", item: "Far", expectedMinutes: 600, factGapMinutes: 600, steadyDaily: true })
+    ];
+    const ideal = buildThreadLoadSegments(declarations, "2026-07-21")[0]!;
+    const exchanged = buildThreadLoadSegments([
+      { ...declarations[0]!, fulfilledMinutes: 240, factGapMinutes: 60 },
+      declarations[1]!,
+      declarations[2]!
+    ], "2026-07-21")[0]!;
+    const minutes = (segment: typeof ideal, key: string) =>
+      segment.contributions.find((item) => item.key === key)?.dailyMinutes ?? 0;
+
+    expect(minutes(exchanged, "donor")).toBeLessThan(minutes(ideal, "donor"));
+    expect(minutes(exchanged, "near")).toBeGreaterThan(60);
+    expect(minutes(exchanged, "far")).toBeGreaterThan(60);
+    expect(exchanged.dailyMinutes).toBeCloseTo(150);
+  });
+
   it("keeps a large unmatched advance proportional as the window rolls", () => {
     const advanced = thread({
       expectedMinutes: 1800,

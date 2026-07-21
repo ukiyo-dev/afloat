@@ -140,37 +140,36 @@ function buildIdealMatrix(
 }
 
 function settlePastDeviations(items: LoadItem[], allocations: Map<string, number[]>): void {
+  const idealAllocations = new Map(
+    items.map((item) => [item.key, [...allocations.get(item.key)!]])
+  );
   const adjustments = items.map((item) => {
     const idealFuture = allocations.get(item.key)!.reduce((sum, minutes) => sum + minutes, 0);
     return { item, remaining: item.openingMinutes - idealFuture };
   });
   const donors = adjustments.filter((entry) => entry.remaining < -EPSILON)
     .map((entry) => ({ item: entry.item, remaining: -entry.remaining }));
-  const deficitGroups = new Map<number, typeof adjustments>();
-  for (const entry of adjustments.filter((candidate) => candidate.remaining > EPSILON)) {
-    const group = deficitGroups.get(entry.item.endIndex) ?? [];
-    group.push(entry);
-    deficitGroups.set(entry.item.endIndex, group);
+  const deficits = adjustments.filter((entry) => entry.remaining > EPSILON)
+    .sort((a, b) => a.item.key.localeCompare(b.item.key));
+
+  const lastDay = Math.max(-1, ...items.map((item) => item.endIndex));
+  for (let day = 0; day <= lastDay; day += 1) {
+    const eligible = deficits.filter((entry) =>
+      entry.remaining > EPSILON && day >= entry.item.startIndex && day <= entry.item.endIndex &&
+      idealAllocations.get(entry.item.key)![day]! > EPSILON
+    );
+    const deficit = eligible.reduce((sum, entry) => sum + entry.remaining, 0);
+    if (deficit <= EPSILON) continue;
+    const exchanged = releaseFromDonors(donors, allocations, day, deficit);
+    distributeToDeficits(eligible, allocations, day, exchanged);
   }
 
-  for (const [deadline, group] of [...deficitGroups].sort((a, b) => a[0] - b[0])) {
-    const orderedGroup = group.sort((a, b) => a.item.key.localeCompare(b.item.key));
-    const start = Math.max(0, Math.min(...orderedGroup.map((entry) => entry.item.startIndex)));
-    for (let day = start; day <= deadline; day += 1) {
-      const eligible = orderedGroup.filter((entry) => entry.remaining > EPSILON && day >= entry.item.startIndex);
-      const deficit = eligible.reduce((sum, entry) => sum + entry.remaining, 0);
-      if (deficit <= EPSILON) break;
-      const exchanged = releaseFromDonors(donors, allocations, day, deficit);
-      distributeToDeficits(eligible, allocations, day, exchanged);
-    }
-
-    for (const entry of orderedGroup.filter((candidate) => candidate.remaining > EPSILON)) {
-      const allocation = allocations.get(entry.item.key)!;
-      const itemStart = Math.max(0, entry.item.startIndex);
-      const dailyIncrease = entry.remaining / (deadline - itemStart + 1);
-      for (let day = itemStart; day <= deadline; day += 1) allocation[day] += dailyIncrease;
-      entry.remaining = 0;
-    }
+  for (const entry of deficits.filter((candidate) => candidate.remaining > EPSILON)) {
+    const allocation = allocations.get(entry.item.key)!;
+    const itemStart = Math.max(0, entry.item.startIndex);
+    const dailyIncrease = entry.remaining / (entry.item.endIndex - itemStart + 1);
+    for (let day = itemStart; day <= entry.item.endIndex; day += 1) allocation[day] += dailyIncrease;
+    entry.remaining = 0;
   }
 
   for (const donor of donors.filter((entry) => entry.remaining > EPSILON)) {
@@ -220,12 +219,24 @@ function distributeToDeficits(
   day: number,
   minutes: number
 ): void {
-  const total = deficits.reduce((sum, entry) => sum + entry.remaining, 0);
-  if (total <= EPSILON) return;
-  for (const entry of deficits) {
-    const received = Math.min(entry.remaining, minutes * entry.remaining / total);
-    allocations.get(entry.item.key)![day] += received;
-    entry.remaining -= received;
+  let undistributed = minutes;
+  while (undistributed > EPSILON) {
+    const eligible = deficits.filter((entry) => entry.remaining > EPSILON);
+    const totalWeight = eligible.reduce((sum, entry) => sum + entry.remaining, 0);
+    if (totalWeight <= EPSILON) return;
+
+    let distributed = 0;
+    for (const entry of eligible) {
+      const received = Math.min(
+        entry.remaining,
+        undistributed * entry.remaining / totalWeight
+      );
+      allocations.get(entry.item.key)![day] += received;
+      entry.remaining -= received;
+      distributed += received;
+    }
+    if (distributed <= EPSILON) return;
+    undistributed -= distributed;
   }
 }
 
