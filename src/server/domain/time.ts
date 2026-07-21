@@ -79,6 +79,58 @@ export function localDayKey(date: Date, timezone: string): string {
   return dayKey(date);
 }
 
+export function localDayRange(day: string, timezone: string): DateRange {
+  const startAt = localMidnightToUtc(day, timezone);
+  const endAt = localMidnightToUtc(addDayKey(day, 1), timezone);
+  return { startAt, endAt };
+}
+
+function localMidnightToUtc(day: string, timezone: string): Date {
+  const localAsUtc = new Date(`${day}T00:00:00.000Z`);
+  if (Number.isNaN(localAsUtc.getTime())) {
+    throw new Error(`Invalid local day: ${day}`);
+  }
+
+  let guess = localAsUtc;
+  try {
+    for (let index = 0; index < 3; index += 1) {
+      guess = new Date(localAsUtc.getTime() - timezoneOffsetMs(guess, timezone));
+    }
+    return guess;
+  } catch {
+    return localAsUtc;
+  }
+}
+
+function timezoneOffsetMs(date: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const zonedAsUtc = Date.UTC(
+    value("year"),
+    value("month") - 1,
+    value("day"),
+    value("hour"),
+    value("minute"),
+    value("second")
+  );
+  return zonedAsUtc - date.getTime();
+}
+
+function addDayKey(day: string, amount: number): string {
+  const date = new Date(`${day}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return dayKey(date);
+}
+
 export function daysBetween(startAt: Date, endAt: Date): number {
   return Math.max(0, Math.ceil((endAt.getTime() - startAt.getTime()) / MS_PER_DAY));
 }

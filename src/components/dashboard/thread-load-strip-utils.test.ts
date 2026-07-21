@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { projectThreadsForNow } from "./thread-now-projection";
 import { apportionDisplayMinutes, buildThreadLoadSegments } from "./thread-load-strip-utils";
 
 function thread(overrides: Record<string, unknown>) {
@@ -333,6 +334,71 @@ describe("buildThreadLoadSegments", () => {
 
     expect(result[0]?.dailyMinutes).toBeCloseTo(-33.333);
     expect(result[1]?.dailyMinutes).toBeCloseTo(66.667);
+  });
+
+  it("counts only today's portion when a fact crosses local midnight", () => {
+    const result = buildThreadLoadSegments([
+      thread({
+        expectedMinutes: 600,
+        fulfilledMinutes: 120,
+        factGapMinutes: 480,
+        history: [{
+          startAt: "2026-07-20T15:30:00.000Z",
+          endAt: "2026-07-20T17:30:00.000Z",
+          kind: "ideal",
+          minutes: 120,
+          title: "G/I",
+          source: "fact"
+        }]
+      })
+    ], "2026-07-21", "Asia/Shanghai");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(-26.667);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(63.333);
+  });
+
+  it("does not charge tomorrow's portion of a fact to Today", () => {
+    const result = buildThreadLoadSegments([
+      thread({
+        expectedMinutes: 600,
+        fulfilledMinutes: 120,
+        factGapMinutes: 480,
+        history: [{
+          startAt: "2026-07-21T23:30:00.000Z",
+          endAt: "2026-07-22T01:30:00.000Z",
+          kind: "ideal",
+          minutes: 120,
+          title: "G/I",
+          source: "fact"
+        }]
+      })
+    ], "2026-07-21", "UTC");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(0);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(60);
+  });
+
+  it("reduces Today load minute by minute while a planned thread is running", () => {
+    const threads = [thread({
+      futureMinutes: 120,
+      history: [{
+        startAt: "2026-07-21T09:00:00.000Z",
+        endAt: "2026-07-21T11:00:00.000Z",
+        kind: "ideal",
+        minutes: 120,
+        title: "G/I",
+        source: "futurePlan"
+      }]
+    })];
+    const loadAt = (now: string) => buildThreadLoadSegments(
+      projectThreadsForNow(threads, now, "UTC", "2026-07-21T09:00:00.000Z"),
+      "2026-07-21",
+      "UTC"
+    )[0]!.dailyMinutes;
+
+    expect(loadAt("2026-07-21T09:02:00.000Z")).toBeCloseTo(
+      loadAt("2026-07-21T09:01:00.000Z") - 1
+    );
   });
 
   it("excludes expired, unbounded, fulfilled, and inactive items", () => {

@@ -1,5 +1,5 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
-import { localDayKey } from "@/server/domain/time";
+import { intersection, localDayRange, minutesInRange } from "@/server/domain/time";
 
 type Thread = DashboardData["view"]["threads"][number];
 
@@ -279,9 +279,16 @@ function isEligible(thread: Thread, today: string): boolean {
 function toLoadItem(thread: Thread, today: string, dates: string[], timezone: string): LoadItem {
   const start = [today, thread.start ?? today].sort().at(-1)!;
   const minutes = thread.factGapMinutes ?? 0;
+  const todayRange = localDayRange(today, timezone);
   const todayFactMinutes = thread.history
-    .filter((entry) => entry.source === "fact" && localDayKey(new Date(entry.startAt), timezone) === today)
-    .reduce((sum, entry) => sum + entry.minutes, 0);
+    .filter((entry) => entry.source === "fact")
+    .reduce((sum, entry) => {
+      const overlap = intersection(
+        { startAt: new Date(entry.startAt), endAt: new Date(entry.endAt) },
+        todayRange
+      );
+      return sum + (overlap ? minutesInRange(overlap) : 0);
+    }, 0);
   return {
     key: thread.key,
     label: `${thread.group}：${thread.item}`,
