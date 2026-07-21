@@ -178,6 +178,28 @@ pages
 
 > 派生视图必须等价于从事实源全量计算的结果。
 
+## Dashboard 服务端缓存
+
+Dashboard 的数据库快照使用 Next.js Data Cache 缓存，浏览器不持有这份服务端缓存。缓存按 `owner_id` 隔离，并拆分为四个域：
+
+```text
+view
+settings
+rules
+sync
+```
+
+缓存不设置 TTL，使用写操作驱动的精确失效：
+
+- 派生视图重建完成后失效 `view`
+- Settings 写入成功后失效 `settings`
+- Personal Rule 写入成功后失效 `rules`
+- Sync Run 开始或结束后失效 `sync`
+
+日记、Thread 声明、日历语义映射和日历同步通过重建派生视图使 `view` 失效。失效必须发生在对应数据库写入或派生视图保存成功之后。下一次读取重新访问 Postgres 并填充缓存；其余读取直接使用服务端缓存。
+
+缓存只保存持久化快照。当前时刻投影、Today 事实扣减、本地日期和 Dashboard range 必须在每次请求中基于缓存快照重新计算，不能依赖定时失效。所有 cache key 和 cache tag 都必须包含 `owner_id`，不得在 owner 之间共享私有 payload。
+
 ## 同步策略
 
 v1 默认手动同步，并且只实现 password/token-based CalDAV 只读同步。

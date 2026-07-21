@@ -1,6 +1,9 @@
-import { db } from "@/server/db/client";
-import { loadSettings } from "@/server/db/settings";
-import { loadLatestSyncRun } from "@/server/db/sync-runs";
+import {
+  loadCachedLatestSyncRun,
+  loadCachedPersonalRuleRecords,
+  loadCachedPrivateView,
+  loadCachedSettings
+} from "@/server/services/dashboard-cache";
 import {
   buildDashboardRangeView,
   parseDashboardDefaultRange,
@@ -11,15 +14,13 @@ import {
 } from "@/server/services/dashboard-range";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
 import { getLocalOwnerId } from "@/server/services/owner-service";
-import {
-  loadPersonalRuleViews,
-  loadPersonalRuleViewsForOwner
-} from "@/server/services/personal-rule-service";
-import { loadPrivateView } from "@/server/services/view-service";
-import { loadPrivateViewForOwner } from "@/server/services/view-service";
 import { localDayKey } from "@/server/domain/time";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
-import { countFulfilledRulesInRange, type PersonalRuleView } from "@/server/domain/personal-rules";
+import {
+  buildPersonalRuleViews,
+  countFulfilledRulesInRange,
+  type PersonalRuleView
+} from "@/server/domain/personal-rules";
 
 export type { DashboardRangeRequest } from "@/server/services/dashboard-range";
 
@@ -49,12 +50,15 @@ export interface DashboardData {
 export async function loadDashboardData(request?: DashboardRangeRequest): Promise<DashboardData> {
   const ownerId = await getCurrentOwnerId();
   const [view, latestSyncRun, settings] = await Promise.all([
-    loadPrivateView(),
-    loadLatestSyncRun(db, ownerId),
-    loadSettings(db, ownerId)
+    loadCachedPrivateView(ownerId),
+    loadCachedLatestSyncRun(ownerId),
+    loadCachedSettings(ownerId)
   ]);
   const timezone = settings.timezone || "UTC";
-  const personalRules = await loadPersonalRuleViews(localDayKey(new Date(), timezone));
+  const personalRules = buildPersonalRuleViews(
+    await loadCachedPersonalRuleRecords(ownerId),
+    localDayKey(new Date(), timezone)
+  );
   const rangeView = buildDashboardRangeView({
     view,
     request,
@@ -71,17 +75,7 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
     view,
     range: rangeView.key,
     rangeView,
-    latestSyncRun: latestSyncRun
-      ? {
-          kind: latestSyncRun.kind,
-          status: latestSyncRun.status,
-          rangeStartAt: latestSyncRun.rangeStartAt?.toISOString() ?? null,
-          rangeEndAt: latestSyncRun.rangeEndAt?.toISOString() ?? null,
-          errorMessage: latestSyncRun.errorMessage,
-          startedAt: latestSyncRun.startedAt.toISOString(),
-          finishedAt: latestSyncRun.finishedAt?.toISOString() ?? null
-        }
-      : null,
+    latestSyncRun,
     settings: {
       publicPageEnabled: settings.publicPageEnabled,
       defaultDashboardRange: parseDashboardDefaultRange(settings.defaultDashboardRange) ?? {
@@ -100,7 +94,7 @@ export async function loadLocalVisitorDashboardData(
   request?: DashboardRangeRequest
 ): Promise<DashboardData | null> {
   const ownerId = await getLocalOwnerId();
-  const settings = await loadSettings(db, ownerId);
+  const settings = await loadCachedSettings(ownerId);
   if (!settings.publicPageEnabled) {
     return null;
   }
@@ -113,14 +107,14 @@ async function loadDashboardDataForOwner(
   options: { visitorMode?: boolean } = {}
 ): Promise<DashboardData> {
   const [view, latestSyncRun, settings] = await Promise.all([
-    loadPrivateViewForOwner(ownerId),
-    loadLatestSyncRun(db, ownerId),
-    loadSettings(db, ownerId)
+    loadCachedPrivateView(ownerId),
+    loadCachedLatestSyncRun(ownerId),
+    loadCachedSettings(ownerId)
   ]);
   const timezone = settings.timezone || "UTC";
   const visibleView = options.visitorMode ? visitorView(view) : view;
-  const personalRules = await loadPersonalRuleViewsForOwner(
-    ownerId,
+  const personalRules = buildPersonalRuleViews(
+    await loadCachedPersonalRuleRecords(ownerId),
     localDayKey(new Date(), timezone)
   );
   const rangeView = buildDashboardRangeView({
@@ -139,17 +133,7 @@ async function loadDashboardDataForOwner(
     view: visibleView,
     range: rangeView.key,
     rangeView,
-    latestSyncRun: latestSyncRun
-      ? {
-          kind: latestSyncRun.kind,
-          status: latestSyncRun.status,
-          rangeStartAt: latestSyncRun.rangeStartAt?.toISOString() ?? null,
-          rangeEndAt: latestSyncRun.rangeEndAt?.toISOString() ?? null,
-          errorMessage: latestSyncRun.errorMessage,
-          startedAt: latestSyncRun.startedAt.toISOString(),
-          finishedAt: latestSyncRun.finishedAt?.toISOString() ?? null
-        }
-      : null,
+    latestSyncRun,
     settings: {
       publicPageEnabled: settings.publicPageEnabled,
       defaultDashboardRange: parseDashboardDefaultRange(settings.defaultDashboardRange) ?? {

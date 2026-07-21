@@ -7,6 +7,7 @@ import {
   type DashboardRangeRequest
 } from "@/server/services/dashboard-range";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
+import { invalidateDashboardCache } from "@/server/services/dashboard-cache-invalidation";
 import { summarizeViews, type RecomputeSummary } from "@/server/services/view-summary";
 import {
   buildDerivedViews,
@@ -16,7 +17,8 @@ import {
 
 export async function recomputeViewsForOwner(
   ownerId?: string,
-  now = new Date()
+  now = new Date(),
+  options: { invalidateCache?: boolean } = {}
 ): Promise<DerivedViews> {
   const resolvedOwnerId = ownerId ?? (await getCurrentOwnerId());
   const [input, settings] = await Promise.all([
@@ -27,6 +29,9 @@ export async function recomputeViewsForOwner(
   const ruleVersion = currentRuleVersion(settings.ruleVersion);
 
   await saveComputedViews(db, resolvedOwnerId, ruleVersion, views);
+  if (options.invalidateCache !== false) {
+    invalidateDashboardCache(resolvedOwnerId, "view");
+  }
   return views;
 }
 
@@ -47,7 +52,7 @@ export async function loadPrivateViewForOwner(ownerId: string): Promise<PrivateD
     }
   }
 
-  const recomputed = await recomputeViewsForOwner(ownerId);
+  const recomputed = await recomputeViewsForOwner(ownerId, new Date(), { invalidateCache: false });
   return recomputed.private;
 }
 

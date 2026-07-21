@@ -13,6 +13,7 @@ import {
 } from "@/server/db/calendar-sources";
 import { finishSyncRun, startSyncRun } from "@/server/db/sync-runs";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
+import { invalidateDashboardCache } from "@/server/services/dashboard-cache-invalidation";
 import { recentSyncRange } from "@/server/services/recent-sync-range";
 import {
   addYears,
@@ -100,6 +101,7 @@ async function runCalDavSync(
 
   const provider = new CalDavProvider(credential);
   const runId = await startSyncRun(db, ownerId, kind, range);
+  invalidateDashboardCache(ownerId, "sync");
 
   try {
     const calendars = await provider.listCalendars();
@@ -113,6 +115,7 @@ async function runCalDavSync(
 
     if (mappedSources.length === 0) {
       await finishSyncRun(db, runId, "failed", "No enabled CalDAV calendar sources are mapped.");
+      invalidateDashboardCache(ownerId, "sync");
       return {
         status: "not_configured",
         kind,
@@ -165,6 +168,7 @@ async function runCalDavSync(
 
     const views = await recomputeViewsForOwner(ownerId);
     await finishSyncRun(db, runId, "succeeded");
+    invalidateDashboardCache(ownerId, "sync");
 
     return {
       status: "succeeded",
@@ -181,6 +185,7 @@ async function runCalDavSync(
   } catch (error) {
     const message = error instanceof Error ? error.message : "CalDAV sync failed.";
     await finishSyncRun(db, runId, "failed", message);
+    invalidateDashboardCache(ownerId, "sync");
     return {
       status: "failed",
       kind,

@@ -97,7 +97,7 @@ describe("buildThreadLoadSegments", () => {
     expect(result[1]?.dailyMinutes).toBeCloseTo(66.667);
   });
 
-  it("uses yesterday's net advance against the earliest remaining days", () => {
+  it("removes yesterday's unmatched net advance proportionally across the remaining window", () => {
     const result = buildThreadLoadSegments([
       thread({
         expectedMinutes: 600,
@@ -114,8 +114,9 @@ describe("buildThreadLoadSegments", () => {
       })
     ], "2026-07-21");
 
-    expect(result[0]).toMatchObject({ start: "2026-07-21", end: "2026-07-21", dailyMinutes: 0 });
-    expect(result.at(-1)?.dailyMinutes).toBeCloseTo(60);
+    expect(result[0]).toMatchObject({ start: "2026-07-21", end: "2026-07-21" });
+    expect(result[0]?.dailyMinutes).toBeCloseTo(53.333);
+    expect(result.at(-1)?.dailyMinutes).toBeCloseTo(53.333);
   });
 
   it("moves yesterday's item-level exchange into the earliest future day", () => {
@@ -144,7 +145,7 @@ describe("buildThreadLoadSegments", () => {
     expect(today.contributions.find((item) => item.key === "two")?.dailyMinutes).toBeCloseTo(60);
   });
 
-  it("lets a large advance clear the earliest remaining days", () => {
+  it("keeps a large unmatched advance proportional as the window rolls", () => {
     const advanced = thread({
       expectedMinutes: 1800,
       fulfilledMinutes: 480,
@@ -155,7 +156,8 @@ describe("buildThreadLoadSegments", () => {
     const whileAhead = buildThreadLoadSegments([advanced], "2026-07-25");
     const afterCreditIsConsumed = buildThreadLoadSegments([advanced], "2026-07-28");
 
-    expect(whileAhead[0]?.dailyMinutes).toBe(0);
+    expect(whileAhead[0]?.dailyMinutes).toBeCloseTo(52.8);
+    expect(whileAhead[1]?.dailyMinutes).toBeCloseTo(52.8);
     expect(afterCreditIsConsumed[0]?.dailyMinutes).toBeCloseTo(60);
   });
 
@@ -168,7 +170,7 @@ describe("buildThreadLoadSegments", () => {
     expect(result[0]?.dailyMinutes).toBeCloseTo(60);
     expect(result[0]?.contributions.find((item) => item.key === "a")).toBeUndefined();
     expect(result[0]?.contributions.find((item) => item.key === "b")?.dailyMinutes).toBeCloseTo(60);
-    expect(result[1]?.dailyMinutes).toBeCloseTo(30);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(37.5);
   });
 
   it("preserves tomorrow's projected curve after completing Today's allocation", () => {
@@ -215,7 +217,7 @@ describe("buildThreadLoadSegments", () => {
     expect(result[0]?.contributions).toEqual(result[1]?.contributions);
   });
 
-  it("uses an unmatched advance from the earliest future dates", () => {
+  it("removes an unmatched advance across its donor's full remaining distribution", () => {
     const result = buildThreadLoadSegments([
       thread({
         key: "ahead",
@@ -228,10 +230,10 @@ describe("buildThreadLoadSegments", () => {
       thread({ key: "behind", item: "Behind", expectedMinutes: 600, factGapMinutes: 600 })
     ], "2026-07-20");
 
-    expect(result[0]?.dailyMinutes).toBeCloseTo(30);
-    expect(result[0]?.contributions.find((item) => item.key === "ahead")).toBeUndefined();
+    expect(result[0]?.dailyMinutes).toBeCloseTo(42);
+    expect(result[0]?.contributions.find((item) => item.key === "ahead")?.dailyMinutes).toBeCloseTo(12);
     expect(result[0]?.contributions.find((item) => item.key === "behind")?.dailyMinutes).toBeCloseTo(30);
-    expect(result.slice(1, 2)[0]?.dailyMinutes).toBeCloseTo(30);
+    expect(result.slice(1, 2)[0]?.dailyMinutes).toBeCloseTo(42);
   });
 
   it("pools multiple past surpluses and deficits proportionally", () => {
@@ -374,8 +376,8 @@ describe("buildThreadLoadSegments", () => {
       })
     ], "2026-07-21", "UTC");
 
-    expect(result[0]?.dailyMinutes).toBeCloseTo(0);
-    expect(result[1]?.dailyMinutes).toBeCloseTo(60);
+    expect(result[0]?.dailyMinutes).toBeCloseTo(26.667);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(56.667);
   });
 
   it("reduces Today load minute by minute while a planned thread is running", () => {

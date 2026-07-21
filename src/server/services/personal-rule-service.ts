@@ -12,6 +12,7 @@ import {
   type PersonalRuleView
 } from "@/server/domain/personal-rules";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
+import { invalidateDashboardCache } from "@/server/services/dashboard-cache-invalidation";
 import { validateNoteDate } from "@/server/services/workbench-validation";
 import { loadSettings } from "@/server/db/settings";
 import { localDayKey } from "@/server/domain/time";
@@ -46,64 +47,72 @@ export async function loadPersonalRuleViewsForOwner(
   today: string
 ): Promise<PersonalRuleView[]> {
   validateNoteDate(today);
+  const rules = await loadPersonalRuleRecordsForOwner(ownerId);
+  return buildPersonalRuleViews(rules, today);
+}
+
+export async function loadPersonalRuleRecordsForOwner(ownerId: string) {
   const rules = await listPersonalRules(db, ownerId);
-  return buildPersonalRuleViews(
-    rules.map((rule) => ({
-      id: rule.id,
-      title: rule.title,
-      content: rule.content,
-      startDate: rule.startDate,
-      commitment: rule.commitment,
-      signedDate: rule.signedDate,
-      signedAt: rule.signedAt?.toISOString() ?? null,
-      status: rule.status,
-      archivedAt: rule.archivedAt?.toISOString() ?? null,
-      archiveReason: rule.archiveReason,
-      createdAt: rule.createdAt.toISOString(),
-      updatedAt: rule.updatedAt.toISOString(),
-      breaks: rule.breaks.map((ruleBreak) => ({
-        id: ruleBreak.id,
-        brokenDate: ruleBreak.brokenDate,
-        type: ruleBreak.type,
-        scene: ruleBreak.scene,
-        reason: ruleBreak.reason,
-        createdAt: ruleBreak.createdAt.toISOString()
-      }))
-    })),
-    today
-  );
+  return rules.map((rule) => ({
+    id: rule.id,
+    title: rule.title,
+    content: rule.content,
+    startDate: rule.startDate,
+    commitment: rule.commitment,
+    signedDate: rule.signedDate,
+    signedAt: rule.signedAt?.toISOString() ?? null,
+    status: rule.status,
+    archivedAt: rule.archivedAt?.toISOString() ?? null,
+    archiveReason: rule.archiveReason,
+    createdAt: rule.createdAt.toISOString(),
+    updatedAt: rule.updatedAt.toISOString(),
+    breaks: rule.breaks.map((ruleBreak) => ({
+      id: ruleBreak.id,
+      brokenDate: ruleBreak.brokenDate,
+      type: ruleBreak.type,
+      scene: ruleBreak.scene,
+      reason: ruleBreak.reason,
+      createdAt: ruleBreak.createdAt.toISOString()
+    }))
+  }));
 }
 
 export async function savePersonalRule(input: PersonalRuleInput) {
   validatePersonalRuleInput(input);
   const ownerId = await getCurrentOwnerId();
-  return createPersonalRule(db, ownerId, {
+  const rule = await createPersonalRule(db, ownerId, {
     title: input.title.trim(),
     content: input.content.trim(),
     startDate: input.startDate,
     commitment: input.commitment
   });
+  invalidateDashboardCache(ownerId, "rules");
+  return rule;
 }
 
 export async function signRule(ruleId: string) {
   if (ruleId.trim().length === 0) throw new Error("ruleId is required.");
   const ownerId = await getCurrentOwnerId();
   const settings = await loadSettings(db, ownerId);
-  return signPersonalRule(db, ownerId, {
+  const rule = await signPersonalRule(db, ownerId, {
     ruleId,
     signedDate: localDayKey(new Date(), settings.timezone || "UTC")
   });
+  invalidateDashboardCache(ownerId, "rules");
+  return rule;
 }
 
 export async function recordPersonalRuleBreak(input: PersonalRuleBreakInput) {
   validatePersonalRuleBreakInput(input);
   const ownerId = await getCurrentOwnerId();
-  return insertPersonalRuleBreak(db, ownerId, {
+  const ruleBreak = await insertPersonalRuleBreak(db, ownerId, {
     ruleId: input.ruleId,
     brokenDate: input.brokenDate,
     scene: input.scene.trim(),
     reason: input.reason.trim()
   });
+  invalidateDashboardCache(ownerId, "rules");
+  return ruleBreak;
 }
 
 export async function stopPersonalRule(input: PersonalRuleArchiveInput) {
@@ -111,10 +120,12 @@ export async function stopPersonalRule(input: PersonalRuleArchiveInput) {
     throw new Error("ruleId is required.");
   }
   const ownerId = await getCurrentOwnerId();
-  return archivePersonalRule(db, ownerId, {
+  const rule = await archivePersonalRule(db, ownerId, {
     ruleId: input.ruleId,
     archiveReason: input.archiveReason?.trim() || null
   });
+  invalidateDashboardCache(ownerId, "rules");
+  return rule;
 }
 
 export async function deletePersonalRule(ruleId: string) {
@@ -122,7 +133,9 @@ export async function deletePersonalRule(ruleId: string) {
     throw new Error("ruleId is required.");
   }
   const ownerId = await getCurrentOwnerId();
-  return deleteArchivedPersonalRule(db, ownerId, ruleId);
+  const rule = await deleteArchivedPersonalRule(db, ownerId, ruleId);
+  invalidateDashboardCache(ownerId, "rules");
+  return rule;
 }
 
 function validatePersonalRuleInput(input: PersonalRuleInput): void {

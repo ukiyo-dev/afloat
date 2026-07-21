@@ -1,6 +1,7 @@
 import { db } from "@/server/db/client";
 import { loadSettings, updateSettings } from "@/server/db/settings";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
+import { invalidateDashboardCache } from "@/server/services/dashboard-cache-invalidation";
 import { validateDashboardSettings } from "@/server/services/workbench-validation";
 import {
   parseDashboardDefaultRange,
@@ -21,10 +22,12 @@ export interface DashboardSettingsInput extends PublicSettingsInput {
 export async function saveDashboardSettings(input: DashboardSettingsInput) {
   validateDashboardSettings(input);
   const ownerId = await getCurrentOwnerId();
-  return updateSettings(db, ownerId, {
+  const settings = await updateSettings(db, ownerId, {
     ...input,
     defaultDashboardRange: serializeDashboardDefaultRange(input.defaultDashboardRange)
   });
+  invalidateDashboardCache(ownerId, "settings");
+  return settings;
 }
 
 export async function loadDashboardSettings(): Promise<DashboardSettingsInput> {

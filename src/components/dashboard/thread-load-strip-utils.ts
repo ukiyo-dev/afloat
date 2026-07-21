@@ -174,7 +174,7 @@ function settlePastDeviations(items: LoadItem[], allocations: Map<string, number
   }
 
   for (const donor of donors.filter((entry) => entry.remaining > EPSILON)) {
-    removeFromPrefix(
+    removeProportionally(
       allocations.get(donor.item.key)!,
       donor.remaining,
       Math.max(0, donor.item.startIndex),
@@ -238,12 +238,15 @@ function applyTodayFacts(items: LoadItem[], allocations: Map<string, number[]>):
   }
 }
 
-function removeFromPrefix(allocation: number[], minutes: number, start: number, end: number): void {
-  let remaining = minutes;
-  for (let day = start; day <= end && remaining > EPSILON; day += 1) {
-    const removed = Math.min(Math.max(0, allocation[day]!), remaining);
-    allocation[day] -= removed;
-    remaining -= removed;
+function removeProportionally(allocation: number[], minutes: number, start: number, end: number): void {
+  const available = allocation
+    .slice(start, end + 1)
+    .reduce((sum, dailyMinutes) => sum + Math.max(0, dailyMinutes), 0);
+  if (available <= EPSILON) return;
+
+  const retainedShare = Math.max(0, 1 - Math.min(minutes, available) / available);
+  for (let day = start; day <= end; day += 1) {
+    if (allocation[day]! > EPSILON) allocation[day] *= retainedShare;
   }
 }
 
