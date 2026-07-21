@@ -1,18 +1,20 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
 import type { CSSProperties, ReactNode } from "react";
 import { formatDuration } from "../view-formatters";
-import { buildThreadLoadSegments } from "./thread-load-strip-utils";
+import { apportionDisplayMinutes, buildThreadLoadSegments } from "./thread-load-strip-utils";
 
 export function ThreadLoadStrip({
   threads,
   today,
+  timezone,
   headerEnd
 }: {
   threads: DashboardData["view"]["threads"];
   today: string;
+  timezone: string;
   headerEnd: ReactNode;
 }) {
-  const segments = buildThreadLoadSegments(threads, today);
+  const segments = buildThreadLoadSegments(threads, today, timezone);
   const peak = Math.max(...segments.flatMap((segment) => [segment.dailyMinutes, segment.originalDailyMinutes]), 1);
 
   return (
@@ -41,6 +43,8 @@ export function ThreadLoadStrip({
       {segments.length > 0 ? <div className="mt-4 w-full overflow-x-auto brutal-scrollbar pb-3">
         <div className="inline-flex min-w-max items-start bg-paper align-top">
           {segments.map((segment, index) => {
+            const displayMinutes = segment.dailyMinutes === 0 ? 0 : Math.ceil(segment.dailyMinutes);
+            const displayContributions = apportionDisplayMinutes(segment.contributions, displayMinutes);
             const change = index === 0 ? null : segment.dailyMinutes - segments[index - 1]!.dailyMinutes;
             const fixedFill = (segment.steadyDailyMinutes / peak) * 100;
             const originalFlexibleFill = ((segment.originalDailyMinutes - segment.steadyDailyMinutes) / peak) * 100;
@@ -67,9 +71,11 @@ export function ThreadLoadStrip({
                         <span>{change > 0 ? "▲" : "▼"} {formatSignedDuration(change)}</span>
                       ) : null}
                     </span>
-                    <strong className="font-mono text-xl tabular-nums">
-                      {segment.dailyMinutes > 0 ? formatDuration(Math.ceil(segment.dailyMinutes)) : "—"}
-                      <span className="ml-1 text-[10px] font-bold">/ {segment.days} DAY</span>
+                    <strong className={`font-mono text-xl tabular-nums ${displayMinutes < 0 ? "text-semantic-rest" : ""}`}>
+                      {displayMinutes !== 0 ? formatDuration(displayMinutes) : "—"}
+                      {index > 0 ? (
+                        <span className="ml-1 text-[10px] font-bold">/ {segment.days} DAY</span>
+                      ) : null}
                     </strong>
                   </span>
                 </summary>
@@ -81,10 +87,12 @@ export function ThreadLoadStrip({
                   </div>
                   {segment.contributions.length > 0 ? (
                     <ul className="space-y-1 border-t border-dashed border-ink/40 pt-2">
-                      {segment.contributions.map((item) => (
+                      {displayContributions.map((item) => (
                         <li className="flex justify-between gap-4" key={item.key}>
                           <span className="min-w-0 truncate font-serif">{item.label}</span>
-                          <strong className="shrink-0">{formatDuration(Math.round(item.dailyMinutes))}</strong>
+                          <strong className={`shrink-0 ${item.displayMinutes < 0 ? "text-semantic-rest" : ""}`}>
+                            {formatDuration(item.displayMinutes)}
+                          </strong>
                         </li>
                       ))}
                     </ul>

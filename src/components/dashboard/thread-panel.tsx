@@ -99,6 +99,7 @@ export function ThreadPanel({
       <ThreadLoadStrip
         threads={view.threads}
         today={defaultStart}
+        timezone={rangeView.timezone}
         headerEnd={<div className="flex max-w-full items-stretch md:mt-0">
           <div className="inline-flex border border-ledger bg-ledger">
             <ThreadViewIconButton

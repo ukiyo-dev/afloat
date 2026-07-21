@@ -55,17 +55,22 @@ export function buildThreadViews(input: {
   const untrackedPlanEventIds = new Set<string>();
   const inactiveTailPlanEventIds = new Set<string>();
   const activeKeysByGroup = new Map<string, Set<string>>();
-  const timeline = buildThreadTimeline(input.declarations, input.parsedEvents);
+  const timeline = buildThreadTimeline(
+    input.declarations,
+    input.parsedEvents,
+    input.timezone ?? "UTC"
+  );
 
   for (const entry of timeline) {
     if (entry.type === "declaration") {
       const declaration = entry.declaration;
       const key = threadKey(declaration.group, declaration.item);
       const thread = ensureThread(activeThreads, declaration.group, declaration.item, "active");
+      const declarationDayStart = localDayStart(entry.at, input.timezone ?? "UTC");
       thread.declared = true;
       thread.declaration = declaration;
-      thread.generationStartAt ??= entry.at;
-      ensureOpenWindow(thread, entry.at);
+      thread.generationStartAt ??= declarationDayStart;
+      ensureOpenWindow(thread, declarationDayStart);
       ensureSet(activeKeysByGroup, declaration.group).add(key);
       continue;
     }
@@ -410,7 +415,8 @@ function mergeClosedThread(
 
 function buildThreadTimeline(
   declarations: ThreadDeclaration[],
-  parsedEvents: ParsedEvent[]
+  parsedEvents: ParsedEvent[],
+  timezone: string
 ): ThreadTimelineEntry[] {
   const declarationEntries: ThreadTimelineEntry[] = declarations.map((declaration) => ({
     type: "declaration",
@@ -425,13 +431,44 @@ function buildThreadTimeline(
       event
     }));
 
-  return [...declarationEntries, ...eventEntries].sort(
-    (a, b) => a.at.getTime() - b.at.getTime() || timelineEntryRank(a) - timelineEntryRank(b)
-  );
+  return [...declarationEntries, ...eventEntries].sort((a, b) => {
+    const dayOrder = localDayKey(a.at, timezone).localeCompare(localDayKey(b.at, timezone));
+    if (dayOrder !== 0) {
+      return dayOrder;
+    }
+
+    const rankOrder = timelineEntryRank(a) - timelineEntryRank(b);
+    return rankOrder !== 0 ? rankOrder : a.at.getTime() - b.at.getTime();
+  });
 }
 
 function timelineEntryRank(entry: ThreadTimelineEntry): number {
   return entry.type === "declaration" ? 0 : 1;
+}
+
+function localDayStart(date: Date, timezone: string): Date {
+  const day = localDayKey(date, timezone);
+  const utcMidnight = new Date(`${day}T00:00:00.000Z`);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(utcMidnight);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const offset = Date.UTC(
+    value("year"),
+    value("month") - 1,
+    value("day"),
+    value("hour"),
+    value("minute"),
+    value("second")
+  );
+  return new Date(utcMidnight.getTime() - (offset - utcMidnight.getTime()));
 }
 
 function ensureSet<TKey, TValue>(map: Map<TKey, Set<TValue>>, key: TKey): Set<TValue> {

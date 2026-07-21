@@ -12,6 +12,47 @@ const sources: CalendarSource[] = [
 ];
 
 describe("buildThreadViews", () => {
+  it("applies a declaration before earlier plan events on the same local calendar day", () => {
+    const declarations: ThreadDeclaration[] = [
+      {
+        id: "same-day-declaration",
+        group: "写作",
+        item: "文章",
+        expectedMinutes: 60,
+        start: new Date("2026-05-02T00:00:00Z"),
+        deadline: null,
+        createdAt: new Date("2026-05-01T14:00:00Z")
+      }
+    ];
+    const rawEvents: RawCalendarEvent[] = [
+      {
+        id: "same-day-closure",
+        calendarSourceId: "ideal",
+        title: "写作：文章",
+        startAt: new Date("2026-05-01T01:00:00Z"),
+        endAt: new Date("2026-05-01T02:00:00Z")
+      }
+    ];
+    const parsedEvents = parseCalendarEvents(sources, rawEvents);
+    const factLayer = buildFactLayer(parsedEvents);
+    const [thread] = buildThreadViews({
+      declarations,
+      facts: factLayer.facts,
+      cleanPlanSegments: factLayer.cleanPlanSegments,
+      parsedEvents,
+      now: new Date("2026-05-02T12:00:00Z"),
+      timezone: "Asia/Shanghai"
+    });
+
+    expect(thread).toMatchObject({
+      group: "写作",
+      item: "文章",
+      activityState: "inactive",
+      closed: true,
+      fulfilledMinutes: 60
+    });
+  });
+
   it("tracks fulfilled minutes only from fact segments and keeps empty declared threads deletable", () => {
     const rawEvents: RawCalendarEvent[] = [
       {

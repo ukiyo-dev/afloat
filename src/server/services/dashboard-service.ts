@@ -11,7 +11,10 @@ import {
 } from "@/server/services/dashboard-range";
 import { getCurrentOwnerId } from "@/server/services/owner-service";
 import { getLocalOwnerId } from "@/server/services/owner-service";
-import { loadPersonalRuleViews } from "@/server/services/personal-rule-service";
+import {
+  loadPersonalRuleViews,
+  loadPersonalRuleViewsForOwner
+} from "@/server/services/personal-rule-service";
 import { loadPrivateView } from "@/server/services/view-service";
 import { loadPrivateViewForOwner } from "@/server/services/view-service";
 import { localDayKey } from "@/server/domain/time";
@@ -40,6 +43,7 @@ export interface DashboardData {
     threadStaleDays: number;
   };
   personalRules: PersonalRuleView[];
+  formalRuleCount: number;
 }
 
 export async function loadDashboardData(request?: DashboardRangeRequest): Promise<DashboardData> {
@@ -87,7 +91,8 @@ export async function loadDashboardData(request?: DashboardRangeRequest): Promis
       timezone,
       threadStaleDays: settings.threadStaleDays || 7
     },
-    personalRules
+    personalRules,
+    formalRuleCount: personalRules.filter((rule) => rule.commitment === "signed").length
   };
 }
 
@@ -114,12 +119,21 @@ async function loadDashboardDataForOwner(
   ]);
   const timezone = settings.timezone || "UTC";
   const visibleView = options.visitorMode ? visitorView(view) : view;
+  const personalRules = await loadPersonalRuleViewsForOwner(
+    ownerId,
+    localDayKey(new Date(), timezone)
+  );
   const rangeView = buildDashboardRangeView({
     view: visibleView,
     request,
     fallbackRange: settings.defaultDashboardRange,
     timezone
   });
+  rangeView.fulfilledRuleCount = countFulfilledRulesInRange(
+    personalRules,
+    rangeView.startDate,
+    rangeView.endDate
+  );
 
   return {
     view: visibleView,
@@ -145,7 +159,8 @@ async function loadDashboardDataForOwner(
       timezone,
       threadStaleDays: settings.threadStaleDays || 7
     },
-    personalRules: []
+    personalRules: options.visitorMode ? [] : personalRules,
+    formalRuleCount: personalRules.filter((rule) => rule.commitment === "signed").length
   };
 }
 

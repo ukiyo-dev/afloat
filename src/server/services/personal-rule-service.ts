@@ -38,6 +38,14 @@ export interface PersonalRuleArchiveInput {
 export async function loadPersonalRuleViews(today: string): Promise<PersonalRuleView[]> {
   validateNoteDate(today);
   const ownerId = await getCurrentOwnerId();
+  return loadPersonalRuleViewsForOwner(ownerId, today);
+}
+
+export async function loadPersonalRuleViewsForOwner(
+  ownerId: string,
+  today: string
+): Promise<PersonalRuleView[]> {
+  validateNoteDate(today);
   const rules = await listPersonalRules(db, ownerId);
   return buildPersonalRuleViews(
     rules.map((rule) => ({

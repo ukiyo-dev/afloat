@@ -140,6 +140,7 @@ export function DashboardWorkbench({
   latestSyncRun,
   settings,
   personalRules,
+  formalRuleCount,
   visitorMode = false,
   isOwner = false,
   basePath = "/dashboard"
@@ -215,7 +216,6 @@ export function DashboardWorkbench({
     }),
     [projectedThreads, threadGroups, view]
   );
-  const formalRuleCount = personalRules.filter((rule) => rule.commitment === "signed").length;
   const activeThreads = projectedThreads.filter((item) => (item.activityState ?? "active") === "active");
   const redActiveThreadCount = activeThreads.filter((item) =>
     ["expired", "stale", "imbalanced"].includes(item.status)
@@ -423,7 +423,7 @@ export function DashboardWorkbench({
               highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
             />
             <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
-            {!visitorMode && activeThreads.length > 0 ? (
+            {activeThreads.length > 0 ? (
               <Metric
                 label={redActiveThreadCount > 0 ? "待规划线程" : "已规划线程"}
                 value={redActiveThreadCount > 0 ? `${redActiveThreadCount}` : `${plannedActiveThreadCount}/${activeThreads.length}`}
