@@ -26,19 +26,16 @@ export interface ThreadLoadSegment {
 interface LoadItem {
   key: string;
   label: string;
-  minutes: number;
   openingMinutes: number;
   startIndex: number;
   endIndex: number;
   steady: boolean;
-  todayMinutes: number;
-  todayDebtMinutes: number;
-  todayPaceRatio: number;
   todayFactMinutes: number;
 }
 
 const MS_PER_DAY = 86_400_000;
 const EPSILON = 0.001;
+const DISPLAY_EPSILON = 0.5;
 
 export function buildThreadLoadSegments(
   threads: DashboardData["view"]["threads"],
@@ -51,41 +48,22 @@ export function buildThreadLoadSegments(
   const lastDay = eligible.map((thread) => thread.deadline!).sort().at(-1)!;
   const dates = dayKeys(today, lastDay);
   const items = eligible.map((thread) => toLoadItem(thread, today, dates, timezone));
-  const baselineToday = buildBaselineToday(items, dates.length);
-  allocateToday(items, baselineToday.allocations, baselineToday.budget);
-  const steadyBase = Array(dates.length).fill(0) as number[];
-  const allocations = new Map<string, number[]>();
-  const originalAllocations = new Map<string, number[]>();
-
-  for (const item of items) {
-    const allocation = Array(dates.length).fill(0) as number[];
-    if (item.startIndex === 0) allocation[0] = item.todayMinutes;
-    const futureStart = Math.max(1, item.startIndex);
-    const futureMinutes = item.minutes - Math.max(0, item.todayMinutes);
-    if (item.steady) {
-      const futureDays = item.endIndex - futureStart + 1;
-      const daily = futureDays > 0 ? futureMinutes / futureDays : 0;
-      steadyBase[0] += Math.max(0, allocation[0]!);
-      for (let day = futureStart; day <= item.endIndex; day += 1) {
-        allocation[day] = daily;
-        steadyBase[day] += daily;
-      }
-    } else {
-      const futureDays = item.endIndex - futureStart + 1;
-      const daily = futureDays > 0 ? futureMinutes / futureDays : 0;
-      for (let day = futureStart; day <= item.endIndex; day += 1) allocation[day] = daily;
-    }
-    allocations.set(item.key, [...allocation]);
-    originalAllocations.set(item.key, allocation);
-  }
-
-  levelFlexibleLoads(items, allocations, steadyBase);
+  const ideal = buildIdealMatrix(eligible, today, lastDay);
+  const originalAllocations = new Map(items.map((item) => [item.key, [...ideal.allocations.get(item.key)!]]));
+  const allocations = new Map(items.map((item) => [item.key, [...ideal.allocations.get(item.key)!]]));
+  settlePastDeviations(items, allocations);
+  applyTodayFacts(items, allocations);
+  const steadyBase = dates.map((_, day) => items
+    .filter((item) => item.steady)
+    .reduce((sum, item) => sum + Math.max(0, allocations.get(item.key)![day]!), 0));
 
   const days = dates.map((date, day) => {
     const contributions = items
       .map((item) => ({ key: item.key, label: item.label, dailyMinutes: allocations.get(item.key)![day]! }))
-      .filter((item) => day === 0 ? Math.abs(item.dailyMinutes) > EPSILON : item.dailyMinutes > EPSILON)
-      .sort((a, b) => b.dailyMinutes - a.dailyMinutes);
+      .filter((item) => day === 0
+        ? Math.abs(item.dailyMinutes) >= DISPLAY_EPSILON
+        : item.dailyMinutes >= DISPLAY_EPSILON)
+      .sort((a, b) => b.dailyMinutes - a.dailyMinutes || a.key.localeCompare(b.key));
     const originalDailyMinutes = items.reduce(
       (sum, item) => sum + originalAllocations.get(item.key)![day]!, 0
     );
@@ -100,56 +78,173 @@ export function buildThreadLoadSegments(
     };
   });
 
-  return compressDays(days);
+  return days.every((day) => day.contributions.length === 0) ? [] : compressDays(days);
 }
 
-function levelFlexibleLoads(items: LoadItem[], allocations: Map<string, number[]>, steadyBase: number[]): void {
-  const cohorts = groupFlexibleItems(items).sort((a, b) =>
-    windowDays(a[0]!) - windowDays(b[0]!) ||
-    a[0]!.endIndex - b[0]!.endIndex ||
-    a[0]!.startIndex - b[0]!.startIndex
-  );
-  if (cohorts.length === 0) return;
+function buildIdealMatrix(
+  threads: Thread[],
+  today: string,
+  lastDay: string
+): { allocations: Map<string, number[]> } {
+  const firstDay = threads.map((thread) => thread.start ?? today).sort()[0] ?? today;
+  const fullDates = dayKeys(firstDay, lastDay);
+  const todayIndex = fullDates.indexOf(today);
+  const totals = Array(fullDates.length).fill(0) as number[];
+  const fullAllocations = new Map<string, number[]>();
+  const specs = threads.map((thread) => ({
+    key: thread.key,
+    minutes: thread.expectedMinutes ?? 0,
+    startIndex: fullDates.indexOf(thread.start ?? today),
+    endIndex: fullDates.indexOf(thread.deadline!),
+    steady: thread.steadyDaily ?? false
+  }));
 
-  const totals = [...steadyBase];
-  for (const item of items.filter((candidate) => !candidate.steady)) {
-    totals[0] += Math.max(0, allocations.get(item.key)?.[0] ?? 0);
+  for (const spec of specs.filter((item) => item.steady)) {
+    const allocation = Array(fullDates.length).fill(0) as number[];
+    const daily = spec.minutes / (spec.endIndex - spec.startIndex + 1);
+    for (let day = spec.startIndex; day <= spec.endIndex; day += 1) {
+      allocation[day] = daily;
+      totals[day] += daily;
+    }
+    fullAllocations.set(spec.key, allocation);
   }
-  for (const cohort of cohorts) {
-    const first = cohort[0]!;
-    const cohortMinutes = cohort.reduce(
-      (sum, item) => sum + item.minutes - Math.max(0, item.todayMinutes),
-      0
-    );
-    const cohortStart = Math.max(1, first.startIndex);
-    const cohortAllocation = cohortStart <= first.endIndex
-      ? waterFill(totals, cohortStart, first.endIndex, cohortMinutes)
-      : Array(totals.length).fill(0) as number[];
 
-    for (const item of cohort) {
-      const itemFutureMinutes = item.minutes - Math.max(0, item.todayMinutes);
-      const share = cohortMinutes === 0 ? 0 : itemFutureMinutes / cohortMinutes;
-      const allocation = cohortAllocation.map((minutes) => minutes * share);
-      allocation[0] = item.todayMinutes;
-      allocations.set(item.key, allocation);
+  const cohorts = new Map<string, typeof specs>();
+  for (const spec of specs.filter((item) => !item.steady)) {
+    const cohortKey = `${spec.startIndex}:${spec.endIndex}`;
+    const cohort = cohorts.get(cohortKey) ?? [];
+    cohort.push(spec);
+    cohorts.set(cohortKey, cohort);
+  }
+  const ordered = [...cohorts.values()].sort((a, b) =>
+    (a[0]!.endIndex - a[0]!.startIndex) - (b[0]!.endIndex - b[0]!.startIndex) ||
+    a[0]!.endIndex - b[0]!.endIndex || a[0]!.startIndex - b[0]!.startIndex
+  );
+  for (const cohort of ordered) {
+    const first = cohort[0]!;
+    const cohortMinutes = cohort.reduce((sum, item) => sum + item.minutes, 0);
+    const cohortAllocation = waterFill(totals, first.startIndex, first.endIndex, cohortMinutes);
+    for (const spec of cohort.sort((a, b) => a.key.localeCompare(b.key))) {
+      const share = cohortMinutes > EPSILON ? spec.minutes / cohortMinutes : 0;
+      fullAllocations.set(spec.key, cohortAllocation.map((minutes) => minutes * share));
     }
     addInto(totals, cohortAllocation, 1);
   }
+
+  return {
+    allocations: new Map(threads.map((thread) => [
+      thread.key,
+      (fullAllocations.get(thread.key) ?? Array(fullDates.length).fill(0) as number[]).slice(todayIndex)
+    ]))
+  };
 }
 
-function groupFlexibleItems(items: LoadItem[]): LoadItem[][] {
-  const cohorts = new Map<string, LoadItem[]>();
-  for (const item of items.filter((candidate) => !candidate.steady)) {
-    const key = `${item.startIndex}:${item.endIndex}`;
-    const cohort = cohorts.get(key) ?? [];
-    cohort.push(item);
-    cohorts.set(key, cohort);
+function settlePastDeviations(items: LoadItem[], allocations: Map<string, number[]>): void {
+  const adjustments = items.map((item) => {
+    const idealFuture = allocations.get(item.key)!.reduce((sum, minutes) => sum + minutes, 0);
+    return { item, remaining: item.openingMinutes - idealFuture };
+  });
+  const donors = adjustments.filter((entry) => entry.remaining < -EPSILON)
+    .map((entry) => ({ item: entry.item, remaining: -entry.remaining }));
+  const deficitGroups = new Map<number, typeof adjustments>();
+  for (const entry of adjustments.filter((candidate) => candidate.remaining > EPSILON)) {
+    const group = deficitGroups.get(entry.item.endIndex) ?? [];
+    group.push(entry);
+    deficitGroups.set(entry.item.endIndex, group);
   }
-  return [...cohorts.values()].map((cohort) => cohort.sort((a, b) => a.key.localeCompare(b.key)));
+
+  for (const [deadline, group] of [...deficitGroups].sort((a, b) => a[0] - b[0])) {
+    const orderedGroup = group.sort((a, b) => a.item.key.localeCompare(b.item.key));
+    const start = Math.max(0, Math.min(...orderedGroup.map((entry) => entry.item.startIndex)));
+    for (let day = start; day <= deadline; day += 1) {
+      const eligible = orderedGroup.filter((entry) => entry.remaining > EPSILON && day >= entry.item.startIndex);
+      const deficit = eligible.reduce((sum, entry) => sum + entry.remaining, 0);
+      if (deficit <= EPSILON) break;
+      const exchanged = releaseFromDonors(donors, allocations, day, deficit);
+      distributeToDeficits(eligible, allocations, day, exchanged);
+    }
+
+    for (const entry of orderedGroup.filter((candidate) => candidate.remaining > EPSILON)) {
+      const allocation = allocations.get(entry.item.key)!;
+      const itemStart = Math.max(0, entry.item.startIndex);
+      const dailyIncrease = entry.remaining / (deadline - itemStart + 1);
+      for (let day = itemStart; day <= deadline; day += 1) allocation[day] += dailyIncrease;
+      entry.remaining = 0;
+    }
+  }
+
+  for (const donor of donors.filter((entry) => entry.remaining > EPSILON)) {
+    removeFromPrefix(
+      allocations.get(donor.item.key)!,
+      donor.remaining,
+      Math.max(0, donor.item.startIndex),
+      donor.item.endIndex
+    );
+  }
 }
 
-function windowDays(item: LoadItem): number {
-  return item.endIndex - item.startIndex + 1;
+function releaseFromDonors(
+  donors: Array<{ item: LoadItem; remaining: number }>,
+  allocations: Map<string, number[]>,
+  day: number,
+  requested: number
+): number {
+  let remaining = requested;
+  let released = 0;
+  while (remaining > EPSILON) {
+    const available = donors.filter((donor) =>
+      donor.remaining > EPSILON && day >= donor.item.startIndex && day <= donor.item.endIndex &&
+      allocations.get(donor.item.key)![day]! > EPSILON
+    );
+    if (available.length === 0) break;
+    const totalWeight = available.reduce((sum, donor) => sum + donor.remaining, 0);
+    let round = 0;
+    for (const donor of available) {
+      const allocation = allocations.get(donor.item.key)!;
+      const share = remaining * donor.remaining / totalWeight;
+      const minutes = Math.min(share, donor.remaining, allocation[day]!);
+      allocation[day] -= minutes;
+      donor.remaining -= minutes;
+      round += minutes;
+    }
+    if (round <= EPSILON) break;
+    released += round;
+    remaining -= round;
+  }
+  return released;
+}
+
+function distributeToDeficits(
+  deficits: Array<{ item: LoadItem; remaining: number }>,
+  allocations: Map<string, number[]>,
+  day: number,
+  minutes: number
+): void {
+  const total = deficits.reduce((sum, entry) => sum + entry.remaining, 0);
+  if (total <= EPSILON) return;
+  for (const entry of deficits) {
+    const received = Math.min(entry.remaining, minutes * entry.remaining / total);
+    allocations.get(entry.item.key)![day] += received;
+    entry.remaining -= received;
+  }
+}
+
+function applyTodayFacts(items: LoadItem[], allocations: Map<string, number[]>): void {
+  for (const item of items) {
+    if (item.todayFactMinutes <= EPSILON || item.startIndex > 0) continue;
+    const allocation = allocations.get(item.key)!;
+    const openingToday = allocation[0]!;
+    allocation[0] = openingToday - item.todayFactMinutes;
+  }
+}
+
+function removeFromPrefix(allocation: number[], minutes: number, start: number, end: number): void {
+  let remaining = minutes;
+  for (let day = start; day <= end && remaining > EPSILON; day += 1) {
+    const removed = Math.min(Math.max(0, allocation[day]!), remaining);
+    allocation[day] -= removed;
+    remaining -= removed;
+  }
 }
 
 function waterFill(base: number[], start: number, end: number, minutes: number): number[] {
@@ -178,7 +273,7 @@ function waterFill(base: number[], start: number, end: number, minutes: number):
 function isEligible(thread: Thread, today: string): boolean {
   if ((thread.activityState ?? "active") !== "active" || thread.source === "untracked" || !thread.deadline || thread.deadline < today) return false;
   if ([today, thread.start ?? today].sort().at(-1)! > thread.deadline) return false;
-  return thread.factGapMinutes !== null && thread.factGapMinutes > 0;
+  return thread.factGapMinutes !== null && thread.factGapMinutes >= 0 && thread.expectedMinutes !== null;
 }
 
 function toLoadItem(thread: Thread, today: string, dates: string[], timezone: string): LoadItem {
@@ -190,93 +285,12 @@ function toLoadItem(thread: Thread, today: string, dates: string[], timezone: st
   return {
     key: thread.key,
     label: `${thread.group}：${thread.item}`,
-    minutes,
     openingMinutes: minutes + todayFactMinutes,
     startIndex: dates.indexOf(start),
     endIndex: dates.indexOf(thread.deadline!),
     steady: thread.steadyDaily ?? false,
-    todayMinutes: 0,
-    todayFactMinutes,
-    ...todayPace(thread, start === today ? today : null, todayFactMinutes)
+    todayFactMinutes
   };
-}
-
-function todayPace(
-  thread: Thread,
-  today: string | null,
-  todayFactMinutes: number
-): Pick<LoadItem, "todayDebtMinutes" | "todayPaceRatio"> {
-  if (today === null || thread.expectedMinutes === null || !thread.deadline) {
-    return { todayDebtMinutes: 0, todayPaceRatio: 0 };
-  }
-  const start = thread.start ?? today;
-  const totalDays = dayKeys(start, thread.deadline).length;
-  const elapsedDays = Math.min(totalDays, dayKeys(start, today).length);
-  const cumulativeTarget = thread.expectedMinutes * elapsedDays / totalDays;
-  const fulfilledBeforeToday = Math.max(0, thread.fulfilledMinutes - todayFactMinutes);
-  const openingGap = (thread.factGapMinutes ?? 0) + todayFactMinutes;
-  const debt = Math.min(openingGap, Math.max(0, cumulativeTarget - fulfilledBeforeToday));
-  return {
-    todayDebtMinutes: debt,
-    todayPaceRatio: cumulativeTarget > 0 ? debt / cumulativeTarget : 0
-  };
-}
-
-function buildBaselineToday(
-  items: LoadItem[],
-  dateCount: number
-): { budget: number; allocations: Map<string, number> } {
-  const totals = Array(dateCount).fill(0) as number[];
-  const allocations = new Map(items.map((item) => [item.key, 0]));
-  const flexible = items.filter((item) => !item.steady);
-
-  for (const item of items.filter((candidate) => candidate.steady)) {
-    const daily = item.openingMinutes / windowDays(item);
-    for (let day = item.startIndex; day <= item.endIndex; day += 1) totals[day] += daily;
-    if (item.startIndex === 0) allocations.set(item.key, daily);
-  }
-
-  const cohorts = groupFlexibleItems(flexible).sort((a, b) =>
-    windowDays(a[0]!) - windowDays(b[0]!) ||
-    a[0]!.endIndex - b[0]!.endIndex ||
-    a[0]!.startIndex - b[0]!.startIndex
-  );
-  for (const cohort of cohorts) {
-    const first = cohort[0]!;
-    const allocation = waterFill(
-      totals,
-      first.startIndex,
-      first.endIndex,
-      cohort.reduce((sum, item) => sum + item.openingMinutes, 0)
-    );
-    const cohortMinutes = cohort.reduce((sum, item) => sum + item.openingMinutes, 0);
-    for (const item of cohort) {
-      if (item.startIndex === 0) {
-        allocations.set(item.key, allocation[0]! * item.openingMinutes / cohortMinutes);
-      }
-    }
-    addInto(totals, allocation, 1);
-  }
-  return { budget: totals[0] ?? 0, allocations };
-}
-
-function allocateToday(items: LoadItem[], baseline: Map<string, number>, budget: number): void {
-  const candidates = items.filter((item) => item.startIndex === 0 && item.todayDebtMinutes > EPSILON);
-  const weights = candidates.map((item) => ({
-    item,
-    weight: (baseline.get(item.key) ?? 0) * item.todayPaceRatio
-  }));
-  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
-  const totalDebt = candidates.reduce((sum, item) => sum + item.todayDebtMinutes, 0);
-  const allocation = Math.min(budget, totalDebt);
-  if (allocation <= EPSILON) return;
-
-  for (const { item, weight } of weights) {
-    const openingAllocation = totalWeight > EPSILON
-      ? allocation * weight / totalWeight
-      : allocation * item.todayDebtMinutes / totalDebt;
-    item.todayMinutes = openingAllocation - item.todayFactMinutes;
-  }
 }
 
 function compressDays(days: ThreadLoadSegment[]): ThreadLoadSegment[] {
@@ -294,8 +308,14 @@ function compressDays(days: ThreadLoadSegment[]): ThreadLoadSegment[] {
 }
 
 function sameLoad(a: ThreadLoadSegment, b: ThreadLoadSegment): boolean {
-  if (Math.abs(a.dailyMinutes - b.dailyMinutes) > EPSILON || Math.abs(a.originalDailyMinutes - b.originalDailyMinutes) > EPSILON || a.contributions.length !== b.contributions.length) return false;
-  return a.contributions.every((item, index) => item.key === b.contributions[index]?.key && Math.abs(item.dailyMinutes - b.contributions[index]!.dailyMinutes) <= EPSILON);
+  const totalA = a.dailyMinutes === 0 ? 0 : Math.ceil(a.dailyMinutes);
+  const totalB = b.dailyMinutes === 0 ? 0 : Math.ceil(b.dailyMinutes);
+  if (totalA !== totalB || a.contributions.length !== b.contributions.length) return false;
+  const displayA = apportionDisplayMinutes(a.contributions, totalA);
+  const displayB = apportionDisplayMinutes(b.contributions, totalB);
+  return displayA.every((item, index) =>
+    item.key === displayB[index]?.key && item.displayMinutes === displayB[index]?.displayMinutes
+  );
 }
 
 function addInto(total: number[], allocation: number[], direction: 1 | -1): void {

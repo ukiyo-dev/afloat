@@ -20,6 +20,7 @@ Afloat 是一个承诺观察系统。
 - [10-technical-architecture.md](./10-technical-architecture.md)：技术架构路线
 - [11-design-system.md](./11-design-system.md)：设计系统与 UI 边界
 - [12-personal-rules.md](./12-personal-rules.md)：用户刚性规则
+- [13-daily-load-algorithm-exploration.md](./13-daily-load-algorithm-exploration.md)：Daily Load 方案 A/B 算法探索
 
 ## 核心术语
 

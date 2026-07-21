@@ -16,10 +16,10 @@ describe("buildThreadLoadSegments", () => {
   it("moves flexible load earlier to level the total across overlapping windows", () => {
     const result = buildThreadLoadSegments([
       thread({ key: "a", factGapMinutes: 600 }),
-      thread({ key: "b", item: "Later", start: "2026-07-25", deadline: "2026-07-29", factGapMinutes: 300 })
+      thread({ key: "b", item: "Later", expectedMinutes: 300, start: "2026-07-25", deadline: "2026-07-29", factGapMinutes: 300 })
     ], "2026-07-20");
 
-    expect(result[0]).toMatchObject({ start: "2026-07-20", end: "2026-07-20", dailyMinutes: 60 });
+    expect(result[0]).toMatchObject({ start: "2026-07-20", end: "2026-07-20", dailyMinutes: 90 });
     expect(result[1]).toMatchObject({ start: "2026-07-21", end: "2026-07-24" });
     expect(result[2]).toMatchObject({ start: "2026-07-25", end: "2026-07-29" });
     expect(result[1]?.dailyMinutes).toBeCloseTo(result[2]!.dailyMinutes);
@@ -44,8 +44,8 @@ describe("buildThreadLoadSegments", () => {
 
   it("levels flexible work on top of steady daily load", () => {
     const result = buildThreadLoadSegments([
-      thread({ key: "steady", factGapMinutes: 300, steadyDaily: true }),
-      thread({ key: "flex", factGapMinutes: 300 })
+      thread({ key: "steady", expectedMinutes: 300, factGapMinutes: 300, steadyDaily: true }),
+      thread({ key: "flex", expectedMinutes: 300, factGapMinutes: 300 })
     ], "2026-07-20");
 
     expect(result).toHaveLength(2);
@@ -96,7 +96,7 @@ describe("buildThreadLoadSegments", () => {
     expect(result[1]?.dailyMinutes).toBeCloseTo(66.667);
   });
 
-  it("carries yesterday's benefit into Today so a sufficiently advanced item can rest", () => {
+  it("uses yesterday's net advance against the earliest remaining days", () => {
     const result = buildThreadLoadSegments([
       thread({
         expectedMinutes: 600,
@@ -114,10 +114,10 @@ describe("buildThreadLoadSegments", () => {
     ], "2026-07-21");
 
     expect(result[0]).toMatchObject({ start: "2026-07-21", end: "2026-07-21", dailyMinutes: 0 });
-    expect(result[1]?.dailyMinutes).toBe(60);
+    expect(result.at(-1)?.dailyMinutes).toBeCloseTo(60);
   });
 
-  it("moves Today's allocation between items based on yesterday's item-level deviation", () => {
+  it("moves yesterday's item-level exchange into the earliest future day", () => {
     const result = buildThreadLoadSegments([
       thread({
         key: "one",
@@ -140,10 +140,10 @@ describe("buildThreadLoadSegments", () => {
     const today = result[0]!;
     expect(today.dailyMinutes).toBe(60);
     expect(today.contributions.find((item) => item.key === "one")).toBeUndefined();
-    expect(today.contributions.find((item) => item.key === "two")?.dailyMinutes).toBe(60);
+    expect(today.contributions.find((item) => item.key === "two")?.dailyMinutes).toBeCloseTo(60);
   });
 
-  it("lets a large advance suppress Today across multiple following days", () => {
+  it("lets a large advance clear the earliest remaining days", () => {
     const advanced = thread({
       expectedMinutes: 1800,
       fulfilledMinutes: 480,
@@ -158,6 +158,31 @@ describe("buildThreadLoadSegments", () => {
     expect(afterCreditIsConsumed[0]?.dailyMinutes).toBeCloseTo(60);
   });
 
+  it("keeps the levelled Today budget while moving an extreme advance from A to B", () => {
+    const result = buildThreadLoadSegments([
+      thread({ key: "a", item: "A", expectedMinutes: 300, fulfilledMinutes: 240, factGapMinutes: 60 }),
+      thread({ key: "b", item: "B", expectedMinutes: 300, fulfilledMinutes: 0, factGapMinutes: 300 })
+    ], "2026-07-21");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(60);
+    expect(result[0]?.contributions.find((item) => item.key === "a")).toBeUndefined();
+    expect(result[0]?.contributions.find((item) => item.key === "b")?.dailyMinutes).toBeCloseTo(60);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(30);
+  });
+
+  it("preserves tomorrow's projected curve after completing Today's allocation", () => {
+    const today = buildThreadLoadSegments([
+      thread({ key: "a", item: "A", expectedMinutes: 300, fulfilledMinutes: 240, factGapMinutes: 60 }),
+      thread({ key: "b", item: "B", expectedMinutes: 300, fulfilledMinutes: 0, factGapMinutes: 300 })
+    ], "2026-07-21");
+    const tomorrow = buildThreadLoadSegments([
+      thread({ key: "a", item: "A", expectedMinutes: 300, fulfilledMinutes: 240, factGapMinutes: 60 }),
+      thread({ key: "b", item: "B", expectedMinutes: 300, fulfilledMinutes: 60, factGapMinutes: 240 })
+    ], "2026-07-22");
+
+    expect(tomorrow[0]?.dailyMinutes).toBeCloseTo(today[1]!.dailyMinutes);
+  });
+
   it("keeps Today item shares equal to the future average when nothing has progressed", () => {
     const result = buildThreadLoadSegments([
       thread({ key: "a", expectedMinutes: 600, factGapMinutes: 600 }),
@@ -169,6 +194,103 @@ describe("buildThreadLoadSegments", () => {
     expect(apportionDisplayMinutes(result[0]!.contributions, Math.ceil(result[0]!.dailyMinutes))).toEqual(
       apportionDisplayMinutes(result[1]!.contributions, Math.ceil(result[1]!.dailyMinutes))
     );
+  });
+
+  it("does not move an unprogressed Today allocation across different windows", () => {
+    const result = buildThreadLoadSegments([
+      thread({ key: "long", item: "Long", expectedMinutes: 600, factGapMinutes: 600 }),
+      thread({
+        key: "short",
+        item: "Short",
+        expectedMinutes: 300,
+        factGapMinutes: 300,
+        deadline: "2026-07-24"
+      })
+    ], "2026-07-20");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(90);
+    expect(result[0]?.contributions.find((item) => item.key === "long")?.dailyMinutes).toBeCloseTo(30);
+    expect(result[0]?.contributions.find((item) => item.key === "short")?.dailyMinutes).toBeCloseTo(60);
+    expect(result[0]?.contributions).toEqual(result[1]?.contributions);
+  });
+
+  it("uses an unmatched advance from the earliest future dates", () => {
+    const result = buildThreadLoadSegments([
+      thread({
+        key: "ahead",
+        item: "Ahead",
+        expectedMinutes: 300,
+        fulfilledMinutes: 240,
+        factGapMinutes: 60,
+        deadline: "2026-07-24"
+      }),
+      thread({ key: "behind", item: "Behind", expectedMinutes: 600, factGapMinutes: 600 })
+    ], "2026-07-20");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(30);
+    expect(result[0]?.contributions.find((item) => item.key === "ahead")).toBeUndefined();
+    expect(result[0]?.contributions.find((item) => item.key === "behind")?.dailyMinutes).toBeCloseTo(30);
+    expect(result.slice(1, 2)[0]?.dailyMinutes).toBeCloseTo(30);
+  });
+
+  it("pools multiple past surpluses and deficits proportionally", () => {
+    const result = buildThreadLoadSegments([
+      thread({ key: "a", item: "A", expectedMinutes: 300, fulfilledMinutes: 60, factGapMinutes: 240 }),
+      thread({ key: "b", item: "B", expectedMinutes: 300, fulfilledMinutes: 45, factGapMinutes: 255 }),
+      thread({ key: "c", item: "C", expectedMinutes: 300, fulfilledMinutes: 0, factGapMinutes: 300 }),
+      thread({ key: "d", item: "D", expectedMinutes: 300, fulfilledMinutes: 15, factGapMinutes: 285 })
+    ], "2026-07-21");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(120);
+    expect(result[0]?.contributions.find((item) => item.key === "a")).toBeUndefined();
+    expect(result[0]?.contributions.find((item) => item.key === "b")?.dailyMinutes).toBeCloseTo(15);
+    expect(result[0]?.contributions.find((item) => item.key === "c")?.dailyMinutes).toBeCloseTo(60);
+    expect(result[0]?.contributions.find((item) => item.key === "d")?.dailyMinutes).toBeCloseTo(45);
+  });
+
+  it("raises the deadline layer evenly when past surplus cannot cover its deficit", () => {
+    const result = buildThreadLoadSegments([
+      thread({ key: "ahead", item: "Ahead", expectedMinutes: 300, fulfilledMinutes: 40, factGapMinutes: 260 }),
+      thread({ key: "behind", item: "Behind", expectedMinutes: 300, fulfilledMinutes: 0, factGapMinutes: 300 })
+    ], "2026-07-21");
+
+    expect(result[0]?.dailyMinutes).toBeCloseTo(62.222);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(62.222);
+    expect(result[0]?.contributions.find((item) => item.key === "ahead")?.dailyMinutes).toBeCloseTo(20);
+    expect(result[0]?.contributions.find((item) => item.key === "behind")?.dailyMinutes).toBeCloseTo(42.222);
+  });
+
+  it("omits future contributions that display as zero minutes", () => {
+    const result = buildThreadLoadSegments([
+      thread({
+        key: "ahead",
+        item: "Ahead",
+        expectedMinutes: 300,
+        fulfilledMinutes: 119.75,
+        factGapMinutes: 180.25
+      }),
+      thread({
+        key: "base",
+        item: "Base",
+        expectedMinutes: 270,
+        factGapMinutes: 270,
+        start: "2026-07-21"
+      })
+    ], "2026-07-21");
+
+    expect(result.flatMap((segment) => segment.contributions)
+      .every((contribution) => Math.abs(contribution.dailyMinutes) >= 0.5)).toBe(true);
+  });
+
+  it("compresses adjacent future days when their displayed loads match", () => {
+    const result = buildThreadLoadSegments([
+      thread({ expectedMinutes: 600, fulfilledMinutes: 59.6, factGapMinutes: 540.4 })
+    ], "2026-07-21");
+
+    expect(result.some((segment) => segment.days > 1)).toBe(true);
+    for (const segment of result.filter((candidate) => candidate.days > 1)) {
+      expect(segment.start).not.toBe("2026-07-21");
+    }
   });
 
   it("puts the full remaining gap in Today for a one-day window", () => {
@@ -210,7 +332,7 @@ describe("buildThreadLoadSegments", () => {
     ], "2026-07-21", "UTC");
 
     expect(result[0]?.dailyMinutes).toBeCloseTo(-33.333);
-    expect(result[1]?.dailyMinutes).toBeCloseTo(62.5);
+    expect(result[1]?.dailyMinutes).toBeCloseTo(66.667);
   });
 
   it("excludes expired, unbounded, fulfilled, and inactive items", () => {
