@@ -1,5 +1,6 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
 import { intersection, localDayRange, minutesInRange } from "@/server/domain/time";
+import { solveDailyLoadByIntervals } from "@/server/domain/daily-load-solver";
 
 type Thread = DashboardData["view"]["threads"][number];
 
@@ -62,7 +63,7 @@ export function buildThreadLoadSegments(
 
   const days = dates.map((date, day) => {
     const contributions = items
-      .map((item) => ({ key: item.key, label: item.label, dailyMinutes: allocations.get(item.key)![day]! }))
+      .map((item) => ({ key: item.key, label: item.label, dailyMinutes: cleanDisplayMinutes(allocations.get(item.key)![day]!) }))
       .filter((item) => day === 0
         ? Math.abs(item.dailyMinutes) >= DISPLAY_EPSILON
         : item.dailyMinutes >= DISPLAY_EPSILON)
@@ -82,6 +83,11 @@ export function buildThreadLoadSegments(
   });
 
   return days.every((day) => day.contributions.length === 0) ? [] : compressDays(days);
+}
+
+function cleanDisplayMinutes(value: number): number {
+  const nearest = Math.round(value);
+  return Math.abs(value - nearest) < 1e-5 ? nearest : value;
 }
 
 function buildIdealMatrix(
@@ -112,26 +118,44 @@ function buildIdealMatrix(
     fullAllocations.set(spec.key, allocation);
   }
 
-  const cohorts = new Map<string, typeof specs>();
-  for (const spec of specs.filter((item) => !item.steady)) {
-    const cohortKey = `${spec.startIndex}:${spec.endIndex}`;
-    const cohort = cohorts.get(cohortKey) ?? [];
+  const flexible = specs.filter((item) => !item.steady);
+  const boundaries = [...new Set([
+    0,
+    ...specs.flatMap((item) => [item.startIndex, item.endIndex + 1]),
+    fullDates.length
+  ])].filter((value) => value >= 0 && value <= fullDates.length).sort((a, b) => a - b);
+  const cohorts = new Map<string, typeof flexible>();
+  for (const spec of flexible) {
+    const key = `${spec.startIndex}:${spec.endIndex}`;
+    const cohort = cohorts.get(key) ?? [];
     cohort.push(spec);
-    cohorts.set(cohortKey, cohort);
+    cohorts.set(key, cohort);
   }
-  const ordered = [...cohorts.values()].sort((a, b) =>
-    (a[0]!.endIndex - a[0]!.startIndex) - (b[0]!.endIndex - b[0]!.startIndex) ||
-    a[0]!.endIndex - b[0]!.endIndex || a[0]!.startIndex - b[0]!.startIndex
-  );
-  for (const cohort of ordered) {
-    const first = cohort[0]!;
-    const cohortMinutes = cohort.reduce((sum, item) => sum + item.minutes, 0);
-    const cohortAllocation = waterFill(totals, first.startIndex, first.endIndex, cohortMinutes);
+  const cohortSpecs = [...cohorts.entries()].map(([key, cohort]) => ({
+    key,
+    minutes: cohort.reduce((sum, item) => sum + item.minutes, 0),
+    startIndex: cohort[0]!.startIndex,
+    endIndex: cohort[0]!.endIndex
+  }));
+  const solution = solveDailyLoadByIntervals(cohortSpecs, totals, boundaries);
+  for (const cohort of cohorts.values()) {
+    const totalMinutes = cohort.reduce((sum, item) => sum + item.minutes, 0);
+    const aggregate = Array(fullDates.length).fill(0) as number[];
+    const cohortKey = `${cohort[0]!.startIndex}:${cohort[0]!.endIndex}`;
+    const intervalValues = solution.intervalAllocations.get(cohortKey) ?? [];
+    intervalValues.forEach((value, interval) => {
+      for (let day = boundaries[interval]!; day < boundaries[interval + 1]!; day += 1) aggregate[day] = value[0]!;
+    });
     for (const spec of cohort.sort((a, b) => a.key.localeCompare(b.key))) {
-      const share = cohortMinutes > EPSILON ? spec.minutes / cohortMinutes : 0;
-      fullAllocations.set(spec.key, cohortAllocation.map((minutes) => minutes * share));
+      const share = totalMinutes > EPSILON ? spec.minutes / totalMinutes : 0;
+      fullAllocations.set(spec.key, aggregate.map((minutes, day) => {
+        const interval = boundaries.findIndex((start, index) => day >= start && day < boundaries[index + 1]!);
+        const intervalStart = boundaries[interval] ?? day;
+        const intervalEnd = boundaries[interval + 1] ?? day + 1;
+        const intervalTotal = aggregate.slice(intervalStart, intervalEnd).reduce((sum, value) => sum + value, 0);
+        return (intervalTotal / Math.max(1, intervalEnd - intervalStart)) * share;
+      }));
     }
-    addInto(totals, cohortAllocation, 1);
   }
 
   return {

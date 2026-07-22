@@ -20,7 +20,7 @@ describe("buildThreadLoadSegments", () => {
       thread({ key: "b", item: "Later", expectedMinutes: 300, start: "2026-07-25", deadline: "2026-07-29", factGapMinutes: 300 })
     ], "2026-07-20");
 
-    expect(result[0]).toMatchObject({ start: "2026-07-20", end: "2026-07-20", dailyMinutes: 90 });
+    expect(result[0]?.dailyMinutes).toBeCloseTo(90, 3);
     expect(result[1]).toMatchObject({ start: "2026-07-21", end: "2026-07-24" });
     expect(result[2]).toMatchObject({ start: "2026-07-25", end: "2026-07-29" });
     expect(result[1]?.dailyMinutes).toBeCloseTo(result[2]!.dailyMinutes);

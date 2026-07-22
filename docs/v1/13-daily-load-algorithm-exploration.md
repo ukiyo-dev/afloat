@@ -235,4 +235,11 @@ Today 0 -> Tomorrow 0 -> Day 3 恢复 30
 
 两种策略都必须保持：Start / Deadline 边界、Item 分钟守恒、确定性，以及已完成逐日交换结果不被重复计算。两者不是单纯的技术 fallback，而是不同的产品偏好；具体采用哪一种，可以由用户偏好或 Dashboard 设置决定。当前实现采用 `Deadline Pressure`。
 
-当前工作区实现的是方案 B：先从 Today 开始逐日按实时剩余欠额比例尽量交换；剩余纯欠额均匀拉高对应的最小 Deadline 窗口；剩余纯超额按原分布比例降低对应供给 Item 的剩余有效窗口。
+## 当前实现语义
+
+当前实现采用两层结构：
+
+1. 理想矩阵层：将同一 `Start / Deadline` 窗口的 Flexible Items 聚合为 Cohort，在由 `Now`、所有 `Start` 和 `Deadline + 1` 形成的原子区间上，使用每日容量固定的 EDF 可行性判断与峰值二分，求全局 minimax 理想 Daily Load；区间内的每日负载固定，Cohort 内再按 Target 比例拆分。
+2. 事实结算层：保留方案 B 的语义，从 Today 开始沿连续日期逐日池化处理超额与欠额；交换完成后，剩余纯欠额和纯超额按所选的 `Deadline Pressure` 或 `Curve Preservation` 策略结算。
+
+区间级求解器已通过小规模连续分钟穷举对照测试：在当前“连续窗口、可拆分分钟、区间容量固定”的约束下，EDF 可行性判断与全局 minimax 峰值一致。该验证不改变第 3 步事实结算的局部语义。
