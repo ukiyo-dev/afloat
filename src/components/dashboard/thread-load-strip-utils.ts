@@ -23,6 +23,8 @@ export interface ThreadLoadSegment {
   contributions: ThreadLoadContribution[];
 }
 
+export type DailyLoadSettlementStrategy = "curve-preservation" | "deadline-pressure";
+
 interface LoadItem {
   key: string;
   label: string;
@@ -40,7 +42,8 @@ const DISPLAY_EPSILON = 0.5;
 export function buildThreadLoadSegments(
   threads: DashboardData["view"]["threads"],
   today: string,
-  timezone = "UTC"
+  timezone = "UTC",
+  settlementStrategy: DailyLoadSettlementStrategy = "deadline-pressure"
 ): ThreadLoadSegment[] {
   const eligible = threads.filter((thread) => isEligible(thread, today));
   if (eligible.length === 0) return [];
@@ -51,7 +54,7 @@ export function buildThreadLoadSegments(
   const ideal = buildIdealMatrix(eligible, today, lastDay);
   const originalAllocations = new Map(items.map((item) => [item.key, [...ideal.allocations.get(item.key)!]]));
   const allocations = new Map(items.map((item) => [item.key, [...ideal.allocations.get(item.key)!]]));
-  settlePastDeviations(items, allocations);
+  settlePastDeviations(items, allocations, settlementStrategy);
   applyTodayFacts(items, allocations);
   const steadyBase = dates.map((_, day) => items
     .filter((item) => item.steady)
@@ -139,7 +142,11 @@ function buildIdealMatrix(
   };
 }
 
-function settlePastDeviations(items: LoadItem[], allocations: Map<string, number[]>): void {
+function settlePastDeviations(
+  items: LoadItem[],
+  allocations: Map<string, number[]>,
+  strategy: DailyLoadSettlementStrategy
+): void {
   const idealAllocations = new Map(
     items.map((item) => [item.key, [...allocations.get(item.key)!]])
   );
@@ -166,9 +173,14 @@ function settlePastDeviations(items: LoadItem[], allocations: Map<string, number
 
   for (const entry of deficits.filter((candidate) => candidate.remaining > EPSILON)) {
     const allocation = allocations.get(entry.item.key)!;
+    const idealAllocation = idealAllocations.get(entry.item.key)!;
     const itemStart = Math.max(0, entry.item.startIndex);
-    const dailyIncrease = entry.remaining / (entry.item.endIndex - itemStart + 1);
-    for (let day = itemStart; day <= entry.item.endIndex; day += 1) allocation[day] += dailyIncrease;
+    if (strategy === "curve-preservation") {
+      scaleByBasis(allocation, idealAllocation, entry.remaining, itemStart, entry.item.endIndex);
+    } else {
+      const dailyIncrease = entry.remaining / (entry.item.endIndex - itemStart + 1);
+      for (let day = itemStart; day <= entry.item.endIndex; day += 1) allocation[day] += dailyIncrease;
+    }
     entry.remaining = 0;
   }
 
@@ -179,6 +191,27 @@ function settlePastDeviations(items: LoadItem[], allocations: Map<string, number
       Math.max(0, donor.item.startIndex),
       donor.item.endIndex
     );
+  }
+}
+
+function scaleByBasis(
+  allocation: number[],
+  basis: number[],
+  minutes: number,
+  start: number,
+  end: number
+): void {
+  const totalBasis = basis
+    .slice(start, end + 1)
+    .reduce((sum, value) => sum + Math.max(0, value), 0);
+  if (totalBasis <= EPSILON) {
+    const daily = minutes / Math.max(1, end - start + 1);
+    for (let day = start; day <= end; day += 1) allocation[day] += daily;
+    return;
+  }
+  for (let day = start; day <= end; day += 1) {
+    const weight = Math.max(0, basis[day]!) / totalBasis;
+    allocation[day] += minutes * weight;
   }
 }
 

@@ -281,7 +281,7 @@ describe("buildThreadLoadSegments", () => {
     const result = buildThreadLoadSegments([
       thread({ key: "ahead", item: "Ahead", expectedMinutes: 300, fulfilledMinutes: 40, factGapMinutes: 260 }),
       thread({ key: "behind", item: "Behind", expectedMinutes: 300, fulfilledMinutes: 0, factGapMinutes: 300 })
-    ], "2026-07-21");
+    ], "2026-07-21", "UTC", "deadline-pressure");
 
     expect(result[0]?.dailyMinutes).toBeCloseTo(62.222);
     expect(result[1]?.dailyMinutes).toBeCloseTo(62.222);
