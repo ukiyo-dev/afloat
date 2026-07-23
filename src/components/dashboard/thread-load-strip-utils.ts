@@ -24,6 +24,13 @@ export interface ThreadLoadSegment {
   contributions: ThreadLoadContribution[];
 }
 
+export interface RangeDailyLoadInvestment {
+  actualMinutes: number;
+  averageActualMinutes: number;
+  idealMinutes: number;
+  rate: number | null;
+}
+
 export type DailyLoadSettlementStrategy = "curve-preservation" | "deadline-pressure";
 
 interface LoadItem {
@@ -85,6 +92,49 @@ export function buildThreadLoadSegments(
   return days.every((day) => day.contributions.length === 0) ? [] : compressDays(days);
 }
 
+export function calculateRangeDailyLoadInvestment(
+  threads: DashboardData["view"]["threads"],
+  startDate: string,
+  endDate: string,
+  timezone = "UTC"
+): RangeDailyLoadInvestment {
+  const eligible = threads.filter((thread) => isEligible(thread, startDate));
+  if (eligible.length === 0) {
+    return { actualMinutes: 0, averageActualMinutes: 0, idealMinutes: 0, rate: null };
+  }
+
+  const lastDay = eligible.map((thread) => thread.deadline!).sort().at(-1)!;
+  const dates = dayKeys(startDate, lastDay);
+  const ideal = buildIdealMatrix(eligible, startDate, lastDay);
+  const idealDailyMinutes = dates.map((date, day) => {
+    if (date > endDate) return 0;
+    return eligible.reduce(
+      (sum, thread) => sum + (ideal.allocations.get(thread.key)?.[day] ?? 0),
+      0
+    );
+  });
+  const idealMinutes = idealDailyMinutes.reduce((sum, minutes) => sum + minutes, 0);
+  const rangeStart = localDayRange(startDate, timezone).startAt;
+  const rangeEnd = localDayRange(endDate, timezone).endAt;
+  const actualMinutes = eligible.reduce((total, thread) => total + thread.history
+    .filter((entry) => entry.source === "fact")
+    .reduce((sum, entry) => {
+      const overlap = intersection(
+        { startAt: new Date(entry.startAt), endAt: new Date(entry.endAt) },
+        { startAt: rangeStart, endAt: rangeEnd }
+      );
+      return sum + (overlap ? minutesInRange(overlap) : 0);
+    }, 0), 0);
+  const loadDays = idealDailyMinutes.filter((minutes) => minutes > EPSILON).length;
+
+  return {
+    actualMinutes,
+    averageActualMinutes: loadDays > 0 ? actualMinutes / loadDays : 0,
+    idealMinutes,
+    rate: idealMinutes > EPSILON ? actualMinutes / idealMinutes : null
+  };
+}
+
 function cleanDisplayMinutes(value: number): number {
   const nearest = Math.round(value);
   return Math.abs(value - nearest) < 1e-5 ? nearest : value;
@@ -95,7 +145,7 @@ function buildIdealMatrix(
   today: string,
   lastDay: string
 ): { allocations: Map<string, number[]> } {
-  const firstDay = threads.map((thread) => thread.start ?? today).sort()[0] ?? today;
+  const firstDay = [today, ...threads.map((thread) => thread.start ?? today)].sort()[0] ?? today;
   const fullDates = dayKeys(firstDay, lastDay);
   const todayIndex = fullDates.indexOf(today);
   const totals = Array(fullDates.length).fill(0) as number[];

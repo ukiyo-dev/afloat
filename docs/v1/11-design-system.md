@@ -1,5 +1,7 @@
 # 设计系统与 UI 边界
 
+Overview 的活动色使用两个正交维度：颜色只表达 Work、Entertainment、Rest 的活动性质；色彩密度表达 Thread 归属。Thread 活动使用实心原色，Non-thread 活动使用 `70%` 语义色与纸色混合的低密度填充，不另增三种组合色。`---` 视为 Thread 活动。标签文案不随色彩密度改变。
+
 本文档定义 Afloat v1 的前端视觉语言、交互模式与页面路由边界。
 
 ## 1. 核心视觉风格：数据账本 (Ledger) 与粗野主义 (Brutalism)

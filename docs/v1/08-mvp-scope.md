@@ -27,6 +27,7 @@ v1 做一个单用户个人承诺观察系统。
 - 线程历史显示
 - Group 聚合 Item 级 expectedMinutes、start 与 deadline
 - `expectedMinutes + start + deadline` 可行性分析
+- Overview 日投入：只统计过去自然日的范围事实分钟及其相对范围理想矩阵的百分比；范围 Daily Load 为零时隐藏，低于 `60%` 时使用危险边框
 - `TEST` 与 `SIGNED` 用户规则
 - 规则违约记录
 - 规则连续守约 run 计算

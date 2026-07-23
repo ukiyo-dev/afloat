@@ -1,15 +1,25 @@
 import { formatDuration } from "../view-formatters";
+import type { DashboardData } from "@/server/services/dashboard-service";
+import { isThreadActivity, semanticThreadFillClass, threadActivityKeys } from "./thread-activity-style";
 
 export function FactDistribution({ 
   factTotals, 
   planTotals, 
   shiftComposition,
-  activePlanDays
+  activePlanDays,
+  timeline,
+  threads,
+  rangeStartAt,
+  rangeEndAt
 }: { 
   factTotals: Record<string, number>; 
   planTotals: Record<string, number>;
   shiftComposition?: Record<string, { internal: number; external: number }>;
   activePlanDays: number;
+  timeline: DashboardData["view"]["timeline"];
+  threads: DashboardData["view"]["threads"];
+  rangeStartAt: string;
+  rangeEndAt: string;
 }) {
   if (Object.keys(factTotals).length === 0 && Object.keys(planTotals).length === 0) {
     return <p className="font-mono text-ink-light text-sm italic">当前时间范围内没有相关记录。</p>;
@@ -21,6 +31,16 @@ export function FactDistribution({
     rest: { internal: 0, external: 0 },
     unmapped: { internal: 0, external: 0 }
   };
+  const threadKeys = threadActivityKeys(threads);
+  const rangeStartMs = new Date(rangeStartAt).getTime();
+  const rangeEndMs = new Date(rangeEndAt).getTime();
+  const threadMinutesByKind = timeline.reduce<Record<string, number>>((totals, fact) => {
+    if (!isThreadActivity(fact, threadKeys)) return totals;
+    const start = Math.max(rangeStartMs, new Date(fact.startAt).getTime());
+    const end = Math.min(rangeEndMs, new Date(fact.endAt).getTime());
+    if (end > start) totals[fact.kind] = (totals[fact.kind] ?? 0) + (end - start) / 60_000;
+    return totals;
+  }, {});
 
   // Work, Leisure, Rest: show fulfilled + intShift + extShift inside the plan!
   const coreStats = [
@@ -28,6 +48,7 @@ export function FactDistribution({
       key: "ideal", 
       label: "工作", 
       fulfilled: factTotals.idealFulfilled ?? 0, 
+      threadFulfilled: threadMinutesByKind.idealFulfilled ?? 0,
       plan: planTotals.ideal ?? 0, 
       color: "bg-semantic-work",
       intShift: shiftComp.ideal?.internal ?? 0,
@@ -37,6 +58,7 @@ export function FactDistribution({
       key: "leisure", 
       label: "娱乐", 
       fulfilled: factTotals.leisureFulfilled ?? 0, 
+      threadFulfilled: threadMinutesByKind.leisureFulfilled ?? 0,
       plan: planTotals.leisure ?? 0, 
       color: "bg-semantic-leisure",
       intShift: shiftComp.leisure?.internal ?? 0,
@@ -46,6 +68,7 @@ export function FactDistribution({
       key: "rest", 
       label: "休息", 
       fulfilled: factTotals.restFulfilled ?? 0, 
+      threadFulfilled: threadMinutesByKind.restFulfilled ?? 0,
       plan: planTotals.rest ?? 0, 
       color: "bg-semantic-rest",
       intShift: shiftComp.rest?.internal ?? 0,
@@ -62,6 +85,7 @@ export function FactDistribution({
       {coreStats.length > 0 && (
         <div className="flex flex-col gap-3">
           {coreStats.map((stat) => {
+            const outsideFulfilled = Math.max(0, stat.fulfilled - stat.threadFulfilled);
             return (
               <div className="grid grid-cols-[max-content_minmax(0,1fr)_max-content] gap-2 items-center group sm:grid-cols-[80px_minmax(0,1fr)_100px] sm:gap-4" key={stat.key}>
                 <span className="font-bold truncate min-w-0">{stat.label}</span>
@@ -69,11 +93,18 @@ export function FactDistribution({
                 {/* Visual scale container acting as a pure flex row, just like TIME COMPOSITION */}
                 <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal group-hover:opacity-80 transition-opacity">
                   {/* Fulfilled (Solid Core Color) */}
-                  {stat.fulfilled > 0 && (
+                  {stat.threadFulfilled > 0 && (
                     <div 
                       className={`h-full ${stat.color} transition-all cursor-crosshair border-r border-ink last:border-r-0`} 
-                      style={{ flexGrow: stat.fulfilled }}
-                      title={`兑现: ${formatDuration(stat.fulfilled)}`}
+                      style={{ flexGrow: stat.threadFulfilled }}
+                      title={`兑现: ${formatDuration(stat.threadFulfilled)}`}
+                    />
+                  )}
+                  {outsideFulfilled > 0 && (
+                    <div
+                      className={`h-full ${stat.color} ${semanticThreadFillClass(stat.key, false)} transition-all cursor-crosshair border-r border-ink last:border-r-0`}
+                      style={{ flexGrow: outsideFulfilled }}
+                      title={`兑现: ${formatDuration(outsideFulfilled)}`}
                     />
                   )}
                   {/* External Shift (Amber) */}
@@ -121,29 +152,13 @@ export function FactDistribution({
         
         <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal">
           {/* Work */}
-          {coreStats.find(s => s.key === 'ideal') && coreStats.find(s => s.key === 'ideal')!.fulfilled > 0 && (
-            <div 
-              className="h-full bg-semantic-work transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0" 
-              style={{ flexGrow: coreStats.find(s => s.key === 'ideal')!.fulfilled }}
-              title={`工作: ${formatDuration(coreStats.find(s => s.key === 'ideal')!.fulfilled)}`}
-            />
-          )}
-          {/* Leisure */}
-          {coreStats.find(s => s.key === 'leisure') && coreStats.find(s => s.key === 'leisure')!.fulfilled > 0 && (
-            <div 
-              className="h-full bg-semantic-leisure transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0" 
-              style={{ flexGrow: coreStats.find(s => s.key === 'leisure')!.fulfilled }}
-              title={`娱乐: ${formatDuration(coreStats.find(s => s.key === 'leisure')!.fulfilled)}`}
-            />
-          )}
-          {/* Rest */}
-          {coreStats.find(s => s.key === 'rest') && coreStats.find(s => s.key === 'rest')!.fulfilled > 0 && (
-            <div 
-              className="h-full bg-semantic-rest transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0" 
-              style={{ flexGrow: coreStats.find(s => s.key === 'rest')!.fulfilled }}
-              title={`休息: ${formatDuration(coreStats.find(s => s.key === 'rest')!.fulfilled)}`}
-            />
-          )}
+          {coreStats.flatMap((stat) => {
+            const outside = Math.max(0, stat.fulfilled - stat.threadFulfilled);
+            return [
+              stat.threadFulfilled > 0 ? <div key={`${stat.key}-thread`} className={`h-full ${stat.color} transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0`} style={{ flexGrow: stat.threadFulfilled }} title={`${stat.label}: ${formatDuration(stat.threadFulfilled)}`} /> : null,
+              outside > 0 ? <div key={`${stat.key}-outside`} className={`h-full ${stat.color} ${semanticThreadFillClass(stat.key, false)} transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0`} style={{ flexGrow: outside }} title={`${stat.label}: ${formatDuration(outside)}`} /> : null
+            ];
+          })}
           {/* External Shift */}
           {extShift > 0 && (
             <div 

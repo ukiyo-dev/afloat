@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .muted-semantic-work {
+    background-color: color-mix(in srgb, rgb(var(--color-semantic-work)) 70%, rgb(var(--color-paper)));
+    background-image: none;
+  }
+
+  .muted-semantic-leisure {
+    background-color: color-mix(in srgb, rgb(var(--color-semantic-leisure)) 80%, rgb(var(--color-paper)));
+    background-image: none;
+  }
+
+  .muted-semantic-rest {
+    background-color: color-mix(in srgb, rgb(var(--color-semantic-rest)) 90%, rgb(var(--color-paper)));
+    background-image: none;
+  }
+}
+
 @layer base {
   :root {
     color-scheme: light;

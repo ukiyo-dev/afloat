@@ -1,7 +1,9 @@
+import { Fragment } from "react";
 import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 import { buildMacroDistributionDays } from "./macro-distribution-utils";
+import { semanticThreadFillClass } from "./thread-activity-style";
 
 export function MacroDistribution({
   timeline,
@@ -9,7 +11,8 @@ export function MacroDistribution({
   now,
   timezone,
   startDate,
-  endDate
+  endDate,
+  threads = []
 }: {
   timeline: DashboardData["view"]["timeline"];
   planTimeline: DashboardData["view"]["planTimeline"];
@@ -17,10 +20,11 @@ export function MacroDistribution({
   timezone: string;
   startDate: string;
   endDate: string;
+  threads?: DashboardData["view"]["threads"];
 }) {
   if (timeline.length === 0 && planTimeline.length === 0) return null;
 
-  const days = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate });
+  const days = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate, threads });
   const visibleLabelDates = new Set(
     days.length <= 7
       ? days.map((day) => day.date)
@@ -88,14 +92,13 @@ export function MacroDistribution({
                   const mins = kinds.reduce((total, kind) => total + (day.kinds[kind] || 0), 0);
                   if (mins === 0) return null;
                   
-                  const segHeightPercent = (mins / day.total) * 100;
-                  
+                  const threadMinutes = kinds.reduce((total, kind) => total + (day.threadKinds[kind] || 0), 0);
+                  const outsideMinutes = Math.max(0, mins - threadMinutes);
                   return (
-                    <div 
-                      key={kinds.join("-")}
-                      className={`w-full ${semanticColorClass(kinds[0])}`}
-                      style={{ height: `${segHeightPercent}%` }}
-                    />
+                    <Fragment key={kinds.join("-")}>
+                      {threadMinutes > 0 ? <div className={`w-full ${semanticColorClass(kinds[0])}`} style={{ height: `${(threadMinutes / day.total) * 100}%` }} /> : null}
+                      {outsideMinutes > 0 ? <div className={`w-full ${semanticColorClass(kinds[0])} ${semanticThreadFillClass(kinds[0], false)}`} style={{ height: `${(outsideMinutes / day.total) * 100}%` }} /> : null}
+                    </Fragment>
                   );
                 })}
               </div>

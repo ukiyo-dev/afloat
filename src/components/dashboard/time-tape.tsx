@@ -5,6 +5,7 @@ import { DashboardData } from "@/server/services/dashboard-service";
 import { formatDuration, timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 import { buildTimeTapeSlices, nowMarkerPositionPercent } from "./time-tape-utils";
+import { isThreadActivity, semanticThreadFillClass, threadActivityKeys } from "./thread-activity-style";
 
 export function TimeTape({ 
   timeline, 
@@ -12,7 +13,8 @@ export function TimeTape({
   startDate, 
   endDate,
   now,
-  visitorMode = false
+  visitorMode = false,
+  threads
 }: { 
   timeline: DashboardData["view"]["timeline"]; 
   timezone: string;
@@ -20,6 +22,7 @@ export function TimeTape({
   endDate: string;
   now?: string;
   visitorMode?: boolean;
+  threads: DashboardData["view"]["threads"];
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -34,6 +37,7 @@ export function TimeTape({
   const isSingleLocalDay =
     localDayKey(startDate, timezone) === localDayKey(new Date(endMs - 1).toISOString(), timezone);
   const slices = buildTimeTapeSlices({ timeline, startDate, endDate });
+  const threadKeys = threadActivityKeys(threads);
   const nowMarkerPercent = now
     ? nowMarkerPositionPercent({ startDate, endDate, now, timezone })
     : null;
@@ -62,7 +66,7 @@ export function TimeTape({
           return (
             <div 
               key={`tape-${slice.startAt}-${slice.endAt}-${idx}`}
-              className={`relative h-full min-w-0 hover:opacity-80 transition-opacity group/tape cursor-crosshair ${semanticColorClass(slice.fact.kind)}`}
+              className={`relative h-full min-w-0 hover:opacity-80 transition-opacity group/tape cursor-crosshair ${semanticColorClass(slice.fact.kind)} ${semanticThreadFillClass(slice.fact.kind, isThreadActivity(slice.fact, threadKeys))}`}
               style={{ flexGrow: slice.durationMs, flexBasis: 0 }}
             >
               {/* Tooltip on hover */}

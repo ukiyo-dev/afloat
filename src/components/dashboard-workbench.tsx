@@ -23,6 +23,7 @@ import { RulePanel } from "./dashboard/rule-panel";
 import { FactDistribution } from "./dashboard/fact-distribution";
 import { Timeline } from "./dashboard/timeline";
 import { TimeTape } from "./dashboard/time-tape";
+import { addDays, calculateRangeDailyLoadInvestment } from "./dashboard/thread-load-strip-utils";
 
 import { MacroDistribution } from "./dashboard/macro-distribution";
 
@@ -216,6 +217,24 @@ export function DashboardWorkbench({
     }),
     [projectedThreads, threadGroups, view]
   );
+  const currentDay = todayKey(projectedRangeView.timezone);
+  const rangeIncludesPast = projectedRangeView.startDate < currentDay;
+  const isTodayOnlyRange = projectedRangeView.startDate === currentDay && projectedRangeView.endDate === currentDay;
+  const rangeDailyLoadEndDate = isTodayOnlyRange
+    ? currentDay
+    : [projectedRangeView.endDate, addDays(currentDay, -1)].sort()[0]!;
+  const rangeDailyLoadInvestment = useMemo(
+    () => calculateRangeDailyLoadInvestment(
+      projectedThreads,
+      projectedRangeView.startDate,
+      rangeDailyLoadEndDate,
+      projectedRangeView.timezone
+    ),
+    [projectedRangeView.startDate, projectedRangeView.timezone, projectedThreads, rangeDailyLoadEndDate]
+  );
+  const showsRangeDailyLoadInvestment =
+    projectedRangeView.startDate <= rangeDailyLoadEndDate && rangeDailyLoadInvestment.idealMinutes > 0;
+  const canJudgeDailyLoad = !isTodayOnlyRange && rangeIncludesPast;
   const activeThreads = projectedThreads.filter((item) => (item.activityState ?? "active") === "active");
   const redActiveThreadCount = activeThreads.filter((item) =>
     ["expired", "stale", "imbalanced"].includes(item.status)
@@ -415,7 +434,14 @@ export function DashboardWorkbench({
 
           {/* Metrics Grid */}
           <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-            <Metric label="平均计划时间" value={formatDuration(projectedRangeView.averagePlannedMinutes)} />
+            {showsRangeDailyLoadInvestment ? (
+              <Metric
+                label="日投入"
+                value={formatDuration(rangeDailyLoadInvestment.averageActualMinutes)}
+                subscriptValue={rangeDailyLoadInvestment.rate === null ? "---" : percent(rangeDailyLoadInvestment.rate)}
+                danger={canJudgeDailyLoad && rangeDailyLoadInvestment.rate !== null && rangeDailyLoadInvestment.rate < 0.6}
+              />
+            ) : null}
             <Metric
               label="兑现率"
               value={internalFulfillmentValue}
@@ -496,6 +522,7 @@ export function DashboardWorkbench({
                       endDate={rangeView.endAt}
                       now={runtimeNow}
                       visitorMode={visitorMode}
+                      threads={projectedThreads}
                     />
                   ) : !isUltraMacro ? (
                     <MacroDistribution
@@ -505,6 +532,7 @@ export function DashboardWorkbench({
                       timezone={rangeView.timezone}
                       startDate={rangeView.startDate}
                       endDate={rangeView.endDate}
+                      threads={projectedThreads}
                     />
                   ) : null}
 
@@ -516,6 +544,10 @@ export function DashboardWorkbench({
                       planTotals={projectedRangeView.planTotals}
                       shiftComposition={projectedRangeView.shiftComposition}
                       activePlanDays={projectedRangeView.observedPlannedDays}
+                      timeline={projectedRangeView.timeline}
+                      threads={projectedThreads}
+                      rangeStartAt={projectedRangeView.startAt}
+                      rangeEndAt={projectedRangeView.endAt}
                     />
                   </div>
                 </div>
@@ -538,6 +570,7 @@ export function DashboardWorkbench({
                     timeline={rangeView.timeline}
                     timezone={rangeView.timezone}
                     startDate={rangeView.startDate}
+                    threads={projectedThreads}
                   />
                 </section>
               )}

@@ -1,4 +1,5 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import { isThreadActivity, threadActivityKeys } from "./thread-activity-style";
 
 const MS_PER_MINUTE = 60_000;
 
@@ -10,6 +11,7 @@ export interface MacroDistributionDay {
   displayDate: string;
   total: number;
   kinds: Record<string, number>;
+  threadKinds: Record<string, number>;
 }
 
 interface LocalDate {
@@ -29,7 +31,8 @@ export function buildMacroDistributionDays({
   now,
   timezone,
   startDate,
-  endDate
+  endDate,
+  threads = []
 }: {
   timeline: DashboardData["view"]["timeline"];
   planTimeline?: DashboardData["view"]["planTimeline"];
@@ -37,6 +40,7 @@ export function buildMacroDistributionDays({
   timezone: string;
   startDate: string;
   endDate: string;
+  threads?: DashboardData["view"]["threads"];
 }): MacroDistributionDay[] {
   const days = buildDays(startDate, endDate);
   const dayRanges = days.map((day) => {
@@ -54,10 +58,11 @@ export function buildMacroDistributionDays({
 
   const nowAt = now ? new Date(now) : null;
   const validNow = nowAt && Number.isFinite(nowAt.getTime()) ? nowAt : null;
+  const threadKeys = threadActivityKeys(threads);
 
-  addSegments(timeline, validNow ? { endAt: validNow } : {}, dayRanges);
+  addSegments(timeline, validNow ? { endAt: validNow } : {}, dayRanges, threadKeys);
   if (validNow) {
-    addSegments(planTimeline, { startAt: validNow }, dayRanges);
+    addSegments(planTimeline, { startAt: validNow }, dayRanges, threadKeys);
   }
 
   return days;
@@ -66,7 +71,8 @@ export function buildMacroDistributionDays({
 function addSegments(
   segments: Array<TimelineFact | PlanEntry>,
   boundary: { startAt?: Date; endAt?: Date },
-  dayRanges: Array<{ day: MacroDistributionDay; range: DateRange }>
+  dayRanges: Array<{ day: MacroDistributionDay; range: DateRange }>,
+  threadKeys: Set<string>
 ) {
   for (const segment of segments) {
     const segmentRange = {
@@ -92,6 +98,9 @@ function addSegments(
 
       day.total += minutes;
       day.kinds[segment.kind] = (day.kinds[segment.kind] ?? 0) + minutes;
+      if (isThreadActivity(segment, threadKeys)) {
+        day.threadKinds[segment.kind] = (day.threadKinds[segment.kind] ?? 0) + minutes;
+      }
     }
   }
 }
@@ -106,7 +115,8 @@ function buildDays(startDate: string, endDate: string): MacroDistributionDay[] {
       date: formatLocalDate(cursor),
       displayDate: `${cursor.month}月${cursor.day}日`,
       total: 0,
-      kinds: {}
+      kinds: {},
+      threadKinds: {}
     });
     cursor = addLocalDays(cursor, 1);
   }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { projectThreadsForNow } from "./thread-now-projection";
-import { apportionDisplayMinutes, buildThreadLoadSegments } from "./thread-load-strip-utils";
+import {
+  apportionDisplayMinutes,
+  buildThreadLoadSegments,
+  calculateRangeDailyLoadInvestment
+} from "./thread-load-strip-utils";
 
 function thread(overrides: Record<string, unknown>) {
   return {
@@ -12,6 +16,73 @@ function thread(overrides: Record<string, unknown>) {
     ...overrides
   } as any;
 }
+
+describe("calculateRangeDailyLoadInvestment", () => {
+  it("compares all range facts with the ideal range load without daily caps", () => {
+    const result = calculateRangeDailyLoadInvestment([
+      thread({
+        expectedMinutes: 600,
+        history: [{
+          startAt: "2026-07-20T09:00:00.000Z",
+          endAt: "2026-07-20T11:00:00.000Z",
+          kind: "ideal",
+          minutes: 120,
+          title: "G/I",
+          source: "fact"
+        }]
+      })
+    ], "2026-07-20", "2026-07-20");
+
+    expect(result.actualMinutes).toBe(120);
+    expect(result.averageActualMinutes).toBe(120);
+    expect(result.idealMinutes).toBeCloseTo(60);
+    expect(result.rate).toBeCloseTo(2);
+  });
+
+  it("excludes untracked thread facts from Daily Load investment", () => {
+    const result = calculateRangeDailyLoadInvestment([
+      thread({ source: "untracked", activityState: "untracked", item: "---" })
+    ], "2026-07-20", "2026-07-20");
+
+    expect(result).toEqual({ actualMinutes: 0, averageActualMinutes: 0, idealMinutes: 0, rate: null });
+  });
+
+  it("shows actual investment as a daily average across the range", () => {
+    const result = calculateRangeDailyLoadInvestment([
+      thread({
+        history: [{
+          startAt: "2026-07-20T09:00:00.000Z",
+          endAt: "2026-07-20T11:00:00.000Z",
+          kind: "ideal",
+          minutes: 120,
+          title: "G/I",
+          source: "fact"
+        }]
+      })
+    ], "2026-07-20", "2026-07-21");
+
+    expect(result.actualMinutes).toBe(120);
+    expect(result.averageActualMinutes).toBe(60);
+  });
+
+  it("only counts days with non-zero ideal Daily Load in the average", () => {
+    const result = calculateRangeDailyLoadInvestment([
+      thread({
+        expectedMinutes: 600,
+        history: [{
+          startAt: "2026-07-20T09:00:00.000Z",
+          endAt: "2026-07-20T11:00:00.000Z",
+          kind: "ideal",
+          minutes: 120,
+          title: "G/I",
+          source: "fact"
+        }]
+      })
+    ], "2026-07-20", "2026-07-30");
+
+    expect(result.averageActualMinutes).toBe(12);
+  });
+});
 
 describe("buildThreadLoadSegments", () => {
   it("moves flexible load earlier to level the total across overlapping windows", () => {
