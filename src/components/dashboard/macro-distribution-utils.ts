@@ -14,6 +14,36 @@ export interface MacroDistributionDay {
   threadKinds: Record<string, number>;
 }
 
+export type MacroThreadScope = "non" | "thread";
+
+export function filterMacroDistributionDay(
+  day: MacroDistributionDay,
+  kinds: string[] | null,
+  scopes: ReadonlySet<MacroThreadScope>
+): MacroDistributionDay {
+  const filteredKinds: Record<string, number> = {};
+  const filteredThreadKinds: Record<string, number> = {};
+
+  for (const [kind, minutes] of Object.entries(day.kinds)) {
+    if (kinds !== null && !kinds.includes(kind)) continue;
+
+    const threadMinutes = day.threadKinds[kind] ?? 0;
+    const nonThreadMinutes = Math.max(0, minutes - threadMinutes);
+    const visibleThreadMinutes = scopes.has("thread") ? threadMinutes : 0;
+    const visibleMinutes = visibleThreadMinutes + (scopes.has("non") ? nonThreadMinutes : 0);
+
+    if (visibleMinutes > 0) filteredKinds[kind] = visibleMinutes;
+    if (visibleThreadMinutes > 0) filteredThreadKinds[kind] = visibleThreadMinutes;
+  }
+
+  return {
+    ...day,
+    total: Object.values(filteredKinds).reduce((total, minutes) => total + minutes, 0),
+    kinds: filteredKinds,
+    threadKinds: filteredThreadKinds
+  };
+}
+
 interface LocalDate {
   year: number;
   month: number;

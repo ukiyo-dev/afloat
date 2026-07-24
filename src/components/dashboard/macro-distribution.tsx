@@ -4,7 +4,11 @@ import { Fragment, useState } from "react";
 import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
-import { buildMacroDistributionDays } from "./macro-distribution-utils";
+import {
+  buildMacroDistributionDays,
+  filterMacroDistributionDay,
+  type MacroThreadScope
+} from "./macro-distribution-utils";
 import { semanticThreadFillClass } from "./thread-activity-style";
 
 type MacroFilter = "work" | "leisure" | "rest" | "all";
@@ -14,6 +18,11 @@ const macroFilters: Array<{ key: MacroFilter; label: string; kinds: string[] | n
   { key: "leisure", label: "娱乐", kinds: ["leisure", "leisureFulfilled"] },
   { key: "rest", label: "休闲", kinds: ["rest", "restFulfilled"] },
   { key: "all", label: "ALL", kinds: null }
+];
+
+const threadScopes: Array<{ key: MacroThreadScope; label: string }> = [
+  { key: "thread", label: "Thread" },
+  { key: "non", label: "Non" }
 ];
 
 export function MacroDistribution({
@@ -34,28 +43,23 @@ export function MacroDistribution({
   threads?: DashboardData["view"]["threads"];
 }) {
   const [filter, setFilter] = useState<MacroFilter>("all");
+  const [selectedScopes, setSelectedScopes] = useState<Set<MacroThreadScope>>(
+    () => new Set(["non", "thread"])
+  );
 
   if (timeline.length === 0 && planTimeline.length === 0) return null;
 
   const allDays = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate, threads });
   const selectedKinds = macroFilters.find((item) => item.key === filter)?.kinds ?? null;
-  const days = allDays.map((day) => {
-    if (selectedKinds === null) return day;
-
-    const kinds = Object.fromEntries(
-      Object.entries(day.kinds).filter(([kind]) => selectedKinds.includes(kind))
-    );
-    const threadKinds = Object.fromEntries(
-      Object.entries(day.threadKinds).filter(([kind]) => selectedKinds.includes(kind))
-    );
-
-    return {
-      ...day,
-      total: Object.values(kinds).reduce((total, minutes) => total + minutes, 0),
-      kinds,
-      threadKinds
-    };
-  });
+  const days = allDays.map((day) => filterMacroDistributionDay(day, selectedKinds, selectedScopes));
+  const toggleScope = (scope: MacroThreadScope) => {
+    setSelectedScopes((current) => {
+      const next = new Set(current);
+      if (next.has(scope)) next.delete(scope);
+      else next.add(scope);
+      return next;
+    });
+  };
   const visibleLabelDates = new Set(
     days.length <= 7
       ? days.map((day) => day.date)
@@ -92,16 +96,39 @@ export function MacroDistribution({
 
   return (
     <div>
-      <div className="mb-2 flex items-stretch">
-         <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 uppercase">
+      <div className="mb-2 flex items-stretch justify-start">
+         <div className="inline-flex border border-ledger bg-ledger" aria-label="Thread 归属过滤器">
+           {threadScopes.map((scope) => (
+             <button
+               key={scope.key}
+               type="button"
+               className={`grid h-[28px] w-[28px] place-items-center border-r border-paper/30 last:border-r-0 transition-colors ${
+                 selectedScopes.has(scope.key)
+                   ? "bg-highlight text-ink-fixed"
+                   : "bg-ledger text-ledger-foreground hover:bg-paper hover:text-ink-fixed"
+               }`}
+               onClick={() => toggleScope(scope.key)}
+               aria-pressed={selectedScopes.has(scope.key)}
+               aria-label={scope.label}
+               title={scope.label}
+             >
+               {scope.key === "thread" ? (
+                 <span aria-hidden className="block h-2.5 w-2.5 bg-current" />
+               ) : (
+                 <span aria-hidden className="block h-2.5 w-2.5 border-2 border-current" />
+               )}
+             </button>
+           ))}
+         </div>
+         <h3 className="inline-flex items-center bg-ledger px-2 font-mono text-sm font-bold uppercase text-ledger-foreground">
             宏观分布
          </h3>
-         <div className="inline-flex border border-ledger bg-ledger" aria-label="宏观分布过滤器">
+         <div className="inline-flex border border-ledger bg-ledger" aria-label="活动类型过滤器">
            {macroFilters.map((item) => (
              <button
                key={item.key}
                type="button"
-               className={`grid h-[28px] w-[28px] place-items-center border-r border-paper/30 last:border-r-0 transition-colors ${
+               className={`grid h-[28px] w-[28px] place-items-center border-r border-paper/30 transition-colors last:border-r-0 ${
                  filter === item.key
                    ? "bg-highlight text-ink-fixed"
                    : "bg-ledger text-ledger-foreground hover:bg-highlight hover:text-ink-fixed"

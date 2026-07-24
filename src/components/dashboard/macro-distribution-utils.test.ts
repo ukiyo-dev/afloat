@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMacroDistributionDays } from "./macro-distribution-utils";
+import { buildMacroDistributionDays, filterMacroDistributionDay } from "./macro-distribution-utils";
 import type { DashboardData } from "@/server/services/dashboard-service";
 
 type Timeline = DashboardData["view"]["timeline"];
@@ -72,6 +72,40 @@ describe("buildMacroDistributionDays", () => {
     expect(days[0]?.total).toBe(240);
     expect(days[0]?.kinds.idealFulfilled).toBe(120);
     expect(days[0]?.kinds.ideal).toBe(120);
+  });
+});
+
+describe("filterMacroDistributionDay", () => {
+  const day = {
+    date: "2026-05-07",
+    displayDate: "5月7日",
+    total: 210,
+    kinds: { ideal: 150, rest: 60 },
+    threadKinds: { ideal: 90, rest: 20 }
+  };
+
+  it("combines the activity-kind and non-thread filters", () => {
+    expect(filterMacroDistributionDay(day, ["ideal"], new Set(["non"]))).toMatchObject({
+      total: 60,
+      kinds: { ideal: 60 },
+      threadKinds: {}
+    });
+  });
+
+  it("shows only thread minutes while preserving their kinds", () => {
+    expect(filterMacroDistributionDay(day, null, new Set(["thread"]))).toMatchObject({
+      total: 110,
+      kinds: { ideal: 90, rest: 20 },
+      threadKinds: { ideal: 90, rest: 20 }
+    });
+  });
+
+  it("returns an empty distribution when both scopes are disabled", () => {
+    expect(filterMacroDistributionDay(day, null, new Set())).toMatchObject({
+      total: 0,
+      kinds: {},
+      threadKinds: {}
+    });
   });
 });
 
