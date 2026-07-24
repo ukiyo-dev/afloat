@@ -547,7 +547,6 @@ export function DashboardWorkbench({
 
 
                   <div className={!isUltraMacro ? "border-t-2 border-dashed border-ink/20 pt-8" : ""}>
-                    <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 mb-4 uppercase">{factLayerTitle}</h3>
                     <FactDistribution
                       factTotals={projectedRangeView.factTotals}
                       planTotals={projectedRangeView.planTotals}
