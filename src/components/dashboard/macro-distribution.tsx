@@ -1,9 +1,20 @@
-import { Fragment } from "react";
+"use client";
+
+import { Fragment, useState } from "react";
 import { DashboardData } from "../../server/services/dashboard-service";
 import { formatDuration, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 import { buildMacroDistributionDays } from "./macro-distribution-utils";
 import { semanticThreadFillClass } from "./thread-activity-style";
+
+type MacroFilter = "work" | "leisure" | "rest" | "all";
+
+const macroFilters: Array<{ key: MacroFilter; label: string; kinds: string[] | null }> = [
+  { key: "work", label: "工作", kinds: ["ideal", "idealFulfilled"] },
+  { key: "leisure", label: "娱乐", kinds: ["leisure", "leisureFulfilled"] },
+  { key: "rest", label: "休闲", kinds: ["rest", "restFulfilled"] },
+  { key: "all", label: "ALL", kinds: null }
+];
 
 export function MacroDistribution({
   timeline,
@@ -22,9 +33,29 @@ export function MacroDistribution({
   endDate: string;
   threads?: DashboardData["view"]["threads"];
 }) {
+  const [filter, setFilter] = useState<MacroFilter>("all");
+
   if (timeline.length === 0 && planTimeline.length === 0) return null;
 
-  const days = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate, threads });
+  const allDays = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate, threads });
+  const selectedKinds = macroFilters.find((item) => item.key === filter)?.kinds ?? null;
+  const days = allDays.map((day) => {
+    if (selectedKinds === null) return day;
+
+    const kinds = Object.fromEntries(
+      Object.entries(day.kinds).filter(([kind]) => selectedKinds.includes(kind))
+    );
+    const threadKinds = Object.fromEntries(
+      Object.entries(day.threadKinds).filter(([kind]) => selectedKinds.includes(kind))
+    );
+
+    return {
+      ...day,
+      total: Object.values(kinds).reduce((total, minutes) => total + minutes, 0),
+      kinds,
+      threadKinds
+    };
+  });
   const visibleLabelDates = new Set(
     days.length <= 7
       ? days.map((day) => day.date)
@@ -61,10 +92,29 @@ export function MacroDistribution({
 
   return (
     <div>
-      <div className="flex justify-between items-end mb-2">
+      <div className="mb-2 flex items-stretch">
          <h3 className="font-mono font-bold text-sm bg-ledger text-ledger-foreground inline-block px-2 py-1 uppercase">
-            宏观分布 (MACRO DISTRIBUTION)
+            宏观分布
          </h3>
+         <div className="inline-flex border border-ledger bg-ledger" aria-label="宏观分布过滤器">
+           {macroFilters.map((item) => (
+             <button
+               key={item.key}
+               type="button"
+               className={`grid h-[28px] w-[28px] place-items-center border-r border-paper/30 last:border-r-0 transition-colors ${
+                 filter === item.key
+                   ? "bg-highlight text-ink-fixed"
+                   : "bg-ledger text-ledger-foreground hover:bg-highlight hover:text-ink-fixed"
+               }`}
+               onClick={() => setFilter(item.key)}
+               aria-pressed={filter === item.key}
+               aria-label={item.label}
+               title={item.label}
+             >
+               <MacroFilterGlyph filter={item.key} />
+             </button>
+           ))}
+         </div>
       </div>
       
       {/* Brutalist Chart Container */}
@@ -75,6 +125,8 @@ export function MacroDistribution({
         >
         {days.map((day) => {
           const heightPercent = Math.min(100, (day.total / maxDailyMinutes) * 100);
+          const selectedThreadMinutes = Object.values(day.threadKinds).reduce((total, minutes) => total + minutes, 0);
+          const selectedOutsideMinutes = Math.max(0, day.total - selectedThreadMinutes);
           
           return (
             <div 
@@ -96,8 +148,8 @@ export function MacroDistribution({
                   const outsideMinutes = Math.max(0, mins - threadMinutes);
                   return (
                     <Fragment key={kinds.join("-")}>
-                      {threadMinutes > 0 ? <div className={`w-full ${semanticColorClass(kinds[0])}`} style={{ height: `${(threadMinutes / day.total) * 100}%` }} /> : null}
-                      {outsideMinutes > 0 ? <div className={`w-full ${semanticColorClass(kinds[0])} ${semanticThreadFillClass(kinds[0], false)}`} style={{ height: `${(outsideMinutes / day.total) * 100}%` }} /> : null}
+                      {outsideMinutes > 0 ? <div className={`w-full min-h-0 ${semanticColorClass(kinds[0])} ${semanticThreadFillClass(kinds[0], false)}`} style={{ flex: `${outsideMinutes} 1 0` }} /> : null}
+                      {threadMinutes > 0 ? <div className={`w-full min-h-0 ${semanticColorClass(kinds[0])}`} style={{ flex: `${threadMinutes} 1 0` }} /> : null}
                     </Fragment>
                   );
                 })}
@@ -107,19 +159,40 @@ export function MacroDistribution({
               <div className="hidden group-hover/bar:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-3 shadow-brutal border-2 border-paper w-48 text-xs font-mono z-50 pointer-events-none">
                 <div className="mb-2 font-bold border-b border-paper/20 pb-1 text-sm">{day.displayDate}</div>
                 <div className="flex flex-col gap-1">
-                  {kindOrder.map(kind => {
-                    const mins = day.kinds[kind] || 0;
-                    if (mins === 0) return null;
-                    return (
-                      <div key={kind} className="flex justify-between items-center">
-                        <span className="flex items-center gap-1.5">
-                           <span className={`w-2 h-2 inline-block ${semanticColorClass(kind)} border border-paper/30`}></span>
-                           {kindLabel(kind)}
-                        </span>
-                        <span className="font-bold">{formatDuration(mins)}</span>
-                      </div>
-                    );
-                  })}
+                  {selectedKinds === null ? kindOrder.map(kind => {
+                      const mins = day.kinds[kind] || 0;
+                      if (mins === 0) return null;
+                      return (
+                        <div key={kind} className="flex justify-between items-center">
+                          <span className="flex items-center gap-1.5">
+                             <span className={`w-2 h-2 inline-block ${semanticColorClass(kind)} border border-paper/30`}></span>
+                             {kindLabel(kind)}
+                          </span>
+                          <span className="font-bold">{formatDuration(mins)}</span>
+                        </div>
+                      );
+                    }) : (
+                      <>
+                        {selectedOutsideMinutes > 0 ? (
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`inline-block h-2 w-2 border border-paper/30 ${semanticColorClass(selectedKinds[0])} ${semanticThreadFillClass(selectedKinds[0], false)}`} />
+                              Non-Thread
+                            </span>
+                            <span className="font-bold">{formatDuration(selectedOutsideMinutes)}</span>
+                          </div>
+                        ) : null}
+                        {selectedThreadMinutes > 0 ? (
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`inline-block h-2 w-2 border border-paper/30 ${semanticColorClass(selectedKinds[0])}`} />
+                              Thread
+                            </span>
+                            <span className="font-bold">{formatDuration(selectedThreadMinutes)}</span>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
                   <div className="flex justify-between items-center mt-2 pt-1 border-t border-paper/20">
                     <span className="text-paper/60">Total</span>
                     <span className="font-bold">{formatDuration(day.total)}</span>
@@ -145,4 +218,25 @@ export function MacroDistribution({
       </div>
     </div>
   );
+}
+
+function MacroFilterGlyph({ filter }: { filter: MacroFilter }) {
+  if (filter === "all") {
+    return (
+      <span aria-hidden className="grid grid-cols-2 gap-[2px]">
+        <span className="block h-[5px] w-[5px] bg-semantic-work" />
+        <span className="block h-[5px] w-[5px] bg-semantic-leisure" />
+        <span className="block h-[5px] w-[5px] bg-semantic-rest" />
+        <span className="block h-[5px] w-[5px] bg-ink-light" />
+      </span>
+    );
+  }
+
+  const colorClass = filter === "work"
+    ? "bg-semantic-work"
+    : filter === "leisure"
+      ? "bg-semantic-leisure"
+      : "bg-semantic-rest";
+
+  return <span aria-hidden className={`block h-2.5 w-2.5 ${colorClass}`} />;
 }

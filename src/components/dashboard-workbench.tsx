@@ -99,7 +99,7 @@ function ThemeModeButton() {
 
 function getFactLayerTitle(startDate: string, endDate: string, timezone: string) {
   if (startDate !== endDate) {
-    return "时间分布 (TEMPORAL DISTRIBUTION)";
+    return "时间分布";
   }
 
   const today = todayKey(timezone);
@@ -440,20 +440,28 @@ export function DashboardWorkbench({
                 value={formatDuration(rangeDailyLoadInvestment.averageActualMinutes)}
                 subscriptValue={rangeDailyLoadInvestment.rate === null ? "---" : percent(rangeDailyLoadInvestment.rate)}
                 danger={canJudgeDailyLoad && rangeDailyLoadInvestment.rate !== null && rangeDailyLoadInvestment.rate < 0.6}
+                success={canJudgeDailyLoad && rangeDailyLoadInvestment.rate !== null && rangeDailyLoadInvestment.rate >= 1}
               />
             ) : null}
             <Metric
               label="兑现率"
               value={internalFulfillmentValue}
               secondaryValue={fulfillmentSecondaryValue}
-              highlight={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.5}
+              danger={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.6}
+              success={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate >= 1}
             />
-            <Metric label="维护率" value={percent(projectedRangeView.maintenanceRate)} />
+            <Metric
+              label="维护率"
+              value={percent(projectedRangeView.maintenanceRate)}
+              danger={projectedRangeView.maintenanceRate < 0.6}
+              success={projectedRangeView.maintenanceRate >= 1}
+            />
             {activeThreads.length > 0 ? (
               <Metric
                 label={redActiveThreadCount > 0 ? "待规划线程" : "已规划线程"}
                 value={redActiveThreadCount > 0 ? `${redActiveThreadCount}` : `${plannedActiveThreadCount}/${activeThreads.length}`}
                 danger={redActiveThreadCount > 0}
+                success={redActiveThreadCount === 0}
               />
             ) : null}
             {projectedRangeView.protocolErrors.length > 0 ? (
@@ -496,6 +504,7 @@ export function DashboardWorkbench({
                 label={unfulfilledRuleCount > 0 ? "违约数" : "履约数"}
                 value={unfulfilledRuleCount > 0 ? `${unfulfilledRuleCount}` : `${projectedRangeView.fulfilledRuleCount}/${formalRuleCount}`}
                 danger={unfulfilledRuleCount > 0}
+                success={unfulfilledRuleCount === 0}
               />
             ) : null}
           </section>

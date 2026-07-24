@@ -87,7 +87,7 @@ export function FactDistribution({
           {coreStats.map((stat) => {
             const outsideFulfilled = Math.max(0, stat.fulfilled - stat.threadFulfilled);
             return (
-              <div className="grid grid-cols-[max-content_minmax(0,1fr)_max-content] gap-2 items-center group sm:grid-cols-[80px_minmax(0,1fr)_100px] sm:gap-4" key={stat.key}>
+              <div className="grid grid-cols-[max-content_minmax(0,1fr)_max-content] items-center gap-2 group sm:grid-cols-[48px_minmax(0,1fr)_100px]" key={stat.key}>
                 <span className="font-bold truncate min-w-0">{stat.label}</span>
                 
                 {/* Visual scale container acting as a pure flex row, just like TIME COMPOSITION */}
@@ -125,13 +125,13 @@ export function FactDistribution({
                   )}
                 </div>
                 
-                <div className="flex flex-col text-right">
+                <div className="flex flex-col pl-2 text-right">
                   <strong>{formatDuration(stat.fulfilled)}</strong>
                   <span
-                    className="text-xs text-ink-light"
-                    title={`活跃日: ${activePlanDays} 天`}
+                    className="whitespace-nowrap text-xs text-ink-light"
+                    title={`日均 Thread time / 日均 all（活跃日: ${activePlanDays} 天）`}
                   >
-                    / {formatDuration(activeDayAverage(stat.fulfilled))}
+                    {formatDuration(activeDayAverage(stat.threadFulfilled))} / {formatDuration(activeDayAverage(stat.fulfilled))}
                   </span>
                   {(stat.extShift > 0 || stat.intShift > 0) && (
                     <span className="text-[10px] mt-1 flex flex-col items-end gap-0.5">
