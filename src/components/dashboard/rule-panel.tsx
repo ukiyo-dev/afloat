@@ -249,12 +249,12 @@ function RuleRow({ rule, today }: { rule: Rule; today: string }) {
                 {rule.breaks.length > 0 ? (
                   rule.breaks.map((ruleBreak) => (
                     <div
-                      className="grid grid-cols-1 gap-2 border border-ink/30 bg-surface px-2 py-2 font-mono text-xs md:grid-cols-[90px_minmax(0,1fr)_minmax(0,2fr)]"
+                      className="grid grid-cols-1 gap-2 border border-ink/30 bg-surface px-2 py-2 font-mono text-xs md:grid-cols-[90px_minmax(100px,0.6fr)_minmax(0,2fr)]"
                       key={ruleBreak.id}
                     >
                       <strong>{ruleBreak.brokenDate}</strong>
                       <span className="truncate">{ruleBreak.scene}</span>
-                      <span className="truncate text-ink-light">{ruleBreak.type === "test_break" ? "TEST BREAK" : "RULE BREAK"} · {ruleBreak.reason}</span>
+                      <span className="min-w-0 whitespace-pre-wrap break-words text-ink-light">{ruleBreak.type === "test_break" ? "TEST BREAK" : "RULE BREAK"} · {ruleBreak.reason}</span>
                     </div>
                   ))
                 ) : (

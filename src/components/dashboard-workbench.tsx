@@ -503,7 +503,6 @@ export function DashboardWorkbench({
               <Metric
                 label={unfulfilledRuleCount > 0 ? "违约数" : "履约数"}
                 value={unfulfilledRuleCount > 0 ? `${unfulfilledRuleCount}` : `${projectedRangeView.fulfilledRuleCount}/${formalRuleCount}`}
-                danger={unfulfilledRuleCount > 0}
                 success={unfulfilledRuleCount === 0}
               />
             ) : null}
