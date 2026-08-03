@@ -50,7 +50,7 @@ export default async function DashboardPage({
           个人时间镜像观察系统。当前环境为私有状态，访客模式尚未开启。
         </p>
         
-        <Link href="/login" className="btn-brutal text-2xl py-4 px-12 inline-flex items-center justify-center gap-4 group">
+        <Link href="/login" prefetch={false} className="btn-brutal text-2xl py-4 px-12 inline-flex items-center justify-center gap-4 group">
           系统入口
           <span className="bg-ledger text-ledger-foreground w-8 h-8 rounded-full flex items-center justify-center text-sm group-hover:bg-highlight group-hover:text-ink-fixed transition-colors">→</span>
         </Link>

@@ -1,11 +1,6 @@
 import Link from "next/link";
-import { getAuthenticatedOwnerId } from "@/server/services/auth-service";
 
-export const dynamic = "force-dynamic";
-
-export default async function HomePage() {
-  const isOwner = await getAuthenticatedOwnerId();
-
+export default function HomePage() {
   return (
     <main className="shell flex flex-col items-center justify-center min-h-[80vh] text-center">
       <section className="max-w-2xl relative flex flex-col items-center">
@@ -20,7 +15,8 @@ export default async function HomePage() {
         </p>
         
         <Link 
-          href={isOwner ? "/dashboard" : "/dashboard"} 
+          href="/dashboard"
+          prefetch={false}
           className="btn-brutal text-2xl py-4 px-12 inline-flex items-center justify-center gap-4 group"
         >
           进入镜像

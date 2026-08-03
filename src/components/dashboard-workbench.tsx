@@ -282,6 +282,7 @@ export function DashboardWorkbench({
                   {isOwner ? (
                     <Link
                       href={guestModeHref}
+                      prefetch={false}
                       className="font-mono text-highlight bg-ledger inline-flex items-center px-2 font-bold tracking-widest text-xs hover:bg-highlight hover:text-ink-fixed transition-colors cursor-pointer"
                       title={visitorMode ? "Switch to Owner Mode" : "View as Guest"}
                     >
@@ -360,12 +361,12 @@ export function DashboardWorkbench({
 
               <div className="ledger-border-t pt-3 mt-1 flex justify-between items-center">
                 {visitorMode ? (
-                  <Link href="/login" className="font-mono text-sm font-bold hover:underline hover:text-highlight hover:bg-ledger px-2 py-1 transition-colors">
+                  <Link href="/login" prefetch={false} className="font-mono text-sm font-bold hover:underline hover:text-highlight hover:bg-ledger px-2 py-1 transition-colors">
                     OWNER LOGIN →
                   </Link>
                 ) : (
                   <>
-                    <Link href="/settings" className="font-mono text-sm font-bold hover:underline">
+                    <Link href="/settings" prefetch={false} className="font-mono text-sm font-bold hover:underline">
                       SETTINGS
                     </Link>
                     <ActionForm action={logoutAction}>
@@ -619,6 +620,7 @@ function RangeLink({ active, href, label, title }: { active: boolean; href: stri
         active ? "bg-ledger text-highlight font-bold" : "bg-surface text-ink hover:bg-highlight"
       }`} 
       href={href}
+      prefetch={false}
       title={title}
     >
       {label}
