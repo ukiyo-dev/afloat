@@ -9,6 +9,7 @@ describe("parseTitle", () => {
     expect(parsed.group).toBe("Afloat");
     expect(parsed.item).toBe("线程承诺");
     expect(parsed.sequence).toBe(1);
+    expect(parsed.threadStart).toBe(true);
     expect(parsed.quality).toBe("excellent");
   });
 
@@ -18,6 +19,35 @@ describe("parseTitle", () => {
     expect(parsed.group).toBe("写作");
     expect(parsed.item).toBe("写作");
     expect(parsed.sequence).toBe(2);
+    expect(parsed.threadStart).toBe(false);
+  });
+
+  it("parses a trailing T as a thread start marker", () => {
+    expect(parseTitle("写作：长篇 T")).toMatchObject({
+      titleBody: "写作：长篇",
+      group: "写作",
+      item: "长篇",
+      sequence: null,
+      threadStart: true
+    });
+  });
+
+  it("parses a trailing 始 as a thread start marker", () => {
+    expect(parseTitle("写作：长篇 始")).toMatchObject({
+      titleBody: "写作：长篇",
+      group: "写作",
+      item: "长篇",
+      sequence: null,
+      threadStart: true
+    });
+  });
+
+  it("accepts the redundant T 1 compatibility form", () => {
+    expect(parseTitle("写作：长篇 T 1")).toMatchObject({
+      item: "长篇",
+      sequence: 1,
+      threadStart: true
+    });
   });
 
   it("preserves a trailing number on the reserved item without parsing sequence semantics", () => {
@@ -28,7 +58,8 @@ describe("parseTitle", () => {
       titleBody: "写作：---",
       group: "写作",
       item: "---",
-      sequence: null
+      sequence: null,
+      threadStart: false
     });
   });
 });

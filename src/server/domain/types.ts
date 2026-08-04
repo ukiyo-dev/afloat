@@ -41,6 +41,7 @@ export interface ParsedTitle {
   group: string;
   item: string;
   sequence: number | null;
+  threadStart?: boolean;
   quality: QualityMark;
 }
 
@@ -147,6 +148,8 @@ export interface ThreadHistoryEntry {
   minutes: number;
   title: string;
   source: "fact" | "futurePlan";
+  threadInstance?: number;
+  activitySequence?: number;
 }
 
 export interface Note {

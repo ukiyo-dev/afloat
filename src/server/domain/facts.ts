@@ -66,10 +66,11 @@ export function detectSequenceRegressions(events: ParsedEvent[]): ProtocolError[
 
   for (const event of planEvents) {
     const key = threadKey(event.title.group, event.title.item);
-    if (event.title.sequence === null) {
+    if (event.title.threadStart) {
       lastByThread.delete(key);
-      continue;
     }
+
+    if (event.title.sequence === null) continue;
 
     const previous = lastByThread.get(key);
     if (

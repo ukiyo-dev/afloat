@@ -124,7 +124,7 @@ export default async function SettingsPage() {
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="font-mono text-xs font-bold uppercase">Thread 关注阈值 / days</span>
+                  <span className="font-mono text-xs font-bold uppercase">Thread 无活动阈值 / days</span>
                   <input
                     className="input-brutal w-full"
                     name="threadStaleDays"
@@ -136,7 +136,7 @@ export default async function SettingsPage() {
                 </label>
               </div>
               <p className="font-mono text-xs text-ink-light italic">
-                Active item 超过该天数没有事实活动时，标记为需要关注。默认 7 天。
+                无 Deadline 的 Item 超过该天数没有事实活动后自动休眠；有 Deadline 时在此前标记为需要关注，并以 Deadline 作为最早休眠基准。默认 7 天。
               </p>
               
               <label className="flex items-center gap-3 p-3 bg-surface border border-ink mt-2 cursor-pointer hover:bg-highlight/10 transition-colors">

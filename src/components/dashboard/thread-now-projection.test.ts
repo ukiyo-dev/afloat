@@ -62,7 +62,7 @@ describe("projectThreadsForNow", () => {
           externalShiftMinutes: 0,
           internalShiftMinutes: 0,
           expectedMinutes: null,
-          deadline: null,
+          deadline: "2026-07-20",
           lastActivityAt: "2026-06-29T00:00:00.000Z",
           factGapMinutes: null,
           unscheduledGapMinutes: null,
@@ -105,7 +105,7 @@ describe("projectThreadsForNow", () => {
     );
 
     expect(active?.status).toBe("stale");
-    expect(inactive?.status).toBe("fulfilled");
+    expect(inactive?.status).toBe("untracked");
   });
 
   it("still evaluates stale state when runtime now has not advanced past generatedAt", () => {
@@ -122,7 +122,7 @@ describe("projectThreadsForNow", () => {
           externalShiftMinutes: 0,
           internalShiftMinutes: 0,
           expectedMinutes: null,
-          deadline: null,
+          deadline: "2026-07-20",
           lastActivityAt: "2026-06-29T00:00:00.000Z",
           factGapMinutes: null,
           unscheduledGapMinutes: null,

@@ -25,8 +25,9 @@ interface ThreadAccumulator {
   externalShiftMinutes: number;
   internalShiftMinutes: number;
   closed: boolean;
-  fulfilledByClosure: boolean;
   sequences: Set<number>;
+  currentInstance: number;
+  activityCount: number;
   history: Array<{
     startAt: Date;
     endAt: Date;
@@ -34,6 +35,8 @@ interface ThreadAccumulator {
     minutes: number;
     title: string;
     source: "fact" | "futurePlan";
+    threadInstance?: number;
+    activitySequence?: number;
   }>;
 }
 
@@ -50,10 +53,12 @@ export function buildThreadViews(input: {
   timezone?: string;
 }): ThreadView[] {
   const activeThreads = new Map<string, ThreadAccumulator>();
-  const inactiveThreads = new Map<string, ThreadAccumulator>();
   const untrackedThreads = new Map<string, ThreadAccumulator>();
   const untrackedPlanEventIds = new Set<string>();
-  const inactiveTailPlanEventIds = new Set<string>();
+  const activityIdentityByPlanEventId = new Map<
+    string,
+    { threadInstance: number; activitySequence: number }
+  >();
   const activeKeysByGroup = new Map<string, Set<string>>();
   const timeline = buildThreadTimeline(
     input.declarations,
@@ -77,52 +82,44 @@ export function buildThreadViews(input: {
 
     const event = entry.event;
     const key = threadKey(event.title.group, event.title.item);
-    if (event.title.sequence === null) {
+    if (event.title.item === "---") {
+      untrackedPlanEventIds.add(event.id);
+      continue;
+    }
+
+    const existingThread = activeThreads.get(key);
+    if (!event.title.threadStart && !existingThread) {
       const hasExplicitGroupItem = event.title.titleBody.includes("：");
-      if (hasExplicitGroupItem && event.title.item === "---") {
+      if (hasExplicitGroupItem) {
         untrackedPlanEventIds.add(event.id);
-        continue;
-      }
-      const thread = activeThreads.get(key);
-      const activeKeys = activeKeysByGroup.get(event.title.group);
-      if (thread && activeKeys?.has(key)) {
-        thread.closed = true;
-        if (event.endAt <= input.now) {
-          thread.fulfilledByClosure = true;
-          closeOpenWindow(thread, event.endAt);
-          activeKeys.delete(key);
-          activeThreads.delete(key);
-          mergeClosedThread(inactiveThreads, thread);
-        }
-      } else if (event.endAt <= input.now) {
-        const inactiveThread = inactiveThreads.get(key);
-        if (inactiveThread?.auto && inactiveThread.sequences.size > 0) {
-          extendClosedAutoThreadWindow(inactiveThread, event.endAt);
-        } else if (hasExplicitGroupItem) {
-          untrackedPlanEventIds.add(event.id);
-        }
-      } else {
-        const inactiveThread = inactiveThreads.get(key);
-        if (inactiveThread?.auto && inactiveThread.sequences.size > 0) {
-          inactiveTailPlanEventIds.add(event.id);
-        } else if (hasExplicitGroupItem) {
-          untrackedPlanEventIds.add(event.id);
-        }
       }
       continue;
     }
 
-    const thread = ensureThread(activeThreads, event.title.group, event.title.item, "active");
-    thread.auto = true;
+    const thread = existingThread ?? ensureThread(activeThreads, event.title.group, event.title.item, "active");
+    if (event.title.threadStart) {
+      thread.currentInstance += 1;
+      thread.activityCount = 0;
+      thread.auto = true;
+    }
+    if (thread.currentInstance === 0) {
+      thread.currentInstance = 1;
+    }
+    thread.activityCount += 1;
     thread.closed = false;
-    thread.fulfilledByClosure = false;
     thread.generationStartAt ??= event.startAt;
     ensureOpenWindow(thread, event.startAt);
-    thread.sequences.add(event.title.sequence);
+    if (event.title.sequence !== null) {
+      thread.sequences.add(event.title.sequence);
+    }
+    activityIdentityByPlanEventId.set(event.id, {
+      threadInstance: thread.currentInstance,
+      activitySequence: thread.activityCount
+    });
     ensureSet(activeKeysByGroup, event.title.group).add(key);
   }
 
-  const threadAccumulators = [...activeThreads.values(), ...inactiveThreads.values()];
+  const threadAccumulators = [...activeThreads.values()];
   const trackedGroups = new Set(threadAccumulators.map((thread) => thread.group));
   for (const fact of input.facts) {
     if (fact.startAt >= input.now) {
@@ -161,7 +158,14 @@ export function buildThreadViews(input: {
         const ranges = rangesInThreadWindows(thread, attribution.range, input.now);
 
         for (const range of ranges) {
-          addFactRange(thread, fact, range);
+          addFactRange(
+            thread,
+            fact,
+            range,
+            attribution.planEventId
+              ? activityIdentityByPlanEventId.get(attribution.planEventId)
+              : undefined
+          );
         }
       }
     }
@@ -185,15 +189,6 @@ export function buildThreadViews(input: {
       }
       continue;
     }
-    if (inactiveTailPlanEventIds.has(segment.eventId)) {
-      const inactiveThread = inactiveThreads.get(key);
-      if (inactiveThread) {
-        addElapsedPlanRange(inactiveThread, segment, input.now);
-        addFutureRange(inactiveThread, segment, input.now);
-      }
-      continue;
-    }
-
     const thread = activeThreads.get(key);
     if (!thread) {
       continue;
@@ -215,7 +210,13 @@ export function buildThreadViews(input: {
     if (!isRangeInOpenThreadWindow(thread, range)) {
       continue;
     }
-    addFutureRange(thread, segment, input.now, range.startAt);
+    addFutureRange(
+      thread,
+      segment,
+      input.now,
+      range.startAt,
+      activityIdentityByPlanEventId.get(segment.eventId)
+    );
   }
 
   const recentDailyCapacity = recentFulfilledDailyCapacity(input.facts, input.now);
@@ -234,41 +235,12 @@ function rangeBeforeNow(
   return endAt > range.startAt ? { startAt: range.startAt, endAt } : null;
 }
 
-function addElapsedPlanRange(
-  thread: ThreadAccumulator,
-  segment: TimeSegment,
-  now: Date
-): void {
-  const range = rangeBeforeNow(segment, now);
-  if (!range) {
-    return;
-  }
-  const minutes = minutesInRange(range);
-  thread.fulfilledMinutes += minutes;
-  thread.history.push({
-    ...range,
-    kind: fulfilledPlanKind(segment.kind),
-    minutes,
-    title: segment.title.rawTitle,
-    source: "fact"
-  });
-}
-
-function fulfilledPlanKind(kind: string): string {
-  return kind === "ideal"
-    ? "idealFulfilled"
-    : kind === "leisure"
-      ? "leisureFulfilled"
-      : kind === "rest"
-        ? "restFulfilled"
-        : kind;
-}
-
 function addFutureRange(
   thread: ThreadAccumulator,
   segment: TimeSegment,
   now: Date,
-  effectiveStartAt?: Date
+  effectiveStartAt?: Date,
+  activityIdentity?: { threadInstance: number; activitySequence: number }
 ): void {
   const range = {
     startAt:
@@ -285,7 +257,8 @@ function addFutureRange(
     kind: segment.kind,
     minutes,
     title: segment.title.rawTitle,
-    source: "futurePlan"
+    source: "futurePlan",
+    ...activityIdentity
   });
 }
 
@@ -328,8 +301,9 @@ function ensureThread(
     externalShiftMinutes: 0,
     internalShiftMinutes: 0,
     closed: false,
-    fulfilledByClosure: false,
     sequences: new Set(),
+    currentInstance: 0,
+    activityCount: 0,
     history: []
   };
   threads.set(key, created);
@@ -339,7 +313,8 @@ function ensureThread(
 function addFactRange(
   thread: ThreadAccumulator,
   fact: FactSegment,
-  range: { startAt: Date; endAt: Date }
+  range: { startAt: Date; endAt: Date },
+  activityIdentity?: { threadInstance: number; activitySequence: number }
 ): void {
   const minutes = minutesInRange(range);
   if (
@@ -358,7 +333,8 @@ function addFactRange(
     kind: fact.kind,
     minutes,
     title: fact.title.rawTitle,
-    source: "fact"
+    source: "fact",
+    ...activityIdentity
   });
 }
 
@@ -366,51 +342,6 @@ function ensureOpenWindow(thread: ThreadAccumulator, startAt: Date): void {
   if (thread.windows.length === 0) {
     thread.windows.push({ startAt });
   }
-}
-
-function closeOpenWindow(thread: ThreadAccumulator, endAt: Date): void {
-  const window = thread.windows.at(-1);
-  if (window && !window.endAt) {
-    window.endAt = endAt;
-  }
-}
-
-function extendClosedAutoThreadWindow(
-  thread: ThreadAccumulator | undefined,
-  endAt: Date
-): void {
-  if (!thread?.auto || thread.sequences.size === 0) {
-    return;
-  }
-
-  const window = thread.windows.at(-1);
-  if (window?.endAt && endAt > window.endAt) {
-    window.endAt = endAt;
-  }
-}
-
-function mergeClosedThread(
-  inactiveThreads: Map<string, ThreadAccumulator>,
-  closedThread: ThreadAccumulator
-): void {
-  const inactive = ensureThread(
-    inactiveThreads,
-    closedThread.group,
-    closedThread.item,
-    "inactive"
-  );
-  inactive.declared ||= closedThread.declared;
-  inactive.auto ||= closedThread.auto;
-  inactive.declaration ??= closedThread.declaration;
-  inactive.generationStartAt =
-    earlierDate(inactive.generationStartAt, closedThread.generationStartAt) ??
-    closedThread.generationStartAt;
-  inactive.closed = true;
-  inactive.fulfilledByClosure = true;
-  for (const sequence of closedThread.sequences) {
-    inactive.sequences.add(sequence);
-  }
-  inactive.windows.push(...closedThread.windows.filter((window) => window.endAt));
 }
 
 function buildThreadTimeline(
@@ -521,7 +452,9 @@ function toThreadView(
           kind: entry.kind,
           minutes: entry.minutes,
           title: entry.title,
-          source: entry.source
+          source: entry.source,
+          threadInstance: entry.threadInstance,
+          activitySequence: entry.activitySequence
         }))
     };
   }
@@ -534,17 +467,11 @@ function toThreadView(
     : localDayKey(fallbackStart, timezone);
   const deadline = thread.declaration?.deadline ?? null;
   const factGapMinutes =
-    expectedMinutes === null
-      ? null
-      : thread.fulfilledByClosure
-        ? 0
-        : Math.max(0, expectedMinutes - thread.fulfilledMinutes);
+    expectedMinutes === null ? null : Math.max(0, expectedMinutes - thread.fulfilledMinutes);
   const unscheduledGapMinutes =
     expectedMinutes === null
       ? null
-      : thread.fulfilledByClosure
-        ? 0
-        : Math.max(0, expectedMinutes - thread.fulfilledMinutes - thread.futureMinutes);
+      : Math.max(0, expectedMinutes - thread.fulfilledMinutes - thread.futureMinutes);
   const planCoverageRate =
     factGapMinutes === null || factGapMinutes === 0
       ? null
@@ -587,7 +514,6 @@ function toThreadView(
       factGapMinutes,
       unscheduledGapMinutes,
       dailyRequiredMinutes,
-      fulfilledByClosure: thread.fulfilledByClosure,
       start,
       deadline,
       now,
@@ -610,7 +536,9 @@ function toThreadView(
         kind: entry.kind,
         minutes: entry.minutes,
         title: entry.title,
-        source: entry.source
+        source: entry.source,
+        threadInstance: entry.threadInstance,
+        activitySequence: entry.activitySequence
       }))
   };
 }
@@ -659,30 +587,16 @@ function isRangeInOpenThreadWindow(
   return range.endAt > window.startAt;
 }
 
-function earlierDate(a?: Date, b?: Date): Date | undefined {
-  if (!a) {
-    return b;
-  }
-  if (!b) {
-    return a;
-  }
-  return a <= b ? a : b;
-}
-
 function feasibilityStatus(input: {
   factGapMinutes: number | null;
   unscheduledGapMinutes: number | null;
   dailyRequiredMinutes: number | null;
-  fulfilledByClosure?: boolean;
   start: string | null;
   deadline: Date | null;
   now: Date;
   timezone: string;
   recentDailyCapacity: number;
 }): FeasibilityStatus {
-  if (input.fulfilledByClosure) {
-    return "fulfilled";
-  }
   if (input.start && localDayKey(input.now, input.timezone) < input.start) {
     return "upcoming";
   }
@@ -757,8 +671,6 @@ function toThreadGroupView(
     factGapMinutes,
     unscheduledGapMinutes,
     dailyRequiredMinutes,
-    fulfilledByClosure:
-      commitmentItems.length > 0 && commitmentItems.every((item) => item.status === "fulfilled"),
     start,
     deadline: deadlineDate,
     now,

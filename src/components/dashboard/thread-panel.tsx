@@ -335,15 +335,16 @@ export function ThreadPanel({
                           <div className="flex flex-col gap-1 mt-2">
                             {(thread.history ?? []).map((entry: any, entryIndex: number) => {
                               const previous = (thread.history ?? [])[entryIndex - 1];
-                              const compactTitle = compactActivityTitle(entry.title);
+                              const compactTitle = entry.activitySequence ?? compactActivityTitle(entry.title);
                               const showDivider = previous && previous.source !== entry.source;
                               const showEpisodeDivider =
                                 previous &&
                                 !showDivider &&
                                 entry.source === "fact" &&
                                 thread.activityState !== "untracked" &&
-                                isUnnumberedActivityTitle(previous.title) &&
-                                !isUnnumberedActivityTitle(entry.title);
+                                previous.threadInstance !== undefined &&
+                                entry.threadInstance !== undefined &&
+                                previous.threadInstance !== entry.threadInstance;
 
                               return (
                                 <div key={`${entry.source}-${entry.startAt}-${entry.endAt}-${entry.kind}`}>
@@ -357,7 +358,9 @@ export function ThreadPanel({
                                     <span className={`font-bold w-16 truncate px-1 text-center border ${semanticTagColorClass(entry.kind)}`}>{kindLabel(entry.kind)}</span>
                                     <span className="flex-1 min-w-0 mx-2" title={entry.title}>
                                       <span className="md:hidden">{compactTitle}</span>
-                                      <span className="hidden truncate md:block">{entry.title}</span>
+                                      <span className="hidden truncate md:block">
+                                        {entry.activitySequence ? `${entry.activitySequence} · ` : ""}{entry.title}
+                                      </span>
                                     </span>
                                     <span className="font-bold">{formatDuration(entry.minutes)}</span>
                                   </div>
@@ -390,10 +393,6 @@ export function ThreadPanel({
       </div>
     </section>
   );
-}
-
-function isUnnumberedActivityTitle(title: string): boolean {
-  return !/(?:^|\s)\d+$/u.test(title.trim());
 }
 
 function combineThreadRowsForAll(threads: DashboardData["view"]["threads"]): DashboardData["view"]["threads"] {

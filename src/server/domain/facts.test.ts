@@ -71,7 +71,7 @@ describe("buildFactLayer", () => {
     });
   });
 
-  it("does not report sequence regression after an unnumbered closure starts a new item instance", () => {
+  it("does not report sequence regression when sequence 1 starts a new thread instance", () => {
     const events = parseCalendarEvents(sources, [
       raw("p1", "ideal", "健康：牙医 1", "2026-05-06T20:00:00Z", "2026-05-06T21:00:00Z"),
       raw("p2", "ideal", "健康：牙医 2", "2026-05-07T20:00:00Z", "2026-05-07T21:00:00Z"),
@@ -84,11 +84,11 @@ describe("buildFactLayer", () => {
     expect(result.errors.filter((error) => error.type === "sequenceRegression")).toEqual([]);
   });
 
-  it("reports sequence regression within the same item instance", () => {
+  it("reports sequence regression within the same thread instance", () => {
     const events = parseCalendarEvents(sources, [
       raw("p1", "ideal", "健康：牙医 1", "2026-05-06T20:00:00Z", "2026-05-06T21:00:00Z"),
-      raw("p2", "ideal", "健康：牙医 2", "2026-05-07T20:00:00Z", "2026-05-07T21:00:00Z"),
-      raw("p3", "ideal", "健康：牙医 1", "2026-05-08T20:00:00Z", "2026-05-08T21:00:00Z")
+      raw("p2", "ideal", "健康：牙医 3", "2026-05-07T20:00:00Z", "2026-05-07T21:00:00Z"),
+      raw("p3", "ideal", "健康：牙医 2", "2026-05-08T20:00:00Z", "2026-05-08T21:00:00Z")
     ]);
 
     const result = buildFactLayer(events);

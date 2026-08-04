@@ -112,6 +112,14 @@ function projectThreadForNow(
     : null;
   const sortedHistory = history.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
   const lastActivityAt = latestFactActivityAt(sortedHistory) ?? thread.lastActivityAt ?? null;
+  const activityState = projectedActivityState(
+    thread.activityState ?? "active",
+    lastActivityAt,
+    thread.deadline,
+    runtimeNow,
+    timezone,
+    staleDays
+  );
 
   return {
     ...thread,
@@ -126,7 +134,7 @@ function projectThreadForNow(
     remainingDays,
     status: projectedStatus({
       previousStatus: thread.status,
-      activityState: thread.activityState ?? "active",
+      activityState,
       factGapMinutes,
       unscheduledGapMinutes,
       dailyRequiredMinutes,
@@ -137,6 +145,8 @@ function projectThreadForNow(
       timezone,
       staleDays
     }),
+    activityState,
+    closed: activityState === "inactive",
     lastActivityAt,
     history: sortedHistory
   };
@@ -256,7 +266,13 @@ function mergeAdjacentHistoryEntries(entries: ThreadHistoryEntry[]): ThreadHisto
 }
 
 function canMergeHistoryEntries(a: ThreadHistoryEntry, b: ThreadHistoryEntry): boolean {
-  if (a.source !== b.source || a.kind !== b.kind || a.title !== b.title) {
+  if (
+    a.source !== b.source ||
+    a.kind !== b.kind ||
+    a.title !== b.title ||
+    a.threadInstance !== b.threadInstance ||
+    a.activitySequence !== b.activitySequence
+  ) {
     return false;
   }
 
@@ -294,9 +310,7 @@ function projectedStatus(input: {
   timezone: string;
   staleDays: number;
 }): Thread["status"] {
-  if (input.previousStatus === "fulfilled") {
-    return "fulfilled";
-  }
+  if (input.activityState === "inactive") return "untracked";
   if (localDayKey(input.runtimeNow, input.timezone) < input.start) {
     return "upcoming";
   }
@@ -310,6 +324,7 @@ function projectedStatus(input: {
   }
   if (
     input.activityState === "active" &&
+    input.deadline !== null &&
     isStale(
       input.lastActivityAt
         ? localDayKey(new Date(input.lastActivityAt), input.timezone)
@@ -330,6 +345,22 @@ function projectedStatus(input: {
   return input.previousStatus === "imbalanced" || input.previousStatus === "tightPace"
     ? input.previousStatus
     : "needsScheduling";
+}
+
+function projectedActivityState(
+  current: Thread["activityState"],
+  lastActivityAt: string | null,
+  deadline: string | null,
+  runtimeNow: Date,
+  timezone: string,
+  staleDays: number
+): Thread["activityState"] {
+  if (current === "untracked" || !lastActivityAt || staleDays < 1) return current;
+  const lastActivityDay = localDayKey(new Date(lastActivityAt), timezone);
+  const referenceDay = deadline && deadline > lastActivityDay ? deadline : lastActivityDay;
+  return dayDifference(referenceDay, localDayKey(runtimeNow, timezone)) > staleDays
+    ? "inactive"
+    : "active";
 }
 
 function latestFactActivityAt(history: ThreadHistoryEntry[]): string | null {

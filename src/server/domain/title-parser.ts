@@ -1,15 +1,20 @@
 import type { ParsedTitle, QualityMark } from "./types";
 
 const SEQUENCE_PATTERN = /(?:^|\s)(\d+)$/u;
+const THREAD_PATTERN = /(?:^|\s)(?:T|始)$/u;
 
 export function parseTitle(rawTitle: string): ParsedTitle {
   const trimmed = rawTitle.trim();
   const { quality, body } = stripQuality(trimmed);
   const sequenceMatch = body.match(SEQUENCE_PATTERN);
   const sequence = sequenceMatch ? Number.parseInt(sequenceMatch[1] ?? "", 10) : null;
-  const titleBody = sequenceMatch
+  const withoutSequence = sequenceMatch
     ? body.slice(0, sequenceMatch.index).trim()
     : body.trim();
+  const threadMatch = withoutSequence.match(THREAD_PATTERN);
+  const titleBody = threadMatch
+    ? withoutSequence.slice(0, threadMatch.index).trim()
+    : withoutSequence;
 
   const [group, item] = splitGroupItem(titleBody);
   const reservedUntrackedItem = item === "---";
@@ -20,6 +25,7 @@ export function parseTitle(rawTitle: string): ParsedTitle {
     group,
     item,
     sequence: reservedUntrackedItem ? null : sequence,
+    threadStart: !reservedUntrackedItem && (threadMatch !== null || sequence === 1),
     quality
   };
 }
