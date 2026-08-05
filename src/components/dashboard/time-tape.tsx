@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { DashboardData } from "@/server/services/dashboard-service";
 import { formatDuration, timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
-import { buildTimeTapeSlices, nowMarkerPositionPercent } from "./time-tape-utils";
+import { buildTimeTapeSlices, guestDayTypeKind, nowMarkerPositionPercent } from "./time-tape-utils";
 import { isThreadActivity, semanticThreadFillClass, threadActivityKeys } from "./thread-activity-style";
 
 export function TimeTape({ 
@@ -14,7 +14,8 @@ export function TimeTape({
   endDate,
   now,
   visitorMode = false,
-  threads
+  threads,
+  planTimeline = []
 }: { 
   timeline: DashboardData["view"]["timeline"]; 
   timezone: string;
@@ -23,6 +24,7 @@ export function TimeTape({
   now?: string;
   visitorMode?: boolean;
   threads: DashboardData["view"]["threads"];
+  planTimeline?: DashboardData["view"]["planTimeline"];
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -72,7 +74,9 @@ export function TimeTape({
               {/* Tooltip on hover */}
               <div className="hidden group-hover/tape:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-brutal border border-paper text-center">
                 {visitorMode ? (
-                   <strong className="block">{kindLabel(slice.fact.kind)}</strong>
+                   <strong className="block">
+                     {kindLabel(now ? guestDayTypeKind(slice.fact, planTimeline, now) : slice.fact.kind)}
+                   </strong>
                 ) : (
                    <strong className="block">{slice.fact.title}</strong>
                 )}

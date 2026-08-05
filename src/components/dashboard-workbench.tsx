@@ -532,6 +532,7 @@ export function DashboardWorkbench({
                       now={runtimeNow}
                       visitorMode={visitorMode}
                       threads={projectedThreads}
+                      planTimeline={view.planTimeline}
                     />
                   ) : !isUltraMacro ? (
                     <MacroDistribution

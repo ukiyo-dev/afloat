@@ -1,6 +1,36 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
 
 type TimelineFact = DashboardData["view"]["timeline"][number];
+type PlanEntry = DashboardData["view"]["planTimeline"][number];
+
+const planKindByFulfilledKind: Record<string, string> = {
+  idealFulfilled: "ideal",
+  leisureFulfilled: "leisure",
+  restFulfilled: "rest"
+};
+
+export function guestDayTypeKind(
+  fact: TimelineFact,
+  planTimeline: PlanEntry[],
+  now: string
+): string {
+  const planKind = planKindByFulfilledKind[fact.kind];
+  const nowMs = new Date(now).getTime();
+  if (!planKind || !Number.isFinite(nowMs)) return fact.kind;
+
+  const matchingPlan = planTimeline.find((plan) =>
+    plan.kind === planKind &&
+    plan.title === fact.title &&
+    plan.group === fact.group &&
+    plan.item === fact.item &&
+    new Date(plan.startAt).getTime() < new Date(fact.endAt).getTime() &&
+    new Date(plan.endAt).getTime() > new Date(fact.startAt).getTime()
+  );
+
+  return matchingPlan && nowMs < new Date(matchingPlan.endAt).getTime()
+    ? planKind
+    : fact.kind;
+}
 
 export interface TimeTapeSlice {
   startAt: string;
