@@ -1,8 +1,20 @@
 import Link from "next/link";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
 
 export default function HomePage() {
   return (
-    <main className="shell flex flex-col items-center justify-center min-h-[80vh] text-center">
+    <main className="shell relative flex min-h-[80vh] flex-col items-center justify-center text-center">
+      <a
+        href="https://github.com/ukiyo-dev/afloat"
+        target="_blank"
+        rel="noreferrer"
+        aria-label="GitHub"
+        title="GitHub"
+        className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink transition-colors hover:bg-highlight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink md:right-6 md:top-6"
+      >
+        <GitHubLogoIcon className="size-5" aria-hidden="true" />
+      </a>
+
       <section className="max-w-2xl relative flex flex-col items-center">
         <p className="font-mono text-highlight bg-ledger inline-block px-2 py-1 mb-8 font-bold tracking-widest uppercase text-sm border-2 border-ink">
           AFLOAT V1
