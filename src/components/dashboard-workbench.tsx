@@ -525,7 +525,7 @@ export function DashboardWorkbench({
 
                   {rangeView.startDate === rangeView.endDate ? (
                     <TimeTape
-                      timeline={rangeView.timeline}
+                      timeline={projectedRangeView.timeline}
                       timezone={rangeView.timezone}
                       startDate={rangeView.startAt}
                       endDate={rangeView.endAt}
@@ -535,7 +535,7 @@ export function DashboardWorkbench({
                     />
                   ) : !isUltraMacro ? (
                     <MacroDistribution
-                      timeline={rangeView.timeline}
+                      timeline={projectedRangeView.timeline}
                       planTimeline={view.planTimeline}
                       now={runtimeNow}
                       timezone={rangeView.timezone}
@@ -552,7 +552,6 @@ export function DashboardWorkbench({
                       planTotals={projectedRangeView.planTotals}
                       shiftComposition={projectedRangeView.shiftComposition}
                       activePlanDays={projectedRangeView.observedPlannedDays}
-                      timeline={projectedRangeView.timeline}
                       threads={projectedThreads}
                       rangeStartAt={projectedRangeView.startAt}
                       rangeEndAt={projectedRangeView.endAt}

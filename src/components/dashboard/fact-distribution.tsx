@@ -1,13 +1,35 @@
 import { formatDuration } from "../view-formatters";
 import type { DashboardData } from "@/server/services/dashboard-service";
-import { isThreadActivity, semanticThreadFillClass, threadActivityKeys } from "./thread-activity-style";
+import { semanticThreadFillClass } from "./thread-activity-style";
+
+type ThreadHistory = DashboardData["view"]["threads"][number]["history"];
+
+export function threadFactMinutesByKind(
+  threads: Array<{ history: ThreadHistory }>,
+  rangeStartAt: string,
+  rangeEndAt: string
+): Record<string, number> {
+  const rangeStartMs = new Date(rangeStartAt).getTime();
+  const rangeEndMs = new Date(rangeEndAt).getTime();
+
+  if (!Number.isFinite(rangeStartMs) || !Number.isFinite(rangeEndMs) || rangeEndMs <= rangeStartMs) {
+    return {};
+  }
+
+  return threads.flatMap((thread) => thread.history).reduce<Record<string, number>>((totals, entry) => {
+    if (entry.source !== "fact") return totals;
+    const start = Math.max(rangeStartMs, new Date(entry.startAt).getTime());
+    const end = Math.min(rangeEndMs, new Date(entry.endAt).getTime());
+    if (end > start) totals[entry.kind] = (totals[entry.kind] ?? 0) + (end - start) / 60_000;
+    return totals;
+  }, {});
+}
 
 export function FactDistribution({ 
   factTotals, 
   planTotals, 
   shiftComposition,
   activePlanDays,
-  timeline,
   threads,
   rangeStartAt,
   rangeEndAt
@@ -16,7 +38,6 @@ export function FactDistribution({
   planTotals: Record<string, number>;
   shiftComposition?: Record<string, { internal: number; external: number }>;
   activePlanDays: number;
-  timeline: DashboardData["view"]["timeline"];
   threads: DashboardData["view"]["threads"];
   rangeStartAt: string;
   rangeEndAt: string;
@@ -31,16 +52,7 @@ export function FactDistribution({
     rest: { internal: 0, external: 0 },
     unmapped: { internal: 0, external: 0 }
   };
-  const threadKeys = threadActivityKeys(threads);
-  const rangeStartMs = new Date(rangeStartAt).getTime();
-  const rangeEndMs = new Date(rangeEndAt).getTime();
-  const threadMinutesByKind = timeline.reduce<Record<string, number>>((totals, fact) => {
-    if (!isThreadActivity(fact, threadKeys)) return totals;
-    const start = Math.max(rangeStartMs, new Date(fact.startAt).getTime());
-    const end = Math.min(rangeEndMs, new Date(fact.endAt).getTime());
-    if (end > start) totals[fact.kind] = (totals[fact.kind] ?? 0) + (end - start) / 60_000;
-    return totals;
-  }, {});
+  const threadMinutesByKind = threadFactMinutesByKind(threads, rangeStartAt, rangeEndAt);
 
   // Work, Leisure, Rest: show fulfilled + intShift + extShift inside the plan!
   const coreStats = [
