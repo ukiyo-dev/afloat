@@ -14,7 +14,7 @@
   }
 
   .muted-semantic-rest {
-    background-color: color-mix(in srgb, rgb(var(--color-semantic-rest)) 90%, rgb(var(--color-paper)));
+    background-color: color-mix(in srgb, rgb(var(--color-semantic-rest)) 100%, rgb(var(--color-paper)));
     background-image: none;
   }
 }
