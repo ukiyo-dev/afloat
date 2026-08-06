@@ -52,17 +52,7 @@ export function formatGeneratedAt(value: string, timezone?: string) {
 
 export function timeRange(startAt: string, endAt: string, timezone?: string) {
   try {
-    const formatTime = (isoString: string) => {
-      const d = new Date(isoString);
-      if (isNaN(d.getTime())) throw new Error();
-      return new Intl.DateTimeFormat("en-GB", {
-        timeZone: timezone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-      }).format(d);
-    };
-    return `${formatTime(startAt)}-${formatTime(endAt)}`;
+    return `${formatClockTime(startAt, timezone)}-${formatClockTime(endAt, timezone)}`;
   } catch (e) {
     return `${startAt.slice(11, 16)}-${endAt.slice(11, 16)}`;
   }
@@ -84,17 +74,21 @@ export function timelineTimeRange(
 
 function formatTimeOnly(value: string, timezone?: string) {
   try {
-    const d = new Date(value);
-    if (isNaN(d.getTime())) throw new Error();
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false
-    }).format(d);
+    return formatClockTime(value, timezone);
   } catch (e) {
     return value.slice(11, 16);
   }
+}
+
+function formatClockTime(value: string, timezone?: string): string {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) throw new Error();
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
 }
 
 function dayOffsetFromReference(value: string, timezone: string | undefined, referenceDate: string) {

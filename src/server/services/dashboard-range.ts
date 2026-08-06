@@ -9,8 +9,13 @@ import {
   overlaps,
   parseLocalDateKey
 } from "@/server/domain/time";
+import {
+  clippedMinutes,
+  commitmentStats,
+  sumMinutes,
+  totalMinutesByKind
+} from "@/server/domain/commitment-stats";
 import type { DateRange } from "@/server/domain/types";
-import { isFulfilledKind } from "@/server/domain/semantic-kinds";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
 
 export type DashboardRange = "yesterday" | "day" | string; // e.g. "7d", "14d", "30d"
@@ -187,26 +192,18 @@ export function buildDashboardRangeView(input: {
   const notes = input.view.notes.filter(
     (note) => note.date >= selection.startDate && note.date <= selection.endDate
   );
-  const plannedMinutes = sumClippedMinutes(planTimeline, range);
+  const stats = commitmentStats(planTimeline, timeline, {
+    planRange: range,
+    observedRange
+  });
+  const plannedMinutes = stats.plannedMinutes;
   const plannedDays = countDaysWithSegments(planTimeline, selection);
-  const observedPlannedMinutes = observedRange
-    ? sumClippedMinutes(observedPlanTimeline, observedRange)
-    : 0;
+  const observedPlannedMinutes = sumMinutes(planTimeline, observedRange);
   const observedPlannedDays = observedRange
     ? countDaysWithSegments(observedPlanTimeline, selection, observedRange)
     : 0;
-  const fulfilledPlanMinutes = sumClippedMinutes(
-    observedTimeline.filter(
-      (fact) => isFulfilledKind(fact.kind)
-    ),
-    observedRange
-  );
-  const externalShiftPlanMinutes = clippedOverlapMinutes(
-    observedPlanTimeline,
-    observedTimeline.filter((fact) => fact.kind === "externalShift"),
-    observedRange
-  );
-  const internalFulfilledPlanMinutes = fulfilledPlanMinutes + externalShiftPlanMinutes;
+  const fulfilledPlanMinutes = stats.fulfilledPlanMinutes;
+  const internalFulfilledPlanMinutes = stats.internalFulfilledPlanMinutes;
 
   return {
     key: selection.key,
@@ -234,8 +231,8 @@ export function buildDashboardRangeView(input: {
     ),
     fulfilledRuleCount: 0,
     runtimeNow: now.toISOString(),
-    factTotals: totalClippedMinutesByKind(observedTimeline, observedRange),
-    planTotals: totalClippedMinutesByKind(planTimeline, range),
+    factTotals: totalMinutesByKind(timeline, observedRange),
+    planTotals: totalMinutesByKind(planTimeline, range),
     shiftComposition: calculateShiftComposition(observedTimeline, observedPlanTimeline, observedRange),
     protocolErrors,
     timeline,
@@ -520,20 +517,6 @@ export function isValidTimeZone(timezone: string): boolean {
   }
 }
 
-function totalClippedMinutesByKind(
-  segments: Array<{ kind: string; startAt: string; endAt: string }>,
-  range: DateRange | null
-): Record<string, number> {
-  if (!range) {
-    return {};
-  }
-
-  return segments.reduce<Record<string, number>>((totals, segment) => {
-    totals[segment.kind] = (totals[segment.kind] ?? 0) + clippedMinutes(segment, range);
-    return totals;
-  }, {});
-}
-
 function calculateShiftComposition(
   timeline: Array<{ kind: string; startAt: string; endAt: string }>,
   planTimeline: Array<{ kind: string; startAt: string; endAt: string }>,
@@ -606,49 +589,6 @@ function calculateShiftComposition(
   }
 
   return composition;
-}
-
-function sumClippedMinutes(
-  segments: Array<{ startAt: string; endAt: string }>,
-  range: DateRange | null
-): number {
-  if (!range) {
-    return 0;
-  }
-
-  return segments.reduce((total, segment) => total + clippedMinutes(segment, range), 0);
-}
-
-function clippedMinutes(segment: { startAt: string; endAt: string }, range: DateRange): number {
-  const clipped = intersection(serializedRange(segment), range);
-  return clipped ? minutesInRange(clipped) : 0;
-}
-
-function clippedOverlapMinutes(
-  plans: Array<{ startAt: string; endAt: string }>,
-  shifts: Array<{ startAt: string; endAt: string }>,
-  range: DateRange | null
-): number {
-  if (!range) {
-    return 0;
-  }
-
-  return shifts.reduce((total, shift) => {
-    const shiftRange = intersection(serializedRange(shift), range);
-    if (!shiftRange) {
-      return total;
-    }
-
-    return total + plans.reduce((shiftTotal, plan) => {
-      const planRange = intersection(serializedRange(plan), range);
-      if (!planRange) {
-        return shiftTotal;
-      }
-
-      const overlap = intersection(planRange, shiftRange);
-      return shiftTotal + (overlap ? minutesInRange(overlap) : 0);
-    }, 0);
-  }, 0);
 }
 
 function observedDateRange(range: DateRange, now: Date): DateRange | null {

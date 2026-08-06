@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { saveCalendarSourceMapping } from "@/server/services/calendar-source-service";
-import { parseCalendarMappingFormData } from "@/server/services/calendar-source-validation";
+import { saveCalendarMappingFromForm } from "@/server/services/calendar-source-action-service";
 import { deleteNoteById, saveNote } from "@/server/services/note-service";
 import { syncRecent, syncRecalibrate } from "@/server/services/sync-service";
 import { parseDurationInput } from "@/server/services/duration-input";
@@ -36,15 +35,7 @@ export async function recomputeViewsAction() {
 }
 
 export async function saveCalendarMappingAction(formData: FormData) {
-  const { externalCalendarId, name, semantic } = parseCalendarMappingFormData(formData);
-
-  await saveCalendarSourceMapping({
-    externalCalendarId,
-    name,
-    semantic,
-    enabled: semantic !== "none"
-  });
-  await recomputeCurrentOwnerViews();
+  await saveCalendarMappingFromForm(formData);
   revalidatePath("/dashboard");
 }
 

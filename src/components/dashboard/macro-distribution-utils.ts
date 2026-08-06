@@ -1,11 +1,10 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import { clippedMinutes } from "@/server/domain/commitment-stats";
 import {
   addLocalDays,
   formatLocalDate,
-  intersection,
   localDateFromKey,
   localMidnightToUtc,
-  minutesInRange
 } from "@/server/domain/time";
 import type { LocalDate } from "@/server/domain/time";
 import type { DateRange } from "@/server/domain/types";
@@ -149,9 +148,4 @@ function buildDays(startDate: string, endDate: string): MacroDistributionDay[] {
   }
 
   return days;
-}
-
-function clippedMinutes(segment: DateRange, range: DateRange): number {
-  const clipped = intersection(segment, range);
-  return clipped ? minutesInRange(clipped) : 0;
 }

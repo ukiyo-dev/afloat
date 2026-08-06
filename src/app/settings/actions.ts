@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 
 import { isValidTimeZone, normalizeDashboardDefaultRange } from "@/server/services/dashboard-range";
 import { saveCurrentCalDavCredential } from "@/server/services/caldav-credential-service";
-import { saveCalendarSourceMapping } from "@/server/services/calendar-source-service";
-import { parseCalendarMappingFormData } from "@/server/services/calendar-source-validation";
+import { saveCalendarMappingFromForm } from "@/server/services/calendar-source-action-service";
 import { saveDashboardSettings } from "@/server/services/settings-service";
 import { recomputeCurrentOwnerViews } from "@/server/services/view-service";
 
@@ -59,15 +58,7 @@ function parseOffset(value: FormDataEntryValue | null): number | null {
 }
 
 export async function saveSettingsCalendarMappingAction(formData: FormData) {
-  const { externalCalendarId, name, semantic } = parseCalendarMappingFormData(formData);
-
-  await saveCalendarSourceMapping({
-    externalCalendarId,
-    name,
-    semantic,
-    enabled: semantic !== "none"
-  });
-  await recomputeCurrentOwnerViews();
+  await saveCalendarMappingFromForm(formData);
   revalidatePath("/dashboard");
   revalidatePath("/settings");
 }

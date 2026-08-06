@@ -1,6 +1,5 @@
 import {
   intersection,
-  minutesInRange,
   overlaps,
   subtractRanges
 } from "./time";
@@ -14,6 +13,8 @@ import type {
   SemanticKind,
   TimeSegment
 } from "./types";
+
+export { commitmentStats, totalMinutesByKind } from "./commitment-stats";
 
 export function detectLayerOverlaps(events: ParsedEvent[]): ProtocolError[] {
   const errors: ProtocolError[] = [];
@@ -137,62 +138,6 @@ export function buildFactLayer(events: ParsedEvent[]): {
     cleanPlanSegments,
     cleanShiftSegments
   };
-}
-
-export function totalMinutesByKind<T extends { kind: string; startAt: Date; endAt: Date }>(
-  segments: T[]
-): Record<string, number> {
-  return segments.reduce<Record<string, number>>((totals, segment) => {
-    totals[segment.kind] = (totals[segment.kind] ?? 0) + minutesInRange(segment);
-    return totals;
-  }, {});
-}
-
-export function commitmentStats(
-  cleanPlanSegments: TimeSegment[],
-  facts: FactSegment[]
-): {
-  plannedMinutes: number;
-  fulfilledPlanMinutes: number;
-  fulfillmentRate: number | null;
-  internalFulfilledPlanMinutes: number;
-  internalFulfillmentRate: number | null;
-} {
-  const plannedMinutes = cleanPlanSegments.reduce(
-    (total, segment) => total + minutesInRange(segment),
-    0
-  );
-  const fulfilledPlanMinutes = facts
-    .filter(
-      (fact) =>
-        fact.kind === "idealFulfilled" ||
-        fact.kind === "leisureFulfilled" ||
-        fact.kind === "restFulfilled"
-    )
-    .reduce((total, fact) => total + minutesInRange(fact), 0);
-  const externalShiftPlanMinutes = overlapMinutes(
-    cleanPlanSegments,
-    facts.filter((fact) => fact.kind === "externalShift")
-  );
-  const internalFulfilledPlanMinutes = fulfilledPlanMinutes + externalShiftPlanMinutes;
-
-  return {
-    plannedMinutes,
-    fulfilledPlanMinutes,
-    fulfillmentRate: plannedMinutes > 0 ? fulfilledPlanMinutes / plannedMinutes : null,
-    internalFulfilledPlanMinutes,
-    internalFulfillmentRate:
-      plannedMinutes > 0 ? internalFulfilledPlanMinutes / plannedMinutes : null
-  };
-}
-
-function overlapMinutes(plans: TimeSegment[], shifts: FactSegment[]): number {
-  return shifts.reduce((total, shift) => {
-    return total + plans.reduce((shiftTotal, plan) => {
-      const overlap = intersection(plan, shift);
-      return shiftTotal + (overlap ? minutesInRange(overlap) : 0);
-    }, 0);
-  }, 0);
 }
 
 function cleanSegments(events: ParsedEvent[], blockers: ProtocolError[]): TimeSegment[] {

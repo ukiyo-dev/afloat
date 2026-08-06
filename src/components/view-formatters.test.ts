@@ -1,11 +1,43 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDuration, timelineTimeRange } from "./view-formatters";
+import { formatDuration, timeRange, timelineTimeRange } from "./view-formatters";
 
 describe("formatDuration", () => {
   it("rounds fractional minutes before formatting", () => {
     expect(formatDuration(6.6666666667)).toBe("7m");
     expect(formatDuration(65.6)).toBe("1h 6m");
+  });
+});
+
+describe("timeRange", () => {
+  it("formats both clock values in the configured timezone", () => {
+    expect(
+      timeRange(
+        "2026-05-07T20:00:00.000Z",
+        "2026-05-07T21:30:00.000Z",
+        "UTC"
+      )
+    ).toBe("20:00-21:30");
+  });
+
+  it("falls back for the whole range when either value is invalid", () => {
+    expect(
+      timeRange(
+        "2026-05-07Txx:yy:00.000Z",
+        "2026-05-07T21:30:00.000Z",
+        "UTC"
+      )
+    ).toBe("xx:yy-21:30");
+  });
+
+  it("falls back when the configured timezone is invalid", () => {
+    expect(
+      timeRange(
+        "2026-05-07T20:00:00.000Z",
+        "2026-05-07T21:30:00.000Z",
+        "Not/A_Timezone"
+      )
+    ).toBe("20:00-21:30");
   });
 });
 
