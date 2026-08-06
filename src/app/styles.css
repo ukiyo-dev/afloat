@@ -205,7 +205,7 @@
     @apply border-2 border-ink bg-paper shadow-brutal-lg p-6 md:p-8;
   }
 
-  .dashboard-bookmark {
+  .workbench-bookmark {
     position: relative;
     isolation: isolate;
     display: inline-flex;
@@ -216,7 +216,7 @@
     clip-path: polygon(0 0, 100% 0, 100% 100%, 18px 100%, 0 calc(100% - 18px));
   }
 
-  .dashboard-bookmark::before {
+  .workbench-bookmark::before {
     content: "";
     position: absolute;
     inset: 2px;

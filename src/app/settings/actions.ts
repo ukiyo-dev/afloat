@@ -78,5 +78,5 @@ export async function saveCalDavCredentialAction(formData: FormData) {
     password: typeof password === "string" && password.trim() !== "" ? password : null
   });
   revalidatePath("/settings");
-  redirect("/settings");
+  redirect("/settings?tab=provider");
 }

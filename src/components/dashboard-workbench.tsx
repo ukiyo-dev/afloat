@@ -40,6 +40,7 @@ import { projectThreadsForNow } from "./dashboard/thread-now-projection";
 import { projectRangeViewForNow } from "./dashboard/range-now-projection";
 import { runRecentSyncAction, runRecalibrateAction, recomputeViewsAction } from "@/app/dashboard/actions";
 import { SubmitButton } from "./submit-button";
+import { WorkbenchTabs } from "./workbench-tabs";
 
 type ThemeMode = "system" | "light" | "dark";
 type DashboardTab = "overview" | "threads" | "rules";
@@ -256,16 +257,14 @@ export function DashboardWorkbench({
     <main className="shell pt-0 md:pt-0">
       <div className="mb-8">
         {!visitorMode ? (
-          <nav className="flex flex-wrap items-start justify-end" aria-label="Dashboard tabs">
-            {dashboardTabs.map((tab) => (
-              <DashboardTabButton
-                key={tab.key}
-                active={activeDashboardTab === tab.key}
-                label={tab.label}
-                onSelect={() => selectTab(tab.key)}
-              />
-            ))}
-          </nav>
+          <WorkbenchTabs
+            tabs={dashboardTabs}
+            activeKey={activeDashboardTab}
+            basePath={basePath}
+            defaultKey="overview"
+            onSelect={selectTab}
+            ariaLabel="Dashboard tabs"
+          />
         ) : null}
       </div>
 
@@ -622,22 +621,5 @@ function RangeLink({ active, href, label, title }: { active: boolean; href: stri
     >
       {label}
     </Link>
-  );
-}
-
-function DashboardTabButton({ active, label, onSelect }: { active: boolean; label: string; onSelect: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onSelect}
-      className={`dashboard-bookmark -ml-3 first:ml-0 min-w-[104px] px-3 py-1.5 text-center font-mono text-xs font-black tracking-widest transition-colors ${
-        active
-          ? "[--bookmark-bg:rgb(var(--color-ledger))] [--bookmark-fg:rgb(var(--color-highlight))]"
-          : "[--bookmark-bg:rgb(var(--color-paper))] [--bookmark-fg:rgb(var(--color-ink))] hover:[--bookmark-bg:rgb(var(--color-highlight))] hover:[--bookmark-fg:rgb(var(--color-ink-fixed))]"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
