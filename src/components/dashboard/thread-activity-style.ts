@@ -1,14 +1,16 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import { isPlanActivityKind } from "@/server/domain/semantic-kinds";
+import { threadIdentityKey } from "@/server/domain/thread-summary";
 
 type Activity = { group: string; item: string; kind: string };
 type Thread = DashboardData["view"]["threads"][number];
 
 export function threadActivityKeys(threads: Thread[]): Set<string> {
-  return new Set(threads.map((thread) => activityKey(thread.group, thread.item)));
+  return new Set(threads.map((thread) => threadIdentityKey(thread.group, thread.item)));
 }
 
 export function isThreadActivity(activity: Activity, keys: Set<string>): boolean {
-  return isPlanActivity(activity.kind) && keys.has(activityKey(activity.group, activity.item));
+  return isPlanActivityKind(activity.kind) && keys.has(threadIdentityKey(activity.group, activity.item));
 }
 
 export function semanticThreadFillClass(kind: string, belongsToThread: boolean): string {
@@ -26,14 +28,4 @@ export function semanticThreadFillClass(kind: string, belongsToThread: boolean):
     default:
       return "";
   }
-}
-
-function activityKey(group: string, item: string): string {
-  return `${group}\u0000${item}`;
-}
-
-function isPlanActivity(kind: string): boolean {
-  return kind === "ideal" || kind === "idealFulfilled" ||
-    kind === "leisure" || kind === "leisureFulfilled" ||
-    kind === "rest" || kind === "restFulfilled";
 }

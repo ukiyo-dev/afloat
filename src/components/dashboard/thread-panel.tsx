@@ -7,6 +7,7 @@ import { SubmitButton } from "../submit-button";
 import { Cross2Icon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { saveThreadDeclarationAction, deleteThreadDeclarationAction } from "../../app/dashboard/actions";
 import { DashboardData } from "../../server/services/dashboard-service";
+import { latestDeadline, sumNullable, threadIdentityKey } from "@/server/domain/thread-summary";
 import { formatDuration, formatGeneratedAt, percent, statusLabel, timeRange, kindLabel } from "../view-formatters";
 import { MetricItem } from "./metric-card";
 import { semanticTagColorClass } from "../semantic-colors";
@@ -399,7 +400,7 @@ function combineThreadRowsForAll(threads: DashboardData["view"]["threads"]): Das
   const byIdentity = new Map<string, DashboardData["view"]["threads"][number]>();
 
   for (const thread of threads) {
-    const key = `${thread.group}\u0000${thread.item}`;
+    const key = threadIdentityKey(thread.group, thread.item);
     const existing = byIdentity.get(key);
     if (!existing) {
       byIdentity.set(key, { ...thread, history: [...(thread.history ?? [])] });
@@ -488,19 +489,6 @@ function combineThreadSource(a: string, b: string): DashboardData["view"]["threa
 
 function activeStatus(threads: DashboardData["view"]["threads"]): DashboardData["view"]["threads"][number]["status"] {
   return threads.find((thread) => (thread.activityState ?? "active") === "active")?.status ?? threads[0]!.status;
-}
-
-function latestDeadline(deadlines: Array<string | null>): string | null {
-  return deadlines
-    .filter((deadline): deadline is string => deadline !== null)
-    .sort((a, b) => b.localeCompare(a))[0] ?? null;
-}
-
-function sumNullable(values: Array<number | null>): number | null {
-  const numericValues = values.filter((value): value is number => value !== null);
-  return numericValues.length > 0
-    ? numericValues.reduce((total, value) => total + value, 0)
-    : null;
 }
 
 function ThreadViewIconButton({

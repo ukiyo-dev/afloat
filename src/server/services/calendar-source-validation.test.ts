@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isCalendarMappingValue,
   isSemanticKind,
+  parseCalendarMappingFormData,
   validateCalendarSourceMapping
 } from "./calendar-source-validation";
 
@@ -42,5 +43,18 @@ describe("calendar source validation", () => {
         semantic: "ideal"
       })
     ).toThrow("externalCalendarId is required");
+  });
+
+  it("parses the same form shape used by dashboard and settings actions", () => {
+    const formData = new FormData();
+    formData.set("externalCalendarId", "/calendars/work/");
+    formData.set("name", "工作");
+    formData.set("semantic", "ideal");
+
+    expect(parseCalendarMappingFormData(formData)).toEqual({
+      externalCalendarId: "/calendars/work/",
+      name: "工作",
+      semantic: "ideal"
+    });
   });
 });

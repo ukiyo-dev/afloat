@@ -1,4 +1,5 @@
 import { formatDuration } from "../view-formatters";
+import { intersection, minutesInRange } from "@/server/domain/time";
 import type { DashboardData } from "@/server/services/dashboard-service";
 import { semanticThreadFillClass } from "./thread-activity-style";
 
@@ -16,11 +17,12 @@ export function threadFactMinutesByKind(
     return {};
   }
 
+  const range = { startAt: new Date(rangeStartAt), endAt: new Date(rangeEndAt) };
   return threads.flatMap((thread) => thread.history).reduce<Record<string, number>>((totals, entry) => {
     if (entry.source !== "fact") return totals;
-    const start = Math.max(rangeStartMs, new Date(entry.startAt).getTime());
-    const end = Math.min(rangeEndMs, new Date(entry.endAt).getTime());
-    if (end > start) totals[entry.kind] = (totals[entry.kind] ?? 0) + (end - start) / 60_000;
+    const entryRange = { startAt: new Date(entry.startAt), endAt: new Date(entry.endAt) };
+    const overlap = intersection(entryRange, range);
+    if (overlap) totals[entry.kind] = (totals[entry.kind] ?? 0) + minutesInRange(overlap);
     return totals;
   }, {});
 }

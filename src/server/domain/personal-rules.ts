@@ -1,3 +1,5 @@
+import { addDateKeyDays, calendarDayDifference, inclusiveCalendarDays } from "./time";
+
 export interface PersonalRuleRecord {
   id: string;
   title: string;
@@ -61,7 +63,7 @@ export function countFulfilledRulesInRange(
 export function buildPersonalRuleView(rule: PersonalRuleRecord, today: string): PersonalRuleView {
   const breaks = [...rule.breaks].sort((a, b) => a.brokenDate.localeCompare(b.brokenDate));
   const lastBreak = breaks.at(-1) ?? null;
-  const currentRunStartDate = lastBreak ? addDays(lastBreak.brokenDate, 1) : rule.startDate;
+  const currentRunStartDate = lastBreak ? addDateKeyDays(lastBreak.brokenDate, 1) : rule.startDate;
   const runStatus = getRunStatus(rule.status, lastBreak?.brokenDate ?? null, today);
   const currentRunDays =
     runStatus === "archived" || runStatus === "brokenToday" || currentRunStartDate > today
@@ -87,7 +89,7 @@ function getRunStatus(
 ): PersonalRuleRunStatus {
   if (status === "archived") return "archived";
   if (lastBreakDate === today) return "brokenToday";
-  if (lastBreakDate && addDays(lastBreakDate, 1) > today) return "resetPending";
+  if (lastBreakDate && addDateKeyDays(lastBreakDate, 1) > today) return "resetPending";
   return "active";
 }
 
@@ -96,30 +98,15 @@ function bestClosedRunDays(startDate: string, breaks: PersonalRuleBreakRecord[])
   let runStart = startDate;
 
   for (const ruleBreak of breaks) {
-    const runEnd = addDays(ruleBreak.brokenDate, -1);
-    best = Math.max(best, inclusiveDays(runStart, runEnd));
-    runStart = addDays(ruleBreak.brokenDate, 1);
+    const runEnd = addDateKeyDays(ruleBreak.brokenDate, -1);
+    best = Math.max(best, inclusiveCalendarDays(runStart, runEnd));
+    runStart = addDateKeyDays(ruleBreak.brokenDate, 1);
   }
 
   return best;
 }
 
-function inclusiveDays(startDate: string, endDate: string): number {
-  if (endDate < startDate) return 0;
-  return Math.floor((dateToMs(endDate) - dateToMs(startDate)) / 86_400_000) + 1;
-}
-
 function elapsedDaysBeforeToday(startDate: string, today: string): number {
   if (today <= startDate) return 0;
-  return Math.floor((dateToMs(today) - dateToMs(startDate)) / 86_400_000);
-}
-
-export function addDays(date: string, days: number): string {
-  const next = new Date(dateToMs(date));
-  next.setUTCDate(next.getUTCDate() + days);
-  return next.toISOString().slice(0, 10);
-}
-
-function dateToMs(date: string): number {
-  return Date.parse(`${date}T00:00:00.000Z`);
+  return calendarDayDifference(startDate, today);
 }

@@ -57,7 +57,7 @@ export function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function localDayKey(date: Date, timezone: string): string {
+export function localDayKey(date: Date, timezone?: string): string {
   try {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: timezone,
@@ -79,16 +79,27 @@ export function localDayKey(date: Date, timezone: string): string {
   return dayKey(date);
 }
 
+export interface LocalDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+export function localDayKeyFromValue(value: string, timezone?: string): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? localDayKey(date, timezone) : value.slice(0, 10);
+}
+
 export function localDayRange(day: string, timezone: string): DateRange {
-  const startAt = localMidnightToUtc(day, timezone);
-  const endAt = localMidnightToUtc(addDayKey(day, 1), timezone);
+  const startAt = localMidnightToUtc(localDateFromKey(day), timezone);
+  const endAt = localMidnightToUtc(addLocalDays(localDateFromKey(day), 1), timezone);
   return { startAt, endAt };
 }
 
-function localMidnightToUtc(day: string, timezone: string): Date {
-  const localAsUtc = new Date(`${day}T00:00:00.000Z`);
+export function localMidnightToUtc(date: LocalDate, timezone: string): Date {
+  const localAsUtc = new Date(Date.UTC(date.year, date.month - 1, date.day));
   if (Number.isNaN(localAsUtc.getTime())) {
-    throw new Error(`Invalid local day: ${day}`);
+    throw new Error(`Invalid local day: ${formatLocalDate(date)}`);
   }
 
   let guess = localAsUtc;
@@ -125,10 +136,49 @@ function timezoneOffsetMs(date: Date, timezone: string): number {
   return zonedAsUtc - date.getTime();
 }
 
-function addDayKey(day: string, amount: number): string {
-  const date = new Date(`${day}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + amount);
-  return dayKey(date);
+export function localDateFromKey(value: string): LocalDate {
+  const [year, month, day] = value.split("-").map(Number);
+  return { year, month, day };
+}
+
+export function formatLocalDate(date: LocalDate): string {
+  return `${date.year}-${pad(date.month)}-${pad(date.day)}`;
+}
+
+export function addLocalDays(date: LocalDate, days: number): LocalDate {
+  const next = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate()
+  };
+}
+
+export function addDateKeyDays(value: string, days: number): string {
+  return formatLocalDate(addLocalDays(localDateFromKey(value), days));
+}
+
+export function parseLocalDateKey(value: unknown): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const parsed = localDateFromKey(value);
+  return formatLocalDate(parsed) === value ? value : null;
+}
+
+function pad(value: number): string {
+  return value.toString().padStart(2, "0");
+}
+
+export function calendarDayDifference(startDate: string, endDate: string): number {
+  const startMs = Date.parse(`${startDate}T00:00:00.000Z`);
+  const endMs = Date.parse(`${endDate}T00:00:00.000Z`);
+  return Math.round((endMs - startMs) / MS_PER_DAY);
+}
+
+export function inclusiveCalendarDays(startDate: string, endDate: string): number {
+  const difference = calendarDayDifference(startDate, endDate);
+  return difference < 0 ? 0 : difference + 1;
 }
 
 export function daysBetween(startAt: Date, endAt: Date): number {

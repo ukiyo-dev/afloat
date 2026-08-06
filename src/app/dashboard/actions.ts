@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { saveCalendarSourceMapping } from "@/server/services/calendar-source-service";
-import { isCalendarMappingValue } from "@/server/services/calendar-source-validation";
+import { parseCalendarMappingFormData } from "@/server/services/calendar-source-validation";
 import { deleteNoteById, saveNote } from "@/server/services/note-service";
 import { syncRecent, syncRecalibrate } from "@/server/services/sync-service";
 import { parseDurationInput } from "@/server/services/duration-input";
@@ -36,17 +36,7 @@ export async function recomputeViewsAction() {
 }
 
 export async function saveCalendarMappingAction(formData: FormData) {
-  const externalCalendarId = formData.get("externalCalendarId");
-  const name = formData.get("name");
-  const semantic = formData.get("semantic");
-
-  if (
-    typeof externalCalendarId !== "string" ||
-    typeof name !== "string" ||
-    !isCalendarMappingValue(semantic)
-  ) {
-    throw new Error("Invalid calendar mapping form data.");
-  }
+  const { externalCalendarId, name, semantic } = parseCalendarMappingFormData(formData);
 
   await saveCalendarSourceMapping({
     externalCalendarId,

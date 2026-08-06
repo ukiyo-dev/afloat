@@ -49,45 +49,7 @@ export interface DashboardData {
 
 export async function loadDashboardData(request?: DashboardRangeRequest): Promise<DashboardData> {
   const ownerId = await getCurrentOwnerId();
-  const [view, latestSyncRun, settings] = await Promise.all([
-    loadCachedPrivateView(ownerId),
-    loadCachedLatestSyncRun(ownerId),
-    loadCachedSettings(ownerId)
-  ]);
-  const timezone = settings.timezone || "UTC";
-  const personalRules = buildPersonalRuleViews(
-    await loadCachedPersonalRuleRecords(ownerId),
-    localDayKey(new Date(), timezone)
-  );
-  const rangeView = buildDashboardRangeView({
-    view,
-    request,
-    fallbackRange: settings.defaultDashboardRange,
-    timezone
-  });
-  rangeView.fulfilledRuleCount = countFulfilledRulesInRange(
-    personalRules,
-    rangeView.startDate,
-    rangeView.endDate
-  );
-
-  return {
-    view,
-    range: rangeView.key,
-    rangeView,
-    latestSyncRun,
-    settings: {
-      publicPageEnabled: settings.publicPageEnabled,
-      defaultDashboardRange: parseDashboardDefaultRange(settings.defaultDashboardRange) ?? {
-        startOffsetDays: 0,
-        endOffsetDays: 0
-      },
-      timezone,
-      threadStaleDays: settings.threadStaleDays || 7
-    },
-    personalRules,
-    formalRuleCount: personalRules.filter((rule) => rule.commitment === "signed").length
-  };
+  return loadDashboardDataForOwner(ownerId, request);
 }
 
 export async function loadLocalVisitorDashboardData(

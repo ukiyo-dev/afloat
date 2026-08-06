@@ -1,4 +1,20 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import {
+  addLocalDays,
+  formatLocalDate,
+  intersection,
+  localDateFromKey,
+  localMidnightToUtc,
+  minutesBetween,
+  overlaps,
+  subtractRanges
+} from "@/server/domain/time";
+import type { DateRange } from "@/server/domain/types";
+import {
+  fulfilledKindByPlanKind,
+  isFulfilledKind,
+  isPlanKind
+} from "@/server/domain/semantic-kinds";
 
 type RangeView = DashboardData["rangeView"];
 type PrivateView = DashboardData["view"];
@@ -6,12 +22,6 @@ type TimelineEntry = RangeView["timeline"][number];
 type PlanEntry = PrivateView["planTimeline"][number];
 
 const MS_PER_MINUTE = 60_000;
-
-const fulfilledKindByPlanKind: Record<string, string> = {
-  ideal: "idealFulfilled",
-  leisure: "leisureFulfilled",
-  rest: "restFulfilled"
-};
 
 export function projectRangeViewForNow({
   rangeView,
@@ -112,10 +122,10 @@ function buildProjectedFacts({
   rangeEnd: Date;
 }): TimelineEntry[] {
   return plans.flatMap((plan) => {
-    const factKind = fulfilledKindByPlanKind[plan.kind];
-    if (!factKind) {
+    if (!isPlanKind(plan.kind)) {
       return [];
     }
+    const factKind = fulfilledKindByPlanKind[plan.kind];
 
     const planStart = new Date(plan.startAt);
     const planEnd = new Date(plan.endAt);
@@ -164,34 +174,11 @@ function subtractExistingTimeline({
   endAt: Date;
   existingTimeline: TimelineEntry[];
 }): Array<{ startAt: Date; endAt: Date }> {
-  let remaining = [{ startAt, endAt }];
-
-  for (const entry of existingTimeline) {
-    const entryStart = new Date(entry.startAt);
-    const entryEnd = new Date(entry.endAt);
-    if (!isFiniteDate(entryStart) || !isFiniteDate(entryEnd)) {
-      continue;
-    }
-
-    remaining = remaining.flatMap((range) => {
-      const overlapStart = new Date(Math.max(range.startAt.getTime(), entryStart.getTime()));
-      const overlapEnd = new Date(Math.min(range.endAt.getTime(), entryEnd.getTime()));
-      if (overlapEnd <= overlapStart) {
-        return [range];
-      }
-
-      const pieces: Array<{ startAt: Date; endAt: Date }> = [];
-      if (range.startAt < overlapStart) {
-        pieces.push({ startAt: range.startAt, endAt: overlapStart });
-      }
-      if (overlapEnd < range.endAt) {
-        pieces.push({ startAt: overlapEnd, endAt: range.endAt });
-      }
-      return pieces;
-    });
-  }
-
-  return remaining;
+  const blockers = existingTimeline.flatMap((entry) => {
+    const range = serializedRange(entry);
+    return range ? [range] : [];
+  });
+  return subtractRanges({ startAt, endAt }, blockers);
 }
 
 function addFactTotals(
@@ -263,9 +250,11 @@ function calculateObservedPlannedMinutes({
       return total;
     }
 
-    const clippedStart = new Date(Math.max(startAt.getTime(), rangeStart.getTime()));
-    const clippedEnd = new Date(Math.min(endAt.getTime(), observedEnd.getTime()));
-    return total + minutesBetween(clippedStart, clippedEnd);
+    const clipped = intersection(
+      { startAt, endAt },
+      { startAt: rangeStart, endAt: observedEnd }
+    );
+    return total + (clipped ? minutesBetween(clipped.startAt, clipped.endAt) : 0);
   }, 0);
 }
 
@@ -279,23 +268,21 @@ function clipTimelineToRange(
   }
 
   return timeline.flatMap((entry) => {
-    const startAt = new Date(entry.startAt);
-    const endAt = new Date(entry.endAt);
-    if (!isFiniteDate(startAt) || !isFiniteDate(endAt)) {
+    const entryRange = serializedRange(entry);
+    if (!entryRange) {
       return [];
     }
 
-    const clippedStart = new Date(Math.max(startAt.getTime(), rangeStart.getTime()));
-    const clippedEnd = new Date(Math.min(endAt.getTime(), rangeEnd.getTime()));
-    if (clippedEnd <= clippedStart) {
+    const clipped = intersection(entryRange, { startAt: rangeStart, endAt: rangeEnd });
+    if (!clipped) {
       return [];
     }
 
     return [{
       ...entry,
-      startAt: clippedStart.toISOString(),
-      endAt: clippedEnd.toISOString(),
-      minutes: minutesBetween(clippedStart, clippedEnd)
+      startAt: clipped.startAt.toISOString(),
+      endAt: clipped.endAt.toISOString(),
+      minutes: minutesBetween(clipped.startAt, clipped.endAt)
     }];
   });
 }
@@ -336,10 +323,6 @@ function canMergeTimelineEntries(a: TimelineEntry, b: TimelineEntry): boolean {
   return Number.isFinite(aEndMs) && Number.isFinite(bStartMs) && aEndMs >= bStartMs;
 }
 
-function isFulfilledKind(kind: string): boolean {
-  return kind === "idealFulfilled" || kind === "leisureFulfilled" || kind === "restFulfilled";
-}
-
 function countObservedPlannedDays({
   plans,
   rangeStart,
@@ -375,7 +358,12 @@ function countObservedPlannedDays({
 
     if (
       observedDayEnd > observedDayStart &&
-      plans.some((plan) => overlaps(plan, observedDayStart, observedDayEnd))
+      plans.some((plan) => {
+        const planRange = serializedRange(plan);
+        return planRange
+          ? overlaps(planRange, { startAt: observedDayStart, endAt: observedDayEnd })
+          : false;
+      })
     ) {
       count += 1;
     }
@@ -386,80 +374,12 @@ function countObservedPlannedDays({
   return count;
 }
 
-function overlaps(segment: { startAt: string; endAt: string }, startAt: Date, endAt: Date): boolean {
-  const segmentStart = new Date(segment.startAt);
-  const segmentEnd = new Date(segment.endAt);
-  return isFiniteDate(segmentStart) && isFiniteDate(segmentEnd) && segmentStart < endAt && segmentEnd > startAt;
-}
-
-function localDateFromKey(value: string): LocalDate {
-  const [year, month, day] = value.split("-").map(Number);
-  return { year, month, day };
-}
-
-function addLocalDays(date: LocalDate, days: number): LocalDate {
-  const utc = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
-  return {
-    year: utc.getUTCFullYear(),
-    month: utc.getUTCMonth() + 1,
-    day: utc.getUTCDate()
-  };
-}
-
-function localMidnightToUtc(date: LocalDate, timezone: string): Date {
-  const localAsUtc = Date.UTC(date.year, date.month - 1, date.day);
-  let guess = new Date(localAsUtc);
-
-  for (let index = 0; index < 3; index += 1) {
-    const offset = timezoneOffsetMs(guess, timezone);
-    guess = new Date(localAsUtc - offset);
-  }
-
-  return guess;
-}
-
-function timezoneOffsetMs(date: Date, timezone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
-  const zonedAsUtc = Date.UTC(
-    value("year"),
-    value("month") - 1,
-    value("day"),
-    value("hour"),
-    value("minute"),
-    value("second")
-  );
-
-  return zonedAsUtc - date.getTime();
-}
-
-function formatLocalDate(date: LocalDate): string {
-  return `${date.year}-${pad(date.month)}-${pad(date.day)}`;
-}
-
-function pad(value: number): string {
-  return value.toString().padStart(2, "0");
-}
-
-function minutesBetween(startAt: Date, endAt: Date): number {
-  return Math.max(0, (endAt.getTime() - startAt.getTime()) / MS_PER_MINUTE);
+function serializedRange(segment: { startAt: string; endAt: string }): DateRange | null {
+  const startAt = new Date(segment.startAt);
+  const endAt = new Date(segment.endAt);
+  return isFiniteDate(startAt) && isFiniteDate(endAt) ? { startAt, endAt } : null;
 }
 
 function isFiniteDate(date: Date): boolean {
   return Number.isFinite(date.getTime());
-}
-
-interface LocalDate {
-  year: number;
-  month: number;
-  day: number;
 }

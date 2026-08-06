@@ -2,6 +2,12 @@ import type { SemanticKind } from "@/server/domain/types";
 
 export type CalendarMappingValue = SemanticKind | "none";
 
+export interface CalendarSourceMappingInput {
+  externalCalendarId: string;
+  name: string;
+  semantic: CalendarMappingValue;
+}
+
 export const SEMANTIC_OPTIONS: Array<{ value: SemanticKind; label: string }> = [
   { value: "ideal", label: "工作" },
   { value: "leisure", label: "娱乐" },
@@ -24,11 +30,7 @@ export function validateCalendarSourceMapping(input: {
   externalCalendarId?: unknown;
   name?: unknown;
   semantic?: unknown;
-}): asserts input is {
-  externalCalendarId: string;
-  name: string;
-  semantic: CalendarMappingValue;
-} {
+}): asserts input is CalendarSourceMappingInput {
   if (typeof input.externalCalendarId !== "string" || input.externalCalendarId.length === 0) {
     throw new Error("externalCalendarId is required.");
   }
@@ -38,4 +40,14 @@ export function validateCalendarSourceMapping(input: {
   if (!isCalendarMappingValue(input.semantic)) {
     throw new Error("semantic is invalid.");
   }
+}
+
+export function parseCalendarMappingFormData(formData: FormData): CalendarSourceMappingInput {
+  const input = {
+    externalCalendarId: formData.get("externalCalendarId"),
+    name: formData.get("name"),
+    semantic: formData.get("semantic")
+  };
+  validateCalendarSourceMapping(input);
+  return input;
 }

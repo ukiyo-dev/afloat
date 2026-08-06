@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import { inclusiveCalendarDays } from "@/server/domain/time";
+import { parseDurationText } from "@/server/domain/duration";
 import { formatDuration } from "../view-formatters";
-
-const MS_PER_DAY = 86_400_000;
 
 export function ThreadCommitmentFields({
   defaultStart,
@@ -25,7 +25,10 @@ export function ThreadCommitmentFields({
   const [amount, setAmount] = useState(String(expectedMinutes ?? ""));
   const parsedAmount = parseDurationPreview(amount);
   const effectiveStart = start > today ? start : today;
-  const days = inclusiveDays(effectiveStart, deadline);
+  const days =
+    effectiveStart && deadline && effectiveStart <= deadline
+      ? inclusiveCalendarDays(effectiveStart, deadline)
+      : null;
   const derivedDaily = days && parsedAmount !== null ? parsedAmount / days : null;
 
   return (
@@ -84,16 +87,6 @@ export function ThreadCommitmentFields({
   );
 }
 
-function inclusiveDays(start: string, deadline: string): number | null {
-  if (!start || !deadline || start > deadline) return null;
-  return Math.round((Date.parse(`${deadline}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / MS_PER_DAY) + 1;
-}
-
 function parseDurationPreview(value: string): number | null {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return null;
-  if (/^\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
-  const match = normalized.match(/^(?:(\d+(?:\.\d+)?)h)?\s*(?:(\d+(?:\.\d+)?)m)?$/);
-  if (!match || (!match[1] && !match[2])) return null;
-  return Number(match[1] ?? 0) * 60 + Number(match[2] ?? 0);
+  return parseDurationText(value, { allowDecimal: true });
 }

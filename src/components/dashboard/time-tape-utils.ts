@@ -1,20 +1,16 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import { localDayKeyFromValue } from "@/server/domain/time";
+import { isFulfilledKind, planKindByFulfilledKind } from "@/server/domain/semantic-kinds";
 
 type TimelineFact = DashboardData["view"]["timeline"][number];
 type PlanEntry = DashboardData["view"]["planTimeline"][number];
-
-const planKindByFulfilledKind: Record<string, string> = {
-  idealFulfilled: "ideal",
-  leisureFulfilled: "leisure",
-  restFulfilled: "rest"
-};
 
 export function guestDayTypeKind(
   fact: TimelineFact,
   planTimeline: PlanEntry[],
   now: string
 ): string {
-  const planKind = planKindByFulfilledKind[fact.kind];
+  const planKind = isFulfilledKind(fact.kind) ? planKindByFulfilledKind[fact.kind] : null;
   const nowMs = new Date(now).getTime();
   if (!planKind || !Number.isFinite(nowMs)) return fact.kind;
 
@@ -135,35 +131,13 @@ export function nowMarkerPositionPercent({
     return null;
   }
 
-  const endLocalDay = localDayKey(new Date(endMs - 1).toISOString(), timezone);
-  const isSingleLocalDay = localDayKey(startDate, timezone) === endLocalDay;
-  const isTodayTape = localDayKey(startDate, timezone) === localDayKey(now, timezone);
+  const endLocalDay = localDayKeyFromValue(new Date(endMs - 1).toISOString(), timezone);
+  const isSingleLocalDay = localDayKeyFromValue(startDate, timezone) === endLocalDay;
+  const isTodayTape = localDayKeyFromValue(startDate, timezone) === localDayKeyFromValue(now, timezone);
 
   if (!isSingleLocalDay || !isTodayTape) {
     return null;
   }
 
   return ((nowMs - startMs) / (endMs - startMs)) * 100;
-}
-
-function localDayKey(value: string, timezone: string) {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(new Date(value));
-    const year = parts.find((part) => part.type === "year")?.value;
-    const month = parts.find((part) => part.type === "month")?.value;
-    const day = parts.find((part) => part.type === "day")?.value;
-
-    if (year && month && day) {
-      return `${year}-${month}-${day}`;
-    }
-  } catch {
-    // Keep rendering with a UTC fallback if the timezone is invalid.
-  }
-
-  return value.slice(0, 10);
 }

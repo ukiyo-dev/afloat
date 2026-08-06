@@ -1,4 +1,4 @@
-import { localDayKey } from "./time";
+import { addDateKeyDays, localDayKey } from "./time";
 import type { ParsedEvent } from "./types";
 
 export function maintenanceRate(
@@ -36,10 +36,4 @@ export function maintenanceRate(
   }
 
   return maintainedDays.size / days;
-}
-
-function addDateKeyDays(value: string, days: number): string {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year!, month! - 1, day! + days));
-  return date.toISOString().slice(0, 10);
 }

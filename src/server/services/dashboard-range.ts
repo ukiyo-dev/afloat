@@ -1,5 +1,16 @@
-import { intersection, minutesInRange, overlaps } from "@/server/domain/time";
+import {
+  addLocalDays,
+  formatLocalDate,
+  intersection,
+  localDateFromKey,
+  localDayKey,
+  localMidnightToUtc,
+  minutesInRange,
+  overlaps,
+  parseLocalDateKey
+} from "@/server/domain/time";
 import type { DateRange } from "@/server/domain/types";
+import { isFulfilledKind } from "@/server/domain/semantic-kinds";
 import type { PrivateDerivedView } from "@/server/views/derived-view";
 
 export type DashboardRange = "yesterday" | "day" | string; // e.g. "7d", "14d", "30d"
@@ -186,10 +197,7 @@ export function buildDashboardRangeView(input: {
     : 0;
   const fulfilledPlanMinutes = sumClippedMinutes(
     observedTimeline.filter(
-      (fact) =>
-        fact.kind === "idealFulfilled" ||
-        fact.kind === "leisureFulfilled" ||
-        fact.kind === "restFulfilled"
+      (fact) => isFulfilledKind(fact.kind)
     ),
     observedRange
   );
@@ -307,7 +315,7 @@ export function dashboardDateRange(
   timezone: string,
   now: Date
 ): DateRange {
-  const today = localDateParts(now, timezone);
+  const today = localDateFromKey(dashboardLocalDayKey(now, timezone));
   if (range === "yesterday") {
     const yesterday = addLocalDays(today, -1);
     return {
@@ -662,72 +670,7 @@ function serializedRange(segment: { startAt: string; endAt: string }): DateRange
 }
 
 export function dashboardLocalDayKey(date: Date, timezone: string): string {
-  const parts = localDateParts(date, timezone);
-  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
-}
-
-function localDateParts(date: Date, timezone: string): LocalDate {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-
-  return {
-    year: Number(parts.find((part) => part.type === "year")?.value),
-    month: Number(parts.find((part) => part.type === "month")?.value),
-    day: Number(parts.find((part) => part.type === "day")?.value)
-  };
-}
-
-function addLocalDays(date: LocalDate, days: number): LocalDate {
-  const utc = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
-  return {
-    year: utc.getUTCFullYear(),
-    month: utc.getUTCMonth() + 1,
-    day: utc.getUTCDate()
-  };
-}
-
-function localMidnightToUtc(date: LocalDate, timezone: string): Date {
-  const localAsUtc = Date.UTC(date.year, date.month - 1, date.day);
-  let guess = new Date(localAsUtc);
-
-  for (let index = 0; index < 3; index += 1) {
-    const offset = timezoneOffsetMs(guess, timezone);
-    guess = new Date(localAsUtc - offset);
-  }
-
-  return guess;
-}
-
-function timezoneOffsetMs(date: Date, timezone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
-  const zonedAsUtc = Date.UTC(
-    value("year"),
-    value("month") - 1,
-    value("day"),
-    value("hour"),
-    value("minute"),
-    value("second")
-  );
-
-  return zonedAsUtc - date.getTime();
-}
-
-function pad(value: number): string {
-  return value.toString().padStart(2, "0");
+  return localDayKey(date, timezone);
 }
 
 function signedOffsetLabel(value: number): string {
@@ -771,12 +714,6 @@ function dashboardQuickRangeFromOffsets(
   return null;
 }
 
-interface LocalDate {
-  year: number;
-  month: number;
-  day: number;
-}
-
 interface DashboardRangeSelection {
   key: DashboardRangeKey;
   quickRange: DashboardRange | null;
@@ -809,21 +746,4 @@ function selectionFromDates(input: {
       endAt: localMidnightToUtc(localDateFromKey(endExclusive), input.timezone)
     }
   };
-}
-
-function parseLocalDateKey(value: unknown): string | null {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
-  const parsed = localDateFromKey(value);
-  return formatLocalDate(parsed) === value ? value : null;
-}
-
-function localDateFromKey(value: string): LocalDate {
-  const [year, month, day] = value.split("-").map(Number);
-  return { year, month, day };
-}
-
-function formatLocalDate(date: LocalDate): string {
-  return `${date.year}-${pad(date.month)}-${pad(date.day)}`;
 }

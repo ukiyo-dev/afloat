@@ -1,7 +1,10 @@
+import { addDateKeyDays, inclusiveCalendarDays, localDayKey } from "@/server/domain/time";
+import {
+  compareActiveThreadSchedule,
+  highestRiskStatus,
+  summarizeThreadGroup
+} from "@/server/domain/thread-summary";
 import { DashboardData } from "@/server/services/dashboard-service";
-
-type ThreadGroup = DashboardData["view"]["threadGroups"][number];
-type ThreadStatus = ThreadGroup["status"];
 
 export function groupThreads(threads: DashboardData["view"]["threads"]): DashboardData["view"]["threadGroups"] {
   const byGroup = new Map<string, DashboardData["view"]["threads"]>();
@@ -10,118 +13,28 @@ export function groupThreads(threads: DashboardData["view"]["threads"]): Dashboa
   }
 
   return [...byGroup.entries()].map(([group, items]) => {
-    const commitmentItems = items.filter((item) => item.activityState !== "untracked");
-    const expectedValues = commitmentItems
-      .map((item) => item.expectedMinutes)
-      .filter((value): value is number => value !== null);
-    const expectedMinutes =
-      expectedValues.length > 0 ? expectedValues.reduce((total, value) => total + value, 0) : null;
-    const fulfilledMinutes = sum(items.map((item) => item.fulfilledMinutes));
-    const futureMinutes = sum(items.map((item) => item.futureMinutes));
-    const factGapMinutes = sumNullable(commitmentItems.map((item) => item.factGapMinutes));
-    const unscheduledGapMinutes = sumNullable(commitmentItems.map((item) => item.unscheduledGapMinutes));
-    const coveredFutureMinutes = sum(
-      commitmentItems.map((item) =>
-        item.factGapMinutes === null ? 0 : Math.min(item.futureMinutes, item.factGapMinutes)
-      )
-    );
-    const planCoverageRate =
-      factGapMinutes === null || factGapMinutes === 0 ? null : coveredFutureMinutes / factGapMinutes;
-
-    const allItemsInactive = items.every(
-      (item) => item.activityState === "inactive" || item.activityState === "untracked"
-    );
-    const computedStatus = highestRiskStatus(commitmentItems.map((item) => item.status));
+    const summary = summarizeThreadGroup(items);
+    const computedStatus = highestRiskStatus(summary.commitmentItems.map((item) => item.status));
 
     return {
       key: encodeURIComponent(group),
       group,
-      expectedMinutes,
-      start:
-        items
-          .flatMap((item) => item.activityState === "untracked" ? [] : [item.start])
-          .filter((start): start is string => Boolean(start))
-          .sort((a, b) => a.localeCompare(b))[0] ?? null,
-      deadline:
-        items
-          .flatMap((item) => item.activityState === "untracked" ? [] : [item.deadline])
-          .filter((deadline): deadline is string => deadline !== null)
-          .sort((a, b) => b.localeCompare(a))[0] ?? null,
-      fulfilledMinutes,
-      futureMinutes,
-      externalShiftMinutes: sum(items.map((item) => item.externalShiftMinutes)),
-      internalShiftMinutes: sum(items.map((item) => item.internalShiftMinutes)),
-      factGapMinutes,
-      unscheduledGapMinutes,
-      planCoverageRate,
+      expectedMinutes: summary.expectedMinutes,
+      start: summary.start,
+      deadline: summary.deadline,
+      fulfilledMinutes: summary.fulfilledMinutes,
+      futureMinutes: summary.futureMinutes,
+      externalShiftMinutes: summary.externalShiftMinutes,
+      internalShiftMinutes: summary.internalShiftMinutes,
+      factGapMinutes: summary.factGapMinutes,
+      unscheduledGapMinutes: summary.unscheduledGapMinutes,
+      planCoverageRate: summary.planCoverageRate,
+      // Group-level daily pacing was intentionally omitted from this client view.
       dailyRequiredMinutes: null,
-      status: computedStatus === "fulfilled" && !allItemsInactive ? "untracked" : computedStatus,
-      items: [...items].sort(compareActiveSchedule)
+      status: computedStatus === "fulfilled" && !summary.allItemsInactive ? "untracked" : computedStatus,
+      items: [...items].sort(compareActiveThreadSchedule)
     };
-  }).sort(compareActiveSchedule);
-}
-
-function compareActiveSchedule(
-  a: { start?: string | null; deadline: string | null; status: ThreadStatus },
-  b: { start?: string | null; deadline: string | null; status: ThreadStatus }
-): number {
-  const upcomingOrder = Number(a.status === "upcoming") - Number(b.status === "upcoming");
-  if (upcomingOrder !== 0) return upcomingOrder;
-
-  if (a.status === "upcoming" && b.status === "upcoming") {
-    return (
-      startRank(a.start) - startRank(b.start) ||
-      statusRank(a.status) - statusRank(b.status) ||
-      deadlineRank(a.deadline) - deadlineRank(b.deadline)
-    );
-  }
-
-  const deadlinePresenceOrder = Number(a.deadline === null) - Number(b.deadline === null);
-  if (deadlinePresenceOrder !== 0) return deadlinePresenceOrder;
-  if (a.deadline && b.deadline) {
-    return (
-      deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
-      statusRank(a.status) - statusRank(b.status) ||
-      startRank(a.start) - startRank(b.start)
-    );
-  }
-  return startRank(a.start) - startRank(b.start) || statusRank(a.status) - statusRank(b.status);
-}
-
-function startRank(start: string | null | undefined): number {
-  return start ? Date.parse(`${start}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
-}
-
-function deadlineRank(deadline: string | null): number {
-  return deadline ? Date.parse(`${deadline}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
-}
-
-function highestRiskStatus(statuses: ThreadStatus[]): ThreadStatus {
-  return [...statuses].sort((a, b) => statusRank(a) - statusRank(b))[0] ?? "untracked";
-}
-
-function statusRank(status: ThreadStatus): number {
-  const ranks: Record<ThreadStatus, number> = {
-    expired: 0,
-    stale: 1,
-    imbalanced: 2,
-    tightPace: 3,
-    needsScheduling: 4,
-    scheduled: 5,
-    fulfilled: 6,
-    untracked: 7,
-    upcoming: 8
-  };
-  return ranks[status] ?? 8;
-}
-
-export function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
-}
-
-function sumNullable(values: Array<number | null>): number | null {
-  const numericValues = values.filter((value): value is number => value !== null);
-  return numericValues.length > 0 ? sum(numericValues) : null;
+  }).sort(compareActiveThreadSchedule);
 }
 
 export function syncKindLabel(kind: string) {
@@ -168,54 +81,20 @@ export function threadSourceLabel(source: string) {
 }
 
 export function todayKey(timezone: string) {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(new Date());
-    
-    const year = parts.find(p => p.type === "year")?.value;
-    const month = parts.find(p => p.type === "month")?.value;
-    const day = parts.find(p => p.type === "day")?.value;
-    
-    if (year && month && day) {
-      return `${year}-${month}-${day}`;
-    }
-  } catch (e) {
-    // fallback if timezone is somehow invalid
-  }
-  return new Date().toISOString().slice(0, 10);
+  return localDayKey(new Date(), timezone);
 }
 
 export function dayHref(basePath: string, date: string) {
   return `${basePath}?range=day&date=${date}`;
 }
 
-export function addLocalDaysKey(value: string, days: number) {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, "0"),
-    String(date.getUTCDate()).padStart(2, "0")
-  ].join("-");
-}
-
 export function shiftedRangeParams(startDate: string, endDate: string, direction: -1 | 1) {
-  const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
-  const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
-  const windowDays =
-    Math.round(
-      (Date.UTC(endYear, endMonth - 1, endDay) - Date.UTC(startYear, startMonth - 1, startDay)) /
-        86_400_000
-    ) + 1;
+  const windowDays = inclusiveCalendarDays(startDate, endDate);
 
   if (windowDays === 1) {
     return {
       range: "day",
-      date: addLocalDaysKey(startDate, direction),
+      date: addDateKeyDays(startDate, direction),
       start: null,
       end: null
     };
@@ -225,7 +104,7 @@ export function shiftedRangeParams(startDate: string, endDate: string, direction
   return {
     range: "custom",
     date: null,
-    start: addLocalDaysKey(startDate, offset),
-    end: addLocalDaysKey(endDate, offset)
+    start: addDateKeyDays(startDate, offset),
+    end: addDateKeyDays(endDate, offset)
   };
 }

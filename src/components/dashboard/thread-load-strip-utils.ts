@@ -1,5 +1,5 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
-import { intersection, localDayRange, minutesInRange } from "@/server/domain/time";
+import { addDateKeyDays, intersection, localDayRange, minutesInRange } from "@/server/domain/time";
 import { solveDailyLoadByIntervals } from "@/server/domain/daily-load-solver";
 
 type Thread = DashboardData["view"]["threads"][number];
@@ -452,14 +452,8 @@ function addInto(total: number[], allocation: number[], direction: 1 | -1): void
 
 function dayKeys(start: string, end: string): string[] {
   const result: string[] = [];
-  for (let day = start; day <= end; day = addDays(day, 1)) result.push(day);
+  for (let day = start; day <= end; day = addDateKeyDays(day, 1)) result.push(day);
   return result;
-}
-
-export function addDays(day: string, amount: number): string {
-  const date = new Date(`${day}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + amount);
-  return date.toISOString().slice(0, 10);
 }
 
 export function apportionDisplayMinutes(

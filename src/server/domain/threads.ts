@@ -1,4 +1,21 @@
-import { dayKey, intersection, localDayKey, minutesInRange } from "./time";
+import {
+  dayKey,
+  inclusiveCalendarDays,
+  intersection,
+  localDateFromKey,
+  localDayKey,
+  localMidnightToUtc,
+  minutesInRange
+} from "./time";
+import { isFulfilledKind } from "./semantic-kinds";
+import {
+  compareActiveThreadSchedule,
+  deadlineRank,
+  statusRank,
+  startRank,
+  summarizeThreadGroup,
+  threadIdentityKey
+} from "./thread-summary";
 import type {
   FactSegment,
   FeasibilityStatus,
@@ -69,7 +86,7 @@ export function buildThreadViews(input: {
   for (const entry of timeline) {
     if (entry.type === "declaration") {
       const declaration = entry.declaration;
-      const key = threadKey(declaration.group, declaration.item);
+      const key = threadIdentityKey(declaration.group, declaration.item);
       const thread = ensureThread(activeThreads, declaration.group, declaration.item, "active");
       const declarationDayStart = localDayStart(entry.at, input.timezone ?? "UTC");
       thread.declared = true;
@@ -81,7 +98,7 @@ export function buildThreadViews(input: {
     }
 
     const event = entry.event;
-    const key = threadKey(event.title.group, event.title.item);
+    const key = threadIdentityKey(event.title.group, event.title.item);
     if (event.title.item === "---") {
       untrackedPlanEventIds.add(event.id);
       continue;
@@ -176,7 +193,7 @@ export function buildThreadViews(input: {
       continue;
     }
 
-    const key = threadKey(segment.title.group, segment.title.item);
+    const key = threadIdentityKey(segment.title.group, segment.title.item);
     if (untrackedPlanEventIds.has(segment.eventId)) {
       if (trackedGroups.has(segment.title.group)) {
         const untrackedThread = ensureThread(
@@ -283,7 +300,7 @@ function ensureThread(
   item: string,
   activityState: "active" | "inactive" | "untracked"
 ): ThreadAccumulator {
-  const key = threadKey(group, item);
+  const key = threadIdentityKey(group, item);
   const existing = threads.get(key);
   if (existing) {
     return existing;
@@ -378,28 +395,7 @@ function timelineEntryRank(entry: ThreadTimelineEntry): number {
 }
 
 function localDayStart(date: Date, timezone: string): Date {
-  const day = localDayKey(date, timezone);
-  const utcMidnight = new Date(`${day}T00:00:00.000Z`);
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(utcMidnight);
-  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
-  const offset = Date.UTC(
-    value("year"),
-    value("month") - 1,
-    value("day"),
-    value("hour"),
-    value("minute"),
-    value("second")
-  );
-  return new Date(utcMidnight.getTime() - (offset - utcMidnight.getTime()));
+  return localMidnightToUtc(localDateFromKey(localDayKey(date, timezone)), timezone);
 }
 
 function ensureSet<TKey, TValue>(map: Map<TKey, Set<TValue>>, key: TKey): Set<TValue> {
@@ -479,7 +475,7 @@ function toThreadView(
   const today = localDayKey(now, timezone);
   const deadlineKey = deadline ? dayKey(deadline) : null;
   const daysLeft = deadlineKey
-    ? inclusiveDaysBetween(laterDayKey(today, start), deadlineKey)
+    ? inclusiveCalendarDays(laterDayKey(today, start), deadlineKey)
     : null;
   const dailyRequiredMinutes =
     unscheduledGapMinutes !== null && deadline && daysLeft !== null && daysLeft > 0
@@ -639,38 +635,14 @@ function toThreadGroupView(
   now: Date,
   timezone: string
 ): ThreadGroupView {
-  const commitmentItems = items.filter((item) => item.activityState !== "untracked");
-  const expectedValues = commitmentItems
-    .map((item) => item.expectedMinutes)
-    .filter((value): value is number => value !== null);
-  const expectedMinutes =
-    expectedValues.length > 0 ? expectedValues.reduce((total, value) => total + value, 0) : null;
-  const deadline = latestDeadline(commitmentItems.map((item) => item.deadline));
-  const start = earliestStart(
-    commitmentItems.map((item) => item.start).filter((value): value is string => Boolean(value))
-  );
-  const fulfilledMinutes = sum(items.map((item) => item.fulfilledMinutes));
-  const futureMinutes = sum(items.map((item) => item.futureMinutes));
-  const externalShiftMinutes = sum(items.map((item) => item.externalShiftMinutes));
-  const internalShiftMinutes = sum(items.map((item) => item.internalShiftMinutes));
-  const factGapMinutes = sumNullable(commitmentItems.map((item) => item.factGapMinutes));
-  const unscheduledGapMinutes = sumNullable(commitmentItems.map((item) => item.unscheduledGapMinutes));
-  const coveredFutureMinutes = sum(
-    commitmentItems.map((item) =>
-      item.factGapMinutes === null ? 0 : Math.min(item.futureMinutes, item.factGapMinutes)
-    )
-  );
-  const planCoverageRate =
-    factGapMinutes === null || factGapMinutes === 0 ? null : coveredFutureMinutes / factGapMinutes;
+  const summary = summarizeThreadGroup(items);
+  const { commitmentItems } = summary;
+  const { start, deadline } = summary;
   const deadlineDate = deadline ? new Date(`${deadline}T00:00:00.000Z`) : null;
-  const dailyRequiredMinutes = sumNullable(commitmentItems.map((item) => item.dailyRequiredMinutes));
-  const allItemsInactive = items.every(
-    (item) => item.activityState === "inactive" || item.activityState === "untracked"
-  );
   const computedStatus = feasibilityStatus({
-    factGapMinutes,
-    unscheduledGapMinutes,
-    dailyRequiredMinutes,
+    factGapMinutes: summary.factGapMinutes,
+    unscheduledGapMinutes: summary.unscheduledGapMinutes,
+    dailyRequiredMinutes: summary.dailyRequiredMinutes,
     start,
     deadline: deadlineDate,
     now,
@@ -681,39 +653,20 @@ function toThreadGroupView(
   return {
     key: encodeURIComponent(group),
     group,
-    expectedMinutes,
+    expectedMinutes: summary.expectedMinutes,
     start,
     deadline,
-    fulfilledMinutes,
-    futureMinutes,
-    externalShiftMinutes,
-    internalShiftMinutes,
-    factGapMinutes,
-    unscheduledGapMinutes,
-    planCoverageRate,
-    dailyRequiredMinutes,
-    status: computedStatus === "fulfilled" && !allItemsInactive ? "untracked" : computedStatus,
+    fulfilledMinutes: summary.fulfilledMinutes,
+    futureMinutes: summary.futureMinutes,
+    externalShiftMinutes: summary.externalShiftMinutes,
+    internalShiftMinutes: summary.internalShiftMinutes,
+    factGapMinutes: summary.factGapMinutes,
+    unscheduledGapMinutes: summary.unscheduledGapMinutes,
+    planCoverageRate: summary.planCoverageRate,
+    dailyRequiredMinutes: summary.dailyRequiredMinutes,
+    status: computedStatus === "fulfilled" && !summary.allItemsInactive ? "untracked" : computedStatus,
     items: [...items].sort((a, b) => statusRank(a.status) - statusRank(b.status))
   };
-}
-
-function earliestStart(starts: string[]): string | null {
-  return [...starts].sort((a, b) => a.localeCompare(b))[0] ?? null;
-}
-
-function latestDeadline(deadlines: Array<string | null>): string | null {
-  return deadlines
-    .filter((deadline): deadline is string => deadline !== null)
-    .sort((a, b) => b.localeCompare(a))[0] ?? null;
-}
-
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
-}
-
-function sumNullable(values: Array<number | null>): number | null {
-  const numericValues = values.filter((value): value is number => value !== null);
-  return numericValues.length > 0 ? sum(numericValues) : null;
 }
 
 function recentFulfilledDailyCapacity(facts: FactSegment[], now: Date): number {
@@ -723,37 +676,14 @@ function recentFulfilledDailyCapacity(facts: FactSegment[], now: Date): number {
       (fact) =>
         fact.endAt > startAt &&
         fact.startAt <= now &&
-        (fact.kind === "idealFulfilled" ||
-          fact.kind === "leisureFulfilled" ||
-          fact.kind === "restFulfilled")
+        isFulfilledKind(fact.kind)
     )
     .reduce((total, fact) => total + minutesInRange(fact), 0);
   return fulfilled / 30;
 }
 
-function statusRank(status: FeasibilityStatus): number {
-  const ranks: Record<FeasibilityStatus, number> = {
-    expired: 0,
-    stale: 1,
-    imbalanced: 2,
-    tightPace: 3,
-    needsScheduling: 4,
-    scheduled: 5,
-    fulfilled: 6,
-    untracked: 7,
-    upcoming: 8
-  };
-  return ranks[status];
-}
-
 function laterDayKey(a: string, b: string): string {
   return a > b ? a : b;
-}
-
-function inclusiveDaysBetween(start: string, end: string): number {
-  const startMs = Date.parse(`${start}T00:00:00.000Z`);
-  const endMs = Date.parse(`${end}T00:00:00.000Z`);
-  return endMs < startMs ? 0 : Math.round((endMs - startMs) / 86_400_000) + 1;
 }
 
 function activityStateRank(state: ThreadView["activityState"]): number {
@@ -780,57 +710,12 @@ function compareThreadGroupViews(a: ThreadGroupView, b: ThreadGroupView): number
   return compareActiveThreadSchedule(a, b) || statusRank(a.status) - statusRank(b.status);
 }
 
-function compareActiveThreadSchedule(
-  a: Pick<ThreadView, "start" | "deadline" | "status">,
-  b: Pick<ThreadView, "start" | "deadline" | "status">
-): number {
-  const upcomingOrder = Number(a.status === "upcoming") - Number(b.status === "upcoming");
-  if (upcomingOrder !== 0) {
-    return upcomingOrder;
-  }
-
-  if (a.status === "upcoming" && b.status === "upcoming") {
-    return (
-      startRank(a.start) - startRank(b.start) ||
-      statusRank(a.status) - statusRank(b.status) ||
-      deadlineRank(a.deadline) - deadlineRank(b.deadline)
-    );
-  }
-
-  const deadlinePresenceOrder = Number(a.deadline === null) - Number(b.deadline === null);
-  if (deadlinePresenceOrder !== 0) {
-    return deadlinePresenceOrder;
-  }
-  if (a.deadline && b.deadline) {
-    return (
-      deadlineRank(a.deadline) - deadlineRank(b.deadline) ||
-      statusRank(a.status) - statusRank(b.status) ||
-      startRank(a.start) - startRank(b.start)
-    );
-  }
-  return (
-    startRank(a.start) - startRank(b.start) ||
-    statusRank(a.status) - statusRank(b.status)
-  );
-}
-
-function startRank(start: string | null | undefined): number {
-  return start ? Date.parse(`${start}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
-}
-
-function deadlineRank(deadline: string | null): number {
-  return deadline ? Date.parse(`${deadline}T00:00:00.000Z`) : Number.POSITIVE_INFINITY;
-}
 
 function latestFactActivityAt(thread: ThreadAccumulator): Date | null {
   return thread.history
     .filter((entry) => entry.source === "fact")
     .map((entry) => entry.endAt)
     .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-}
-
-function threadKey(group: string, item: string): string {
-  return `${group}\u0000${item}`;
 }
 
 function publicThreadKey(group: string, item: string): string {

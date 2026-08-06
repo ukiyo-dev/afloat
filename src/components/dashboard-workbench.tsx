@@ -15,6 +15,7 @@ import {
   timeRange
 } from "@/components/view-formatters";
 import type { DashboardData } from "@/server/services/dashboard-service";
+import { addDateKeyDays, inclusiveCalendarDays } from "@/server/domain/time";
 
 
 import { JournalPanel } from "./dashboard/journal-panel";
@@ -23,7 +24,7 @@ import { RulePanel } from "./dashboard/rule-panel";
 import { FactDistribution } from "./dashboard/fact-distribution";
 import { Timeline } from "./dashboard/timeline";
 import { TimeTape } from "./dashboard/time-tape";
-import { addDays, calculateRangeDailyLoadInvestment } from "./dashboard/thread-load-strip-utils";
+import { calculateRangeDailyLoadInvestment } from "./dashboard/thread-load-strip-utils";
 
 import { MacroDistribution } from "./dashboard/macro-distribution";
 
@@ -222,7 +223,7 @@ export function DashboardWorkbench({
   const isTodayOnlyRange = projectedRangeView.startDate === currentDay && projectedRangeView.endDate === currentDay;
   const rangeDailyLoadEndDate = isTodayOnlyRange
     ? currentDay
-    : [projectedRangeView.endDate, addDays(currentDay, -1)].sort()[0]!;
+    : [projectedRangeView.endDate, addDateKeyDays(currentDay, -1)].sort()[0]!;
   const rangeDailyLoadInvestment = useMemo(
     () => calculateRangeDailyLoadInvestment(
       projectedThreads,
@@ -248,11 +249,7 @@ export function DashboardWorkbench({
     projectedRangeView.timezone
   );
 
-  const [startY, startM, startD] = rangeView.startDate.split('-').map(Number);
-  const [endY, endM, endD] = rangeView.endDate.split('-').map(Number);
-  const startUtc = Date.UTC(startY, startM - 1, startD);
-  const endUtc = Date.UTC(endY, endM - 1, endD);
-  const daysCount = Math.round((endUtc - startUtc) / 86400000) + 1;
+  const daysCount = inclusiveCalendarDays(rangeView.startDate, rangeView.endDate);
   const isUltraMacro = daysCount > 30;
 
   return (

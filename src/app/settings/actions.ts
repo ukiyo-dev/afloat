@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { normalizeDashboardDefaultRange } from "@/server/services/dashboard-range";
+import { isValidTimeZone, normalizeDashboardDefaultRange } from "@/server/services/dashboard-range";
 import { saveCurrentCalDavCredential } from "@/server/services/caldav-credential-service";
 import { saveCalendarSourceMapping } from "@/server/services/calendar-source-service";
-import { isCalendarMappingValue } from "@/server/services/calendar-source-validation";
+import { parseCalendarMappingFormData } from "@/server/services/calendar-source-validation";
 import { saveDashboardSettings } from "@/server/services/settings-service";
 import { recomputeCurrentOwnerViews } from "@/server/services/view-service";
 
@@ -26,10 +26,7 @@ export async function saveSettingsAction(formData: FormData) {
     throw new Error("Invalid settings form data.");
   }
 
-  // Validate that the timezone is a valid IANA timezone string
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: timezone });
-  } catch (e) {
+  if (!isValidTimeZone(timezone)) {
     throw new Error(`Invalid timezone: ${timezone}`);
   }
 
@@ -62,17 +59,7 @@ function parseOffset(value: FormDataEntryValue | null): number | null {
 }
 
 export async function saveSettingsCalendarMappingAction(formData: FormData) {
-  const externalCalendarId = formData.get("externalCalendarId");
-  const name = formData.get("name");
-  const semantic = formData.get("semantic");
-
-  if (
-    typeof externalCalendarId !== "string" ||
-    typeof name !== "string" ||
-    !isCalendarMappingValue(semantic)
-  ) {
-    throw new Error("Invalid calendar mapping form data.");
-  }
+  const { externalCalendarId, name, semantic } = parseCalendarMappingFormData(formData);
 
   await saveCalendarSourceMapping({
     externalCalendarId,

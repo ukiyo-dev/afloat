@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardData } from "@/server/services/dashboard-service";
+import { localDayKeyFromValue } from "@/server/domain/time";
 import { formatDuration, timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 import { buildTimeTapeSlices, guestDayTypeKind, nowMarkerPositionPercent } from "./time-tape-utils";
@@ -37,7 +38,8 @@ export function TimeTape({
   // Calculate the total duration of the current view window
   const endMs = new Date(endDate).getTime();
   const isSingleLocalDay =
-    localDayKey(startDate, timezone) === localDayKey(new Date(endMs - 1).toISOString(), timezone);
+    localDayKeyFromValue(startDate, timezone) ===
+    localDayKeyFromValue(new Date(endMs - 1).toISOString(), timezone);
   const slices = buildTimeTapeSlices({ timeline, startDate, endDate });
   const threadKeys = threadActivityKeys(threads);
   const nowMarkerPercent = now
@@ -113,26 +115,4 @@ export function TimeTape({
 
 function durationMinutes(durationMs: number): number {
   return Math.max(0, Math.round(durationMs / 60_000));
-}
-
-function localDayKey(value: string, timezone: string) {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(new Date(value));
-    const year = parts.find((part) => part.type === "year")?.value;
-    const month = parts.find((part) => part.type === "month")?.value;
-    const day = parts.find((part) => part.type === "day")?.value;
-
-    if (year && month && day) {
-      return `${year}-${month}-${day}`;
-    }
-  } catch {
-    // Keep rendering with a UTC fallback if the timezone is invalid.
-  }
-
-  return value.slice(0, 10);
 }

@@ -1,4 +1,15 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import {
+  calendarDayDifference,
+  inclusiveCalendarDays,
+  localDayKey,
+  minutesBetween
+} from "@/server/domain/time";
+import {
+  fulfilledKindByPlanKind,
+  isFulfilledKind,
+  isPlanKind
+} from "@/server/domain/semantic-kinds";
 
 import { groupThreads } from "./utils";
 
@@ -17,14 +28,6 @@ type ElapsedTotals = {
 };
 
 const MS_PER_MINUTE = 60_000;
-const MS_PER_DAY = 86_400_000;
-
-const fulfilledKindByPlanKind: Record<string, string> = {
-  ideal: "idealFulfilled",
-  leisure: "leisureFulfilled",
-  rest: "restFulfilled"
-};
-
 export function projectThreadsForNow(
   threads: DashboardData["view"]["threads"],
   runtimeNowIso: string,
@@ -103,7 +106,7 @@ function projectThreadForNow(
         )
       : null;
   const remainingDays = thread.deadline
-    ? inclusiveDaysBetween(
+      ? inclusiveCalendarDays(
         [localDayKey(runtimeNow, timezone), thread.start ?? localDayKey(runtimeNow, timezone)]
           .sort()
           .at(-1)!,
@@ -235,11 +238,7 @@ function unchangedProjection(entry: ThreadHistoryEntry): HistoryProjection {
 }
 
 function fulfilledKind(kind: string): string {
-  return fulfilledKindByPlanKind[kind] ?? kind;
-}
-
-function isFulfilledKind(kind: string): boolean {
-  return kind === "idealFulfilled" || kind === "leisureFulfilled" || kind === "restFulfilled";
+  return isPlanKind(kind) ? fulfilledKindByPlanKind[kind] : kind;
 }
 
 function mergeAdjacentHistoryEntries(entries: ThreadHistoryEntry[]): ThreadHistoryEntry[] {
@@ -281,10 +280,6 @@ function canMergeHistoryEntries(a: ThreadHistoryEntry, b: ThreadHistoryEntry): b
   return Number.isFinite(aEndMs) && Number.isFinite(bStartMs) && aEndMs === bStartMs;
 }
 
-function minutesBetween(startAt: Date, endAt: Date): number {
-  return Math.max(0, (endAt.getTime() - startAt.getTime()) / MS_PER_MINUTE);
-}
-
 function dailyRequired(
   unscheduledGapMinutes: number,
   start: string,
@@ -293,7 +288,7 @@ function dailyRequired(
   timezone: string
 ): number | null {
   const effectiveStart = [localDayKey(runtimeNow, timezone), start].sort().at(-1)!;
-  const daysLeft = inclusiveDaysBetween(effectiveStart, deadline);
+  const daysLeft = inclusiveCalendarDays(effectiveStart, deadline);
   return daysLeft > 0 ? unscheduledGapMinutes / daysLeft : null;
 }
 
@@ -358,7 +353,7 @@ function projectedActivityState(
   if (current === "untracked" || !lastActivityAt || staleDays < 1) return current;
   const lastActivityDay = localDayKey(new Date(lastActivityAt), timezone);
   const referenceDay = deadline && deadline > lastActivityDay ? deadline : lastActivityDay;
-  return dayDifference(referenceDay, localDayKey(runtimeNow, timezone)) > staleDays
+  return calendarDayDifference(referenceDay, localDayKey(runtimeNow, timezone)) > staleDays
     ? "inactive"
     : "active";
 }
@@ -382,37 +377,5 @@ function isStale(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(referenceDay)) {
     return false;
   }
-  return dayDifference(referenceDay, localDayKey(runtimeNow, timezone)) >= staleDays;
-}
-
-function inclusiveDaysBetween(start: string, end: string): number {
-  const difference = dayDifference(start, end);
-  return difference < 0 ? 0 : difference + 1;
-}
-
-function dayDifference(start: string, end: string): number {
-  const startMs = Date.parse(`${start}T00:00:00.000Z`);
-  const endMs = Date.parse(`${end}T00:00:00.000Z`);
-  return Math.round((endMs - startMs) / MS_PER_DAY);
-}
-
-function localDayKey(date: Date, timezone: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(date);
-    const year = parts.find((part) => part.type === "year")?.value;
-    const month = parts.find((part) => part.type === "month")?.value;
-    const day = parts.find((part) => part.type === "day")?.value;
-    if (year && month && day) {
-      return `${year}-${month}-${day}`;
-    }
-  } catch {
-    // Keep projection resilient to invalid persisted timezones.
-  }
-
-  return date.toISOString().slice(0, 10);
+  return calendarDayDifference(referenceDay, localDayKey(runtimeNow, timezone)) >= staleDays;
 }

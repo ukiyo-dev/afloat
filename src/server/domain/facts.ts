@@ -4,8 +4,9 @@ import {
   overlaps,
   subtractRanges
 } from "./time";
+import { fulfilledKindByPlanKind } from "./semantic-kinds";
+import { threadIdentityKey } from "./thread-summary";
 import type {
-  FactKind,
   FactSegment,
   ParsedEvent,
   PlanKind,
@@ -13,12 +14,6 @@ import type {
   SemanticKind,
   TimeSegment
 } from "./types";
-
-const planFactKind: Record<PlanKind, FactKind> = {
-  ideal: "idealFulfilled",
-  leisure: "leisureFulfilled",
-  rest: "restFulfilled"
-};
 
 export function detectLayerOverlaps(events: ParsedEvent[]): ProtocolError[] {
   const errors: ProtocolError[] = [];
@@ -65,7 +60,7 @@ export function detectSequenceRegressions(events: ParsedEvent[]): ProtocolError[
   const lastByThread = new Map<string, ParsedEvent>();
 
   for (const event of planEvents) {
-    const key = threadKey(event.title.group, event.title.item);
+    const key = threadIdentityKey(event.title.group, event.title.item);
     if (event.title.threadStart) {
       lastByThread.delete(key);
     }
@@ -116,7 +111,7 @@ export function buildFactLayer(events: ParsedEvent[]): {
     const blockers = cleanShiftSegments.filter((shift) => overlaps(segment, shift));
     return subtractRanges(segment, blockers).map((range) => ({
       ...range,
-      kind: planFactKind[segment.kind as PlanKind],
+      kind: fulfilledKindByPlanKind[segment.kind as PlanKind],
       sourceEventId: segment.eventId,
       title: segment.title
     }));
@@ -209,8 +204,4 @@ function cleanSegments(events: ParsedEvent[], blockers: ProtocolError[]): TimeSe
       title: event.title
     }))
   );
-}
-
-function threadKey(group: string, item: string): string {
-  return `${group}\u0000${item}`;
 }
