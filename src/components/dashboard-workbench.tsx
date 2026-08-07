@@ -548,9 +548,11 @@ export function DashboardWorkbench({
                       planTotals={projectedRangeView.planTotals}
                       shiftComposition={projectedRangeView.shiftComposition}
                       activePlanDays={projectedRangeView.observedPlannedDays}
+                      plannedDays={projectedRangeView.plannedDays}
                       attributions={threadActivityAttributions}
                       rangeStartAt={projectedRangeView.startAt}
                       rangeEndAt={projectedRangeView.endAt}
+                      futurePlanPreview={projectedRangeView.startDate > currentDay}
                     />
                   </div>
                 </div>

@@ -9,6 +9,23 @@ export function threadFactMinutesByKind(
   rangeEndAt: string,
   attributions: ThreadActivityAttribution[]
 ): Record<string, number> {
+  return threadActivityMinutesByKind(rangeStartAt, rangeEndAt, attributions, "fact");
+}
+
+export function threadPlanMinutesByKind(
+  rangeStartAt: string,
+  rangeEndAt: string,
+  attributions: ThreadActivityAttribution[]
+): Record<string, number> {
+  return threadActivityMinutesByKind(rangeStartAt, rangeEndAt, attributions, "futurePlan");
+}
+
+function threadActivityMinutesByKind(
+  rangeStartAt: string,
+  rangeEndAt: string,
+  attributions: ThreadActivityAttribution[],
+  source: ThreadActivityAttribution["source"]
+): Record<string, number> {
   const rangeStartMs = new Date(rangeStartAt).getTime();
   const rangeEndMs = new Date(rangeEndAt).getTime();
 
@@ -18,7 +35,7 @@ export function threadFactMinutesByKind(
 
   const range = { startAt: new Date(rangeStartAt), endAt: new Date(rangeEndAt) };
   return attributions.reduce<Record<string, number>>((totals, entry) => {
-    if (entry.source !== "fact") return totals;
+    if (entry.source !== source) return totals;
     const entryRange = { startAt: new Date(entry.startAt), endAt: new Date(entry.endAt) };
     const overlap = intersection(entryRange, range);
     if (overlap) totals[entry.kind] = (totals[entry.kind] ?? 0) + minutesInRange(overlap);
@@ -31,17 +48,21 @@ export function FactDistribution({
   planTotals, 
   shiftComposition,
   activePlanDays,
+  plannedDays,
   attributions,
   rangeStartAt,
-  rangeEndAt
-}: { 
+  rangeEndAt,
+  futurePlanPreview
+}: {
   factTotals: Record<string, number>; 
   planTotals: Record<string, number>;
   shiftComposition?: Record<string, { internal: number; external: number }>;
   activePlanDays: number;
+  plannedDays: number;
   attributions: ThreadActivityAttribution[];
   rangeStartAt: string;
   rangeEndAt: string;
+  futurePlanPreview?: boolean;
 }) {
   if (Object.keys(factTotals).length === 0 && Object.keys(planTotals).length === 0) {
     return <p className="font-mono text-ink-light text-sm italic">当前时间范围内没有相关记录。</p>;
@@ -53,15 +74,17 @@ export function FactDistribution({
     rest: { internal: 0, external: 0 },
     unmapped: { internal: 0, external: 0 }
   };
-  const threadMinutesByKind = threadFactMinutesByKind(rangeStartAt, rangeEndAt, attributions);
+  const isFuturePlanPreview = futurePlanPreview === true;
+  const threadMinutesByKind = isFuturePlanPreview
+    ? threadPlanMinutesByKind(rangeStartAt, rangeEndAt, attributions)
+    : threadFactMinutesByKind(rangeStartAt, rangeEndAt, attributions);
 
-  // Work, Leisure, Rest: show fulfilled + intShift + extShift inside the plan!
+  // Work, Leisure, Rest: show observed facts or future plan composition.
   const coreStats = [
     { 
       key: "ideal", 
       label: "工作", 
       fulfilled: factTotals.idealFulfilled ?? 0, 
-      threadFulfilled: threadMinutesByKind.idealFulfilled ?? 0,
       plan: planTotals.ideal ?? 0, 
       color: "bg-semantic-work",
       intShift: shiftComp.ideal?.internal ?? 0,
@@ -71,7 +94,6 @@ export function FactDistribution({
       key: "leisure", 
       label: "娱乐", 
       fulfilled: factTotals.leisureFulfilled ?? 0, 
-      threadFulfilled: threadMinutesByKind.leisureFulfilled ?? 0,
       plan: planTotals.leisure ?? 0, 
       color: "bg-semantic-leisure",
       intShift: shiftComp.leisure?.internal ?? 0,
@@ -81,7 +103,6 @@ export function FactDistribution({
       key: "rest", 
       label: "休息", 
       fulfilled: factTotals.restFulfilled ?? 0, 
-      threadFulfilled: threadMinutesByKind.restFulfilled ?? 0,
       plan: planTotals.rest ?? 0, 
       color: "bg-semantic-rest",
       intShift: shiftComp.rest?.internal ?? 0,
@@ -89,39 +110,50 @@ export function FactDistribution({
     },
   ].filter(stat => stat.plan > 0 || stat.fulfilled > 0 || stat.intShift > 0 || stat.extShift > 0);
 
-  const intShift = factTotals.internalShift ?? 0;
-  const extShift = factTotals.externalShift ?? 0;
+  const intShift = isFuturePlanPreview ? 0 : factTotals.internalShift ?? 0;
+  const extShift = isFuturePlanPreview ? 0 : factTotals.externalShift ?? 0;
   const activeDayAverage = (minutes: number) => activePlanDays > 0 ? minutes / activePlanDays : 0;
+  const plannedDayAverage = (minutes: number) => plannedDays > 0 ? minutes / plannedDays : 0;
 
   return (
     <div className="flex flex-col gap-6 font-mono text-sm">
       {coreStats.length > 0 && (
         <div className="flex flex-col gap-3">
           {coreStats.map((stat) => {
-            const outsideFulfilled = Math.max(0, stat.fulfilled - stat.threadFulfilled);
+            const total = isFuturePlanPreview ? stat.plan : stat.fulfilled;
+            const threadTotal = isFuturePlanPreview
+              ? threadMinutesByKind[stat.key] ?? 0
+              : threadMinutesByKind[`${stat.key}Fulfilled`] ?? 0;
+            const outsideTotal = Math.max(0, total - threadTotal);
+            const averageThread = isFuturePlanPreview
+              ? plannedDayAverage(threadTotal)
+              : activeDayAverage(threadTotal);
+            const averageTotal = isFuturePlanPreview
+              ? plannedDayAverage(total)
+              : activeDayAverage(total);
             return (
               <div className="grid grid-cols-[max-content_minmax(0,1fr)_max-content] items-center gap-2 group sm:grid-cols-[48px_minmax(0,1fr)_100px]" key={stat.key}>
                 <span className="font-bold truncate min-w-0">{stat.label}</span>
                 
                 {/* Visual scale container acting as a pure flex row, just like TIME COMPOSITION */}
                 <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal group-hover:opacity-80 transition-opacity">
-                  {/* Fulfilled (Solid Core Color) */}
-                  {stat.threadFulfilled > 0 && (
+                  {/* Thread-owned primary composition */}
+                  {threadTotal > 0 && (
                     <div 
                       className={`h-full ${stat.color} transition-all cursor-crosshair border-r border-ink last:border-r-0`} 
-                      style={{ flexGrow: stat.threadFulfilled }}
-                      title={`兑现: ${formatDuration(stat.threadFulfilled)}`}
+                      style={{ flexGrow: threadTotal }}
+                      title={`${isFuturePlanPreview ? "计划" : "兑现"}: ${formatDuration(threadTotal)}`}
                     />
                   )}
-                  {outsideFulfilled > 0 && (
+                  {outsideTotal > 0 && (
                     <div
                       className={`h-full ${stat.color} ${semanticThreadFillClass(stat.key, false)} transition-all cursor-crosshair border-r border-ink last:border-r-0`}
-                      style={{ flexGrow: outsideFulfilled }}
-                      title={`兑现: ${formatDuration(outsideFulfilled)}`}
+                      style={{ flexGrow: outsideTotal }}
+                      title={`${isFuturePlanPreview ? "计划" : "兑现"}: ${formatDuration(outsideTotal)}`}
                     />
                   )}
                   {/* External Shift (Amber) */}
-                  {stat.extShift > 0 && (
+                  {!isFuturePlanPreview && stat.extShift > 0 && (
                     <div 
                       className={`h-full bg-semantic-ext transition-all cursor-crosshair border-r border-ink last:border-r-0`} 
                       style={{ flexGrow: stat.extShift }}
@@ -129,7 +161,7 @@ export function FactDistribution({
                     />
                   )}
                   {/* Internal Shift (Red) */}
-                  {stat.intShift > 0 && (
+                  {!isFuturePlanPreview && stat.intShift > 0 && (
                     <div 
                       className={`h-full bg-semantic-int transition-all cursor-crosshair border-r border-ink last:border-r-0`} 
                       style={{ flexGrow: stat.intShift }}
@@ -139,14 +171,16 @@ export function FactDistribution({
                 </div>
                 
                 <div className="flex flex-col pl-2 text-right">
-                  <strong>{formatDuration(stat.fulfilled)}</strong>
+                  <strong>{formatDuration(total)}</strong>
                   <span
                     className="whitespace-nowrap text-xs text-ink-light"
-                    title={`日均 Thread time / 日均 all（活跃日: ${activePlanDays} 天）`}
+                    title={isFuturePlanPreview
+                      ? `日均 Thread plan / 日均 plan（计划日: ${plannedDays} 天）`
+                      : `日均 Thread time / 日均 all（活跃日: ${activePlanDays} 天）`}
                   >
-                    {formatDuration(activeDayAverage(stat.threadFulfilled))} / {formatDuration(activeDayAverage(stat.fulfilled))}
+                    {formatDuration(averageThread)} / {formatDuration(averageTotal)}
                   </span>
-                  {(stat.extShift > 0 || stat.intShift > 0) && (
+                  {(!isFuturePlanPreview && (stat.extShift > 0 || stat.intShift > 0)) && (
                     <span className="text-[10px] mt-1 flex flex-col items-end gap-0.5">
                       {stat.extShift > 0 && <span className="text-[#a16207] font-bold">+{formatDuration(stat.extShift)} 外部</span>}
                       {stat.intShift > 0 && <span className="text-semantic-int font-bold">+{formatDuration(stat.intShift)} 内部</span>}
@@ -159,16 +193,20 @@ export function FactDistribution({
         </div>
       )}
 
-      {/* A Global Stacked Bar showing the absolute Day composition: Fulfilled vs Shifts */}
+      {/* A global stacked bar for observed facts or future plans. */}
       <div className="pt-4 border-t-2 border-dashed border-ink/20">
         <p className="text-xs text-ink-light uppercase font-bold tracking-widest mb-2">TIME COMPOSITION</p>
         
         <div className="h-8 border-2 border-ink bg-paper flex overflow-hidden shadow-brutal">
           {/* Work */}
           {coreStats.flatMap((stat) => {
-            const outside = Math.max(0, stat.fulfilled - stat.threadFulfilled);
+            const total = isFuturePlanPreview ? stat.plan : stat.fulfilled;
+            const threadTotal = isFuturePlanPreview
+              ? threadMinutesByKind[stat.key] ?? 0
+              : threadMinutesByKind[`${stat.key}Fulfilled`] ?? 0;
+            const outside = Math.max(0, total - threadTotal);
             return [
-              stat.threadFulfilled > 0 ? <div key={`${stat.key}-thread`} className={`h-full ${stat.color} transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0`} style={{ flexGrow: stat.threadFulfilled }} title={`${stat.label}: ${formatDuration(stat.threadFulfilled)}`} /> : null,
+              threadTotal > 0 ? <div key={`${stat.key}-thread`} className={`h-full ${stat.color} transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0`} style={{ flexGrow: threadTotal }} title={`${stat.label}: ${formatDuration(threadTotal)}`} /> : null,
               outside > 0 ? <div key={`${stat.key}-outside`} className={`h-full ${stat.color} ${semanticThreadFillClass(stat.key, false)} transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0`} style={{ flexGrow: outside }} title={`${stat.label}: ${formatDuration(outside)}`} /> : null
             ];
           })}
@@ -191,8 +229,8 @@ export function FactDistribution({
         </div>
         
         <div className="flex justify-between mt-2 text-xs font-mono text-ink-light">
-          <span>兑现 (FULFILLED)</span>
-          <span>偏移 (SHIFTS)</span>
+          <span>{isFuturePlanPreview ? "计划 (PLANNED)" : "兑现 (FULFILLED)"}</span>
+          <span>{isFuturePlanPreview ? "未来预览 (PREVIEW)" : "偏移 (SHIFTS)"}</span>
         </div>
       </div>
     </div>

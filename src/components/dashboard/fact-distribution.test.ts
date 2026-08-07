@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { threadFactMinutesByKind } from "./fact-distribution";
+import { threadFactMinutesByKind, threadPlanMinutesByKind } from "./fact-distribution";
 
 describe("threadFactMinutesByKind", () => {
   it("uses projected thread facts and excludes the remaining future plan", () => {
@@ -48,5 +48,34 @@ describe("threadFactMinutesByKind", () => {
     ])).toEqual({
       restFulfilled: 15
     });
+  });
+});
+
+describe("threadPlanMinutesByKind", () => {
+  it("uses future plan attributions and excludes fulfilled facts", () => {
+    expect(threadPlanMinutesByKind("2026-08-05T00:00:00.000Z", "2026-08-06T00:00:00.000Z", [
+      {
+        startAt: "2026-08-05T10:00:00.000Z",
+        endAt: "2026-08-05T10:30:00.000Z",
+        kind: "ideal",
+        title: "Afloat: Work 1",
+        source: "futurePlan",
+        sourceEventId: "work-1",
+        planEventId: "work-1",
+        threadGroup: "Afloat",
+        threadItem: "Work 1"
+      },
+      {
+        startAt: "2026-08-05T10:30:00.000Z",
+        endAt: "2026-08-05T11:00:00.000Z",
+        kind: "idealFulfilled",
+        title: "Afloat: Work 1",
+        source: "fact",
+        sourceEventId: "work-1",
+        planEventId: "work-1",
+        threadGroup: "Afloat",
+        threadItem: "Work 1"
+      }
+    ])).toEqual({ ideal: 30 });
   });
 });
