@@ -1,18 +1,19 @@
 import { DashboardData } from "@/server/services/dashboard-service";
 import { kindLabel, formatDuration, timelineTimeRange } from "../view-formatters";
 import { semanticTagColorClass } from "../semantic-colors";
-import { isThreadActivity, semanticThreadFillClass, threadActivityKeys } from "./thread-activity-style";
+import type { ThreadActivityAttribution } from "@/server/views/derived-view";
+import { isAttributedThreadActivity, semanticThreadFillClass } from "./thread-activity-style";
 
 export function Timeline({ 
   timeline, 
   timezone,
   startDate,
-  threads
+  attributions
 }: { 
   timeline: DashboardData["view"]["timeline"]; 
   timezone: string;
   startDate: string;
-  threads: DashboardData["view"]["threads"];
+  attributions: ThreadActivityAttribution[];
 }) {
   if (timeline.length === 0) {
     return (
@@ -21,8 +22,6 @@ export function Timeline({
       </div>
     );
   }
-
-  const threadKeys = threadActivityKeys(threads);
 
   return (
     <div className="flex flex-col font-mono text-sm max-h-[320px] overflow-y-auto brutal-scrollbar pr-2 mr-[-8px]">
@@ -44,7 +43,7 @@ export function Timeline({
             </div>
 
             <div className="flex items-start gap-3 md:contents">
-              <strong className={`shrink-0 px-1 text-center truncate border ${semanticTagColorClass(fact.kind)} ${semanticThreadFillClass(fact.kind, isThreadActivity(fact, threadKeys))}`}>{kindLabel(fact.kind)}</strong>
+              <strong className={`shrink-0 px-1 text-center truncate border ${semanticTagColorClass(fact.kind)} ${semanticThreadFillClass(fact.kind, isAttributedThreadActivity(fact, attributions))}`}>{kindLabel(fact.kind)}</strong>
               <span className="font-serif text-base leading-tight break-all md:break-normal">{fact.title}</span>
             </div>
 

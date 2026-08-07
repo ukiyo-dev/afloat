@@ -24,6 +24,8 @@ describe("projectRangeViewForNow", () => {
       internalFulfillmentRate: 0.5,
       fulfillmentRate: 0.5,
       maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
       fulfilledRuleCount: 0,
       factTotals: { idealFulfilled: 30 },
       planTotals: { ideal: 90 },
@@ -51,6 +53,8 @@ describe("projectRangeViewForNow", () => {
       internalFulfillmentRate: 0.5,
       fulfillmentRate: 0.5,
       maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
       factTotals: { idealFulfilled: 30 },
       protocolErrors: [],
       planTimeline: [
@@ -96,6 +100,8 @@ describe("projectRangeViewForNow", () => {
         internalFulfillmentRate: 0,
         fulfillmentRate: 0,
         maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
         factTotals: {},
         protocolErrors: [],
         planTimeline: [
@@ -175,6 +181,8 @@ describe("projectRangeViewForNow", () => {
         internalFulfillmentRate: 0.25,
         fulfillmentRate: 0.25,
         maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
         factTotals: {},
         protocolErrors: [],
         planTimeline: [
@@ -260,6 +268,8 @@ describe("projectRangeViewForNow", () => {
         internalFulfillmentRate: 1,
         fulfillmentRate: 1,
         maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
         factTotals: {},
         protocolErrors: [],
         planTimeline: [
@@ -333,6 +343,8 @@ describe("projectRangeViewForNow", () => {
         internalFulfillmentRate: 1,
         fulfillmentRate: 1,
         maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
         factTotals: {},
         protocolErrors: [],
         planTimeline: [
@@ -407,6 +419,8 @@ describe("projectRangeViewForNow", () => {
         internalFulfillmentRate: 1,
         fulfillmentRate: 1,
         maintenanceRate: 1,
+        recentDailyCapacity: 0,
+        threadActivityAttributions: [],
         fulfilledRuleCount: 0,
         factTotals: {},
         protocolErrors: [],

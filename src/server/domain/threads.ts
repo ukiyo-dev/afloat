@@ -8,9 +8,11 @@ import {
   minutesInRange
 } from "./time";
 import { isFulfilledKind } from "./semantic-kinds";
+import { deriveThreadStatus } from "./thread-status";
 import {
   compareActiveThreadSchedule,
   deadlineRank,
+  highestRiskStatus,
   statusRank,
   startRank,
   summarizeThreadGroup,
@@ -52,6 +54,8 @@ interface ThreadAccumulator {
     minutes: number;
     title: string;
     source: "fact" | "futurePlan";
+    sourceEventId?: string | null;
+    planEventId?: string | null;
     threadInstance?: number;
     activitySequence?: number;
   }>;
@@ -275,22 +279,20 @@ function addFutureRange(
     minutes,
     title: segment.title.rawTitle,
     source: "futurePlan",
+    sourceEventId: segment.eventId,
+    planEventId: segment.eventId,
     ...activityIdentity
   });
 }
 
-export function buildThreadGroupViews(
-  threads: ThreadView[],
-  now: Date,
-  timezone = "UTC"
-): ThreadGroupView[] {
+export function buildThreadGroupViews(threads: ThreadView[]): ThreadGroupView[] {
   const byGroup = new Map<string, ThreadView[]>();
   for (const thread of threads) {
     byGroup.set(thread.group, [...(byGroup.get(thread.group) ?? []), thread]);
   }
 
   return [...byGroup.entries()]
-    .map(([group, items]) => toThreadGroupView(group, items, now, timezone))
+    .map(([group, items]) => toThreadGroupView(group, items))
     .sort(compareThreadGroupViews);
 }
 
@@ -351,6 +353,8 @@ function addFactRange(
     minutes,
     title: fact.title.rawTitle,
     source: "fact",
+    sourceEventId: fact.sourceEventId,
+    planEventId: fact.coveredPlanEventId ?? fact.sourceEventId,
     ...activityIdentity
   });
 }
@@ -449,6 +453,8 @@ function toThreadView(
           minutes: entry.minutes,
           title: entry.title,
           source: entry.source,
+          sourceEventId: entry.sourceEventId,
+          planEventId: entry.planEventId,
           threadInstance: entry.threadInstance,
           activitySequence: entry.activitySequence
         }))
@@ -506,12 +512,12 @@ function toThreadView(
     planCoverageRate,
     dailyRequiredMinutes,
     remainingDays: daysLeft,
-    status: feasibilityStatus({
+    status: deriveThreadStatus({
       factGapMinutes,
       unscheduledGapMinutes,
       dailyRequiredMinutes,
       start,
-      deadline,
+      deadline: deadlineKey,
       now,
       timezone,
       recentDailyCapacity
@@ -532,7 +538,9 @@ function toThreadView(
         kind: entry.kind,
         minutes: entry.minutes,
         title: entry.title,
-        source: entry.source,
+          source: entry.source,
+          sourceEventId: entry.sourceEventId,
+          planEventId: entry.planEventId,
         threadInstance: entry.threadInstance,
         activitySequence: entry.activitySequence
       }))
@@ -583,72 +591,14 @@ function isRangeInOpenThreadWindow(
   return range.endAt > window.startAt;
 }
 
-function feasibilityStatus(input: {
-  factGapMinutes: number | null;
-  unscheduledGapMinutes: number | null;
-  dailyRequiredMinutes: number | null;
-  start: string | null;
-  deadline: Date | null;
-  now: Date;
-  timezone: string;
-  recentDailyCapacity: number;
-}): FeasibilityStatus {
-  if (input.start && localDayKey(input.now, input.timezone) < input.start) {
-    return "upcoming";
-  }
-  if (input.factGapMinutes === null || input.unscheduledGapMinutes === null) {
-    return "untracked";
-  }
-  if (input.factGapMinutes === 0) {
-    return "scheduled";
-  }
-  if (input.deadline && isPastDeadlineDate(input.deadline, input.now, input.timezone)) {
-    return "expired";
-  }
-  if (input.unscheduledGapMinutes === 0) {
-    return "scheduled";
-  }
-  if (
-    input.dailyRequiredMinutes !== null &&
-    input.recentDailyCapacity > 0 &&
-    input.dailyRequiredMinutes > input.recentDailyCapacity
-  ) {
-    return "imbalanced";
-  }
-  if (
-    input.dailyRequiredMinutes !== null &&
-    input.recentDailyCapacity > 0 &&
-    input.dailyRequiredMinutes > input.recentDailyCapacity * 0.7
-  ) {
-    return "tightPace";
-  }
-  return "needsScheduling";
-}
-
-function isPastDeadlineDate(deadline: Date, now: Date, timezone: string): boolean {
-  return dayKey(deadline) < localDayKey(now, timezone);
-}
-
 function toThreadGroupView(
   group: string,
-  items: ThreadView[],
-  now: Date,
-  timezone: string
+  items: ThreadView[]
 ): ThreadGroupView {
   const summary = summarizeThreadGroup(items);
   const { commitmentItems } = summary;
   const { start, deadline } = summary;
-  const deadlineDate = deadline ? new Date(`${deadline}T00:00:00.000Z`) : null;
-  const computedStatus = feasibilityStatus({
-    factGapMinutes: summary.factGapMinutes,
-    unscheduledGapMinutes: summary.unscheduledGapMinutes,
-    dailyRequiredMinutes: summary.dailyRequiredMinutes,
-    start,
-    deadline: deadlineDate,
-    now,
-    timezone,
-    recentDailyCapacity: 0
-  });
+  const computedStatus = highestRiskStatus(commitmentItems.map((item) => item.status));
 
   return {
     key: encodeURIComponent(group),
@@ -665,11 +615,11 @@ function toThreadGroupView(
     planCoverageRate: summary.planCoverageRate,
     dailyRequiredMinutes: summary.dailyRequiredMinutes,
     status: computedStatus === "fulfilled" && !summary.allItemsInactive ? "untracked" : computedStatus,
-    items: [...items].sort((a, b) => statusRank(a.status) - statusRank(b.status))
+    items: [...items].sort(compareActiveThreadSchedule)
   };
 }
 
-function recentFulfilledDailyCapacity(facts: FactSegment[], now: Date): number {
+export function recentFulfilledDailyCapacity(facts: FactSegment[], now: Date): number {
   const startAt = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const fulfilled = facts
     .filter(

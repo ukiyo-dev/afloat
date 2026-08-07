@@ -1,16 +1,18 @@
-import type { DashboardData } from "@/server/services/dashboard-service";
-import { isPlanActivityKind } from "@/server/domain/semantic-kinds";
-import { threadIdentityKey } from "@/server/domain/thread-summary";
+import type { ThreadActivityAttribution } from "@/server/views/derived-view";
+import { threadAttributionMinutes } from "@/server/domain/thread-attribution";
 
-type Activity = { group: string; item: string; kind: string };
-type Thread = DashboardData["view"]["threads"][number];
+type Activity = {
+  startAt: string;
+  endAt: string;
+  sourceEventId?: string | null;
+  planEventId?: string | null;
+};
 
-export function threadActivityKeys(threads: Thread[]): Set<string> {
-  return new Set(threads.map((thread) => threadIdentityKey(thread.group, thread.item)));
-}
-
-export function isThreadActivity(activity: Activity, keys: Set<string>): boolean {
-  return isPlanActivityKind(activity.kind) && keys.has(threadIdentityKey(activity.group, activity.item));
+export function isAttributedThreadActivity(
+  activity: Activity,
+  attributions: ThreadActivityAttribution[]
+): boolean {
+  return threadAttributionMinutes(activity, attributions) > 0;
 }
 
 export function semanticThreadFillClass(kind: string, belongsToThread: boolean): string {

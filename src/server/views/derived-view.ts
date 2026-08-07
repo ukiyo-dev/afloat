@@ -1,7 +1,7 @@
 import { parseCalendarEvents } from "@/server/domain/calendar";
 import { buildFactLayer, commitmentStats, totalMinutesByKind } from "@/server/domain/facts";
 import { maintenanceRate } from "@/server/domain/maintenance";
-import { buildThreadGroupViews, buildThreadViews } from "@/server/domain/threads";
+import { buildThreadGroupViews, buildThreadViews, recentFulfilledDailyCapacity } from "@/server/domain/threads";
 import { localDayKey, minutesInRange } from "@/server/domain/time";
 import type {
   CalendarSource,
@@ -33,6 +33,7 @@ export interface PrivateDerivedView {
   internalFulfillmentRate: number | null;
   fulfillmentRate: number | null;
   maintenanceRate: number;
+  recentDailyCapacity: number;
   maintenanceTimeline?: Array<SerializedMaintenanceSegment>;
   factTotals: Record<string, number>;
   protocolErrors: Array<SerializedProtocolError>;
@@ -40,7 +41,20 @@ export interface PrivateDerivedView {
   timeline: Array<SerializedFactSegment>;
   threadGroups: ThreadGroupView[];
   threads: ThreadView[];
+  threadActivityAttributions: ThreadActivityAttribution[];
   notes: Note[];
+}
+
+export interface ThreadActivityAttribution {
+  startAt: string;
+  endAt: string;
+  source: "fact" | "futurePlan";
+  kind: string;
+  title: string;
+  sourceEventId: string | null;
+  planEventId: string | null;
+  threadGroup: string;
+  threadItem: string;
 }
 
 export interface DerivedViews {
@@ -55,6 +69,8 @@ interface SerializedFactSegment {
   title: string;
   group: string;
   item: string;
+  sourceEventId?: string;
+  planEventId?: string | null;
 }
 
 interface SerializedPlanSegment {
@@ -65,6 +81,8 @@ interface SerializedPlanSegment {
   title: string;
   group: string;
   item: string;
+  sourceEventId?: string;
+  planEventId?: string | null;
 }
 
 interface SerializedMaintenanceSegment {
@@ -94,7 +112,21 @@ export function buildDerivedViews(input: DerivedViewInput): DerivedViews {
     now: input.now,
     timezone: input.timezone ?? "UTC"
   });
-  const threadGroups = buildThreadGroupViews(threads, input.now, input.timezone ?? "UTC");
+  const threadGroups = buildThreadGroupViews(threads);
+  const threadActivityAttributions = threads.flatMap((thread) =>
+    thread.history.map((entry) => ({
+      startAt: entry.startAt,
+      endAt: entry.endAt,
+      source: entry.source,
+      kind: entry.kind,
+      title: entry.title,
+      sourceEventId: entry.sourceEventId ?? null,
+      planEventId: entry.planEventId ?? null,
+      threadGroup: thread.group,
+      threadItem: thread.item
+    }))
+  );
+  const recentDailyCapacity = recentFulfilledDailyCapacity(factLayer.facts, input.now);
   const observedSemantics = input.calendarSources.map((source) => source.semantic);
 
   return {
@@ -107,6 +139,7 @@ export function buildDerivedViews(input: DerivedViewInput): DerivedViews {
       internalFulfillmentRate: stats.internalFulfillmentRate,
       fulfillmentRate: stats.fulfillmentRate,
       maintenanceRate: maintenanceRate(parsedEvents, input.now, 30, input.timezone ?? "UTC"),
+      recentDailyCapacity,
       maintenanceTimeline: parsedEvents.map(serializeMaintenanceSegment),
       factTotals: totalMinutesByKind(factLayer.facts),
       protocolErrors: factLayer.errors.map((error) => serializeError(error, input.timezone ?? "UTC")),
@@ -114,6 +147,7 @@ export function buildDerivedViews(input: DerivedViewInput): DerivedViews {
       timeline: factLayer.facts.map(serializeFact),
       threadGroups,
       threads,
+      threadActivityAttributions,
       notes: [...input.notes].sort((a, b) => b.date.localeCompare(a.date))
     }
   };
@@ -136,6 +170,8 @@ function serializePlan(plan: TimeSegment): SerializedPlanSegment {
     title: plan.title.rawTitle,
     group: plan.title.group,
     item: plan.title.item
+    ,sourceEventId: plan.eventId,
+    planEventId: plan.eventId
   };
 }
 
@@ -148,6 +184,8 @@ function serializeFact(fact: FactSegment): SerializedFactSegment {
     title: fact.title.rawTitle,
     group: fact.title.group,
     item: fact.title.item
+    ,sourceEventId: fact.sourceEventId,
+    planEventId: fact.coveredPlanEventId ?? fact.sourceEventId
   };
 }
 

@@ -1,41 +1,5 @@
 import { addDateKeyDays, inclusiveCalendarDays, localDayKey } from "@/server/domain/time";
-import {
-  compareActiveThreadSchedule,
-  highestRiskStatus,
-  summarizeThreadGroup
-} from "@/server/domain/thread-summary";
 import { DashboardData } from "@/server/services/dashboard-service";
-
-export function groupThreads(threads: DashboardData["view"]["threads"]): DashboardData["view"]["threadGroups"] {
-  const byGroup = new Map<string, DashboardData["view"]["threads"]>();
-  for (const thread of threads) {
-    byGroup.set(thread.group, [...(byGroup.get(thread.group) ?? []), thread]);
-  }
-
-  return [...byGroup.entries()].map(([group, items]) => {
-    const summary = summarizeThreadGroup(items);
-    const computedStatus = highestRiskStatus(summary.commitmentItems.map((item) => item.status));
-
-    return {
-      key: encodeURIComponent(group),
-      group,
-      expectedMinutes: summary.expectedMinutes,
-      start: summary.start,
-      deadline: summary.deadline,
-      fulfilledMinutes: summary.fulfilledMinutes,
-      futureMinutes: summary.futureMinutes,
-      externalShiftMinutes: summary.externalShiftMinutes,
-      internalShiftMinutes: summary.internalShiftMinutes,
-      factGapMinutes: summary.factGapMinutes,
-      unscheduledGapMinutes: summary.unscheduledGapMinutes,
-      planCoverageRate: summary.planCoverageRate,
-      // Group-level daily pacing was intentionally omitted from this client view.
-      dailyRequiredMinutes: null,
-      status: computedStatus === "fulfilled" && !summary.allItemsInactive ? "untracked" : computedStatus,
-      items: [...items].sort(compareActiveThreadSchedule)
-    };
-  }).sort(compareActiveThreadSchedule);
-}
 
 export function syncKindLabel(kind: string) {
   const labels: Record<string, string> = {

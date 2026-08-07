@@ -1,8 +1,47 @@
 import { describe, expect, it } from "vitest";
 
-import { projectThreadGroupsForNow, projectThreadsForNow } from "./thread-now-projection";
+import { projectThreadDerivedViewForNow, projectThreadsForNow } from "./thread-projection";
 
 describe("projectThreadsForNow", () => {
+  it("matches direct derived values when a future plan crosses runtime now", () => {
+    const thread = {
+      key: "afloat-sync",
+      group: "Afloat",
+      item: "Sync",
+      source: "auto" as const,
+      fulfilledMinutes: 0,
+      futureMinutes: 60,
+      externalShiftMinutes: 0,
+      internalShiftMinutes: 0,
+      expectedMinutes: 60,
+      deadline: null,
+      factGapMinutes: 60,
+      unscheduledGapMinutes: 0,
+      planCoverageRate: 1,
+      dailyRequiredMinutes: null,
+      status: "scheduled" as const,
+      canDelete: false,
+      closed: false,
+      sequences: [1],
+      history: [{
+        startAt: "2026-07-05T10:00:00.000Z",
+        endAt: "2026-07-05T11:00:00.000Z",
+        kind: "ideal" as const,
+        minutes: 60,
+        title: "Afloat: Sync 1",
+        source: "futurePlan" as const
+      }]
+    };
+    const projected = projectThreadDerivedViewForNow(
+      [thread],
+      "2026-07-05T11:00:00.000Z",
+      "UTC",
+      "2026-07-05T09:00:00.000Z"
+    );
+    expect(projected.threads[0]?.fulfilledMinutes).toBe(60);
+    expect(projected.threads[0]?.futureMinutes).toBe(0);
+    expect(projected.threadActivityAttributions[0]).toMatchObject({ source: "fact", threadItem: "Sync" });
+  });
   it("does not apply the attention threshold before Start and activates on the Start date", () => {
     const thread = {
       key: "future",
@@ -208,7 +247,7 @@ describe("projectThreadsForNow", () => {
   });
 
   it("projects group totals from projected thread values", () => {
-    const [group] = projectThreadGroupsForNow(
+    const [group] = projectThreadDerivedViewForNow(
       [
         {
           key: "afloat-sync",
@@ -244,12 +283,49 @@ describe("projectThreadsForNow", () => {
       "2026-07-05T11:00:00.000Z",
       "UTC",
       "2026-07-05T10:00:00.000Z"
-    );
+    ).threadGroups;
 
     expect(group?.fulfilledMinutes).toBe(60);
     expect(group?.futureMinutes).toBe(0);
     expect(group?.factGapMinutes).toBe(0);
     expect(group?.status).toBe("scheduled");
+  });
+
+  it("uses the shared recent capacity when projecting pace risk", () => {
+    const result = projectThreadDerivedViewForNow(
+      [{
+        key: "paced",
+        group: "Afloat",
+        item: "Paced",
+        activityState: "active",
+        source: "declared",
+        fulfilledMinutes: 0,
+        futureMinutes: 0,
+        externalShiftMinutes: 0,
+        internalShiftMinutes: 0,
+        expectedMinutes: 80,
+        start: "2026-07-05",
+        deadline: "2026-07-05",
+        lastActivityAt: "2026-07-05T00:00:00.000Z",
+        factGapMinutes: 80,
+        unscheduledGapMinutes: 80,
+        planCoverageRate: 0,
+        dailyRequiredMinutes: 80,
+        status: "needsScheduling",
+        canDelete: false,
+        closed: false,
+        sequences: [],
+        history: []
+      }],
+      "2026-07-05T12:00:00.000Z",
+      "UTC",
+      "2026-07-05T12:00:00.000Z",
+      7,
+      100
+    );
+
+    expect(result.threads[0]?.status).toBe("tightPace");
+    expect(result.threadGroups[0]?.status).toBe("tightPace");
   });
 
   it("merges client-projected done with the existing server done for the same title", () => {

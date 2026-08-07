@@ -148,6 +148,8 @@ export interface ThreadHistoryEntry {
   minutes: number;
   title: string;
   source: "fact" | "futurePlan";
+  sourceEventId?: string | null;
+  planEventId?: string | null;
   threadInstance?: number;
   activitySequence?: number;
 }

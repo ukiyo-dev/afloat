@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectThreadsForNow } from "./thread-now-projection";
+import { projectThreadsForNow } from "@/server/domain/thread-projection";
 import {
   apportionDisplayMinutes,
   buildThreadLoadSegments,

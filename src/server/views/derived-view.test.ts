@@ -44,6 +44,28 @@ describe("buildDerivedViews", () => {
 
     expect(views.private.protocolErrors[0]?.date).toBe("2026-05-08");
   });
+
+  it("publishes derived --- activity attributions for Overview consumers", () => {
+    const views = buildDerivedViews({
+      ...sampleInput(),
+      threadDeclarations: [{
+        id: "formal",
+        group: "Afloat",
+        item: "Formal",
+        createdAt: new Date("2026-05-01T00:00:00.000Z")
+      }]
+    });
+
+    expect(views.private.threadActivityAttributions).toContainEqual(
+      expect.objectContaining({
+        source: "fact",
+        title: "Afloat：镜像",
+        threadGroup: "Afloat",
+        threadItem: "---"
+      })
+    );
+    expect(views.private.recentDailyCapacity).toBeGreaterThan(0);
+  });
 });
 
 function sampleInput(): DerivedViewInput {

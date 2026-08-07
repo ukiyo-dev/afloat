@@ -1,4 +1,5 @@
 import type { DashboardData } from "@/server/services/dashboard-service";
+import type { ThreadActivityAttribution } from "@/server/views/derived-view";
 import { clippedMinutes } from "@/server/domain/commitment-stats";
 import {
   addLocalDays,
@@ -8,7 +9,7 @@ import {
 } from "@/server/domain/time";
 import type { LocalDate } from "@/server/domain/time";
 import type { DateRange } from "@/server/domain/types";
-import { isThreadActivity, threadActivityKeys } from "./thread-activity-style";
+import { threadAttributionMinutes } from "@/server/domain/thread-attribution";
 
 type TimelineFact = DashboardData["view"]["timeline"][number];
 type PlanEntry = DashboardData["view"]["planTimeline"][number];
@@ -58,7 +59,7 @@ export function buildMacroDistributionDays({
   timezone,
   startDate,
   endDate,
-  threads = []
+  attributions
 }: {
   timeline: DashboardData["view"]["timeline"];
   planTimeline?: DashboardData["view"]["planTimeline"];
@@ -66,7 +67,7 @@ export function buildMacroDistributionDays({
   timezone: string;
   startDate: string;
   endDate: string;
-  threads?: DashboardData["view"]["threads"];
+  attributions: ThreadActivityAttribution[];
 }): MacroDistributionDay[] {
   const days = buildDays(startDate, endDate);
   const dayRanges = days.map((day) => {
@@ -84,11 +85,9 @@ export function buildMacroDistributionDays({
 
   const nowAt = now ? new Date(now) : null;
   const validNow = nowAt && Number.isFinite(nowAt.getTime()) ? nowAt : null;
-  const threadKeys = threadActivityKeys(threads);
-
-  addSegments(timeline, validNow ? { endAt: validNow } : {}, dayRanges, threadKeys);
+  addSegments(timeline, validNow ? { endAt: validNow } : {}, dayRanges, attributions);
   if (validNow) {
-    addSegments(planTimeline, { startAt: validNow }, dayRanges, threadKeys);
+    addSegments(planTimeline, { startAt: validNow }, dayRanges, attributions);
   }
 
   return days;
@@ -98,7 +97,7 @@ function addSegments(
   segments: Array<TimelineFact | PlanEntry>,
   boundary: { startAt?: Date; endAt?: Date },
   dayRanges: Array<{ day: MacroDistributionDay; range: DateRange }>,
-  threadKeys: Set<string>
+  attributions: ThreadActivityAttribution[]
 ) {
   for (const segment of segments) {
     const segmentRange = {
@@ -124,8 +123,15 @@ function addSegments(
 
       day.total += minutes;
       day.kinds[segment.kind] = (day.kinds[segment.kind] ?? 0) + minutes;
-      if (isThreadActivity(segment, threadKeys)) {
-        day.threadKinds[segment.kind] = (day.threadKinds[segment.kind] ?? 0) + minutes;
+      const clippedStart = new Date(Math.max(segmentRange.startAt.getTime(), range.startAt.getTime()));
+      const clippedEnd = new Date(Math.min(segmentRange.endAt.getTime(), range.endAt.getTime()));
+      const threadMinutes = threadAttributionMinutes({
+        ...segment,
+        startAt: clippedStart.toISOString(),
+        endAt: clippedEnd.toISOString()
+      }, attributions);
+      if (threadMinutes > 0) {
+        day.threadKinds[segment.kind] = (day.threadKinds[segment.kind] ?? 0) + threadMinutes;
       }
     }
   }

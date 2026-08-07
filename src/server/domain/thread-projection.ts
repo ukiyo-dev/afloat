@@ -1,6 +1,5 @@
-import type { DashboardData } from "@/server/services/dashboard-service";
+import type { ThreadView } from "@/server/domain/types";
 import {
-  calendarDayDifference,
   inclusiveCalendarDays,
   localDayKey,
   minutesBetween
@@ -10,10 +9,12 @@ import {
   isFulfilledKind,
   isPlanKind
 } from "@/server/domain/semantic-kinds";
+import { deriveThreadActivityState, deriveThreadStatus } from "@/server/domain/thread-status";
+import type { ThreadActivityAttribution } from "@/server/views/derived-view";
 
-import { groupThreads } from "./utils";
+import { buildThreadGroupViews } from "@/server/domain/threads";
 
-type Thread = DashboardData["view"]["threads"][number];
+type Thread = ThreadView;
 type ThreadHistoryEntry = Thread["history"][number];
 type HistoryProjection = {
   entries: ThreadHistoryEntry[];
@@ -29,12 +30,13 @@ type ElapsedTotals = {
 
 const MS_PER_MINUTE = 60_000;
 export function projectThreadsForNow(
-  threads: DashboardData["view"]["threads"],
+  threads: ThreadView[],
   runtimeNowIso: string,
   timezone: string,
   baseNowIso: string,
-  staleDays = 7
-): DashboardData["view"]["threads"] {
+  staleDays = 7,
+  recentDailyCapacity = 0
+): ThreadView[] {
   const baseNow = new Date(baseNowIso);
   const runtimeNow = new Date(runtimeNowIso);
   if (Number.isNaN(baseNow.getTime()) || Number.isNaN(runtimeNow.getTime())) {
@@ -43,21 +45,54 @@ export function projectThreadsForNow(
 
   const minuteRuntimeNow = floorToMinute(runtimeNow);
   const projectionNow = minuteRuntimeNow > baseNow ? minuteRuntimeNow : baseNow;
-  return threads.map((thread) => projectThreadForNow(thread, baseNow, projectionNow, timezone, staleDays));
+  return threads.map((thread) => projectThreadForNow(
+    thread,
+    baseNow,
+    projectionNow,
+    timezone,
+    staleDays,
+    recentDailyCapacity
+  ));
 }
 
 function floorToMinute(value: Date): Date {
   return new Date(Math.floor(value.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
 }
 
-export function projectThreadGroupsForNow(
-  threads: DashboardData["view"]["threads"],
+export function projectThreadDerivedViewForNow(
+  threads: ThreadView[],
   runtimeNowIso: string,
   timezone: string,
   baseNowIso: string,
-  staleDays = 7
+  staleDays = 7,
+  recentDailyCapacity = 0
 ) {
-  return groupThreads(projectThreadsForNow(threads, runtimeNowIso, timezone, baseNowIso, staleDays));
+  const projectedThreads = projectThreadsForNow(
+    threads,
+    runtimeNowIso,
+    timezone,
+    baseNowIso,
+    staleDays,
+    recentDailyCapacity
+  );
+  const threadActivityAttributions: ThreadActivityAttribution[] = projectedThreads.flatMap((thread) =>
+    thread.history.map((entry) => ({
+      startAt: entry.startAt,
+      endAt: entry.endAt,
+      source: entry.source,
+      sourceEventId: entry.sourceEventId ?? null,
+      planEventId: entry.planEventId ?? null,
+      kind: entry.kind,
+      title: entry.title,
+      threadGroup: thread.group,
+      threadItem: thread.item
+    }))
+  );
+  return {
+    threads: projectedThreads,
+    threadGroups: buildThreadGroupViews(projectedThreads),
+    threadActivityAttributions
+  };
 }
 
 function projectThreadForNow(
@@ -65,7 +100,8 @@ function projectThreadForNow(
   baseNow: Date,
   runtimeNow: Date,
   timezone: string,
-  staleDays: number
+  staleDays: number,
+  recentDailyCapacity: number
 ): Thread {
   const elapsed: ElapsedTotals = {
     fulfilledMinutes: 0,
@@ -115,14 +151,14 @@ function projectThreadForNow(
     : null;
   const sortedHistory = history.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
   const lastActivityAt = latestFactActivityAt(sortedHistory) ?? thread.lastActivityAt ?? null;
-  const activityState = projectedActivityState(
-    thread.activityState ?? "active",
+  const activityState = deriveThreadActivityState({
+    current: thread.activityState ?? "active",
     lastActivityAt,
-    thread.deadline,
-    runtimeNow,
+    deadline: thread.deadline,
+    now: runtimeNow,
     timezone,
     staleDays
-  );
+  });
 
   return {
     ...thread,
@@ -135,7 +171,7 @@ function projectThreadForNow(
     planCoverageRate,
     dailyRequiredMinutes,
     remainingDays,
-    status: projectedStatus({
+    status: deriveThreadStatus({
       previousStatus: thread.status,
       activityState,
       factGapMinutes,
@@ -144,9 +180,10 @@ function projectThreadForNow(
       start: thread.start ?? localDayKey(runtimeNow, timezone),
       deadline: thread.deadline,
       lastActivityAt,
-      runtimeNow,
+      now: runtimeNow,
       timezone,
-      staleDays
+      staleDays,
+      recentDailyCapacity
     }),
     activityState,
     closed: activityState === "inactive",
@@ -292,90 +329,9 @@ function dailyRequired(
   return daysLeft > 0 ? unscheduledGapMinutes / daysLeft : null;
 }
 
-function projectedStatus(input: {
-  previousStatus: Thread["status"];
-  activityState: Thread["activityState"];
-  factGapMinutes: number | null;
-  unscheduledGapMinutes: number | null;
-  dailyRequiredMinutes: number | null;
-  start: string;
-  deadline: string | null;
-  lastActivityAt: string | null;
-  runtimeNow: Date;
-  timezone: string;
-  staleDays: number;
-}): Thread["status"] {
-  if (input.activityState === "inactive") return "untracked";
-  if (localDayKey(input.runtimeNow, input.timezone) < input.start) {
-    return "upcoming";
-  }
-  if (
-    input.deadline &&
-    input.factGapMinutes !== null &&
-    input.factGapMinutes > 0 &&
-    input.deadline < localDayKey(input.runtimeNow, input.timezone)
-  ) {
-    return "expired";
-  }
-  if (
-    input.activityState === "active" &&
-    input.deadline !== null &&
-    isStale(
-      input.lastActivityAt
-        ? localDayKey(new Date(input.lastActivityAt), input.timezone)
-        : input.start,
-      input.runtimeNow,
-      input.timezone,
-      input.staleDays
-    )
-  ) {
-    return "stale";
-  }
-  if (input.factGapMinutes === null || input.unscheduledGapMinutes === null) {
-    return "untracked";
-  }
-  if (input.factGapMinutes === 0 || input.unscheduledGapMinutes === 0) {
-    return "scheduled";
-  }
-  return input.previousStatus === "imbalanced" || input.previousStatus === "tightPace"
-    ? input.previousStatus
-    : "needsScheduling";
-}
-
-function projectedActivityState(
-  current: Thread["activityState"],
-  lastActivityAt: string | null,
-  deadline: string | null,
-  runtimeNow: Date,
-  timezone: string,
-  staleDays: number
-): Thread["activityState"] {
-  if (current === "untracked" || !lastActivityAt || staleDays < 1) return current;
-  const lastActivityDay = localDayKey(new Date(lastActivityAt), timezone);
-  const referenceDay = deadline && deadline > lastActivityDay ? deadline : lastActivityDay;
-  return calendarDayDifference(referenceDay, localDayKey(runtimeNow, timezone)) > staleDays
-    ? "inactive"
-    : "active";
-}
-
 function latestFactActivityAt(history: ThreadHistoryEntry[]): string | null {
   return history
     .filter((entry) => entry.source === "fact")
     .map((entry) => entry.endAt)
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
-}
-
-function isStale(
-  referenceDay: string | null,
-  runtimeNow: Date,
-  timezone: string,
-  staleDays: number
-): boolean {
-  if (!referenceDay || !Number.isFinite(staleDays) || staleDays < 1) {
-    return false;
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(referenceDay)) {
-    return false;
-  }
-  return calendarDayDifference(referenceDay, localDayKey(runtimeNow, timezone)) >= staleDays;
 }

@@ -17,7 +17,8 @@ describe("buildMacroDistributionDays", () => {
       ],
       timezone: "Asia/Shanghai",
       startDate: "2026-05-06",
-      endDate: "2026-05-07"
+      endDate: "2026-05-07",
+      attributions: []
     });
 
     expect(days.map((day) => [day.date, day.total])).toEqual([
@@ -39,7 +40,8 @@ describe("buildMacroDistributionDays", () => {
       ],
       timezone: "UTC",
       startDate: "2026-05-07",
-      endDate: "2026-05-07"
+      endDate: "2026-05-07",
+      attributions: []
     });
 
     expect(days).toHaveLength(1);
@@ -67,11 +69,80 @@ describe("buildMacroDistributionDays", () => {
       timezone: "UTC",
       startDate: "2026-05-07",
       endDate: "2026-05-07"
+      ,attributions: []
     });
 
     expect(days[0]?.total).toBe(240);
     expect(days[0]?.kinds.idealFulfilled).toBe(120);
     expect(days[0]?.kinds.ideal).toBe(120);
+  });
+
+  it("counts an original activity attributed to the derived --- Item as Thread time", () => {
+    const activity = {
+      ...fact({
+        startAt: "2026-05-07T10:00:00.000Z",
+        endAt: "2026-05-07T11:00:00.000Z",
+        kind: "idealFulfilled"
+      }),
+      title: "Writing:Research",
+      group: "Writing",
+      item: "Research",
+      sourceEventId: "research",
+      planEventId: "research"
+    };
+    const days = buildMacroDistributionDays({
+      timeline: [activity],
+      timezone: "UTC",
+      startDate: "2026-05-07",
+      endDate: "2026-05-07",
+      attributions: [{
+          startAt: activity.startAt,
+          endAt: activity.endAt,
+          sourceEventId: activity.sourceEventId,
+          planEventId: activity.planEventId,
+          kind: activity.kind,
+          title: activity.title,
+          source: "fact",
+          threadGroup: "Writing",
+          threadItem: "---"
+      }]
+    });
+
+    expect(days[0]?.threadKinds.idealFulfilled).toBe(60);
+    expect(filterMacroDistributionDay(days[0]!, null, new Set(["non"])).total).toBe(0);
+  });
+
+  it("counts only the attributed part of an activity as Thread time", () => {
+    const activity = {
+      ...fact({
+        startAt: "2026-05-07T10:00:00.000Z",
+        endAt: "2026-05-07T11:00:00.000Z",
+        kind: "idealFulfilled"
+      }),
+      sourceEventId: "partial",
+      planEventId: "partial"
+    };
+    const days = buildMacroDistributionDays({
+      timeline: [activity],
+      timezone: "UTC",
+      startDate: "2026-05-07",
+      endDate: "2026-05-07",
+      attributions: [{
+        startAt: "2026-05-07T10:15:00.000Z",
+        endAt: "2026-05-07T10:45:00.000Z",
+        sourceEventId: "partial",
+        planEventId: "partial",
+        kind: activity.kind,
+        title: activity.title,
+        source: "fact",
+        threadGroup: "Writing",
+        threadItem: "---"
+      }]
+    });
+
+    expect(days[0]?.total).toBe(60);
+    expect(days[0]?.threadKinds.idealFulfilled).toBe(30);
+    expect(filterMacroDistributionDay(days[0]!, null, new Set(["non"])).total).toBe(30);
   });
 });
 

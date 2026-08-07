@@ -30,13 +30,12 @@ import { MacroDistribution } from "./dashboard/macro-distribution";
 
 import { Metric } from "./dashboard/metric-card";
 import { 
-  groupThreads,
   protocolErrorLabel, 
   todayKey, 
   shiftedRangeParams,
   syncStatusLabel
 } from "./dashboard/utils";
-import { projectThreadsForNow } from "./dashboard/thread-now-projection";
+import { projectThreadDerivedViewForNow } from "@/server/domain/thread-projection";
 import { projectRangeViewForNow } from "./dashboard/range-now-projection";
 import { runRecentSyncAction, runRecalibrateAction, recomputeViewsAction } from "@/app/dashboard/actions";
 import { SubmitButton } from "./submit-button";
@@ -196,21 +195,21 @@ export function DashboardWorkbench({
     projectedRangeView.fulfillmentRate === null ? undefined : percent(projectedRangeView.fulfillmentRate);
   const fulfillmentSecondaryValue =
     fulfillmentValue && fulfillmentValue !== internalFulfillmentValue ? fulfillmentValue : undefined;
-  const projectedThreads = useMemo(
+  const projectedThreadView = useMemo(
     () =>
-      projectThreadsForNow(
+      projectThreadDerivedViewForNow(
         view.threads,
         runtimeNow,
         rangeView.timezone,
         view.generatedAt,
-        settings.threadStaleDays
+        settings.threadStaleDays,
+        view.recentDailyCapacity
       ),
-    [rangeView.timezone, runtimeNow, settings.threadStaleDays, view.generatedAt, view.threads]
+    [rangeView.timezone, runtimeNow, settings.threadStaleDays, view.generatedAt, view.recentDailyCapacity, view.threads]
   );
-  const threadGroups = useMemo(
-    () => groupThreads(projectedThreads),
-    [projectedThreads]
-  );
+  const projectedThreads = projectedThreadView.threads;
+  const threadGroups = projectedThreadView.threadGroups;
+  const threadActivityAttributions = projectedThreadView.threadActivityAttributions;
   const projectedView = useMemo(
     () => ({
       ...view,
@@ -527,7 +526,7 @@ export function DashboardWorkbench({
                       endDate={rangeView.endAt}
                       now={runtimeNow}
                       visitorMode={visitorMode}
-                      threads={projectedThreads}
+                      attributions={threadActivityAttributions}
                       planTimeline={view.planTimeline}
                     />
                   ) : !isUltraMacro ? (
@@ -538,7 +537,7 @@ export function DashboardWorkbench({
                       timezone={rangeView.timezone}
                       startDate={rangeView.startDate}
                       endDate={rangeView.endDate}
-                      threads={projectedThreads}
+                      attributions={threadActivityAttributions}
                     />
                   ) : null}
 
@@ -549,7 +548,7 @@ export function DashboardWorkbench({
                       planTotals={projectedRangeView.planTotals}
                       shiftComposition={projectedRangeView.shiftComposition}
                       activePlanDays={projectedRangeView.observedPlannedDays}
-                      threads={projectedThreads}
+                      attributions={threadActivityAttributions}
                       rangeStartAt={projectedRangeView.startAt}
                       rangeEndAt={projectedRangeView.endAt}
                     />
@@ -574,7 +573,7 @@ export function DashboardWorkbench({
                     timeline={rangeView.timeline}
                     timezone={rangeView.timezone}
                     startDate={rangeView.startDate}
-                    threads={projectedThreads}
+                    attributions={threadActivityAttributions}
                   />
                 </section>
               )}

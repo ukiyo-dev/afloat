@@ -293,6 +293,8 @@ function samplePrivateView(): PrivateDerivedView {
     internalFulfillmentRate: 1,
     fulfillmentRate: 0.5,
     maintenanceRate: 1,
+    recentDailyCapacity: 0,
+    threadActivityAttributions: [],
     factTotals: {},
     protocolErrors: [
       {

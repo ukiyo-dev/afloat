@@ -1,14 +1,13 @@
 import { formatDuration } from "../view-formatters";
 import { intersection, minutesInRange } from "@/server/domain/time";
 import type { DashboardData } from "@/server/services/dashboard-service";
+import type { ThreadActivityAttribution } from "@/server/views/derived-view";
 import { semanticThreadFillClass } from "./thread-activity-style";
 
-type ThreadHistory = DashboardData["view"]["threads"][number]["history"];
-
 export function threadFactMinutesByKind(
-  threads: Array<{ history: ThreadHistory }>,
   rangeStartAt: string,
-  rangeEndAt: string
+  rangeEndAt: string,
+  attributions: ThreadActivityAttribution[]
 ): Record<string, number> {
   const rangeStartMs = new Date(rangeStartAt).getTime();
   const rangeEndMs = new Date(rangeEndAt).getTime();
@@ -18,7 +17,7 @@ export function threadFactMinutesByKind(
   }
 
   const range = { startAt: new Date(rangeStartAt), endAt: new Date(rangeEndAt) };
-  return threads.flatMap((thread) => thread.history).reduce<Record<string, number>>((totals, entry) => {
+  return attributions.reduce<Record<string, number>>((totals, entry) => {
     if (entry.source !== "fact") return totals;
     const entryRange = { startAt: new Date(entry.startAt), endAt: new Date(entry.endAt) };
     const overlap = intersection(entryRange, range);
@@ -32,7 +31,7 @@ export function FactDistribution({
   planTotals, 
   shiftComposition,
   activePlanDays,
-  threads,
+  attributions,
   rangeStartAt,
   rangeEndAt
 }: { 
@@ -40,7 +39,7 @@ export function FactDistribution({
   planTotals: Record<string, number>;
   shiftComposition?: Record<string, { internal: number; external: number }>;
   activePlanDays: number;
-  threads: DashboardData["view"]["threads"];
+  attributions: ThreadActivityAttribution[];
   rangeStartAt: string;
   rangeEndAt: string;
 }) {
@@ -54,7 +53,7 @@ export function FactDistribution({
     rest: { internal: 0, external: 0 },
     unmapped: { internal: 0, external: 0 }
   };
-  const threadMinutesByKind = threadFactMinutesByKind(threads, rangeStartAt, rangeEndAt);
+  const threadMinutesByKind = threadFactMinutesByKind(rangeStartAt, rangeEndAt, attributions);
 
   // Work, Leisure, Rest: show fulfilled + intShift + extShift inside the plan!
   const coreStats = [

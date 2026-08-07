@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { DashboardData } from "../../server/services/dashboard-service";
+import type { ThreadActivityAttribution } from "@/server/views/derived-view";
 import { formatDuration, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
 import {
@@ -32,7 +33,7 @@ export function MacroDistribution({
   timezone,
   startDate,
   endDate,
-  threads = []
+  attributions = []
 }: {
   timeline: DashboardData["view"]["timeline"];
   planTimeline: DashboardData["view"]["planTimeline"];
@@ -40,7 +41,7 @@ export function MacroDistribution({
   timezone: string;
   startDate: string;
   endDate: string;
-  threads?: DashboardData["view"]["threads"];
+  attributions?: ThreadActivityAttribution[];
 }) {
   const [filter, setFilter] = useState<MacroFilter>("all");
   const [selectedScopes, setSelectedScopes] = useState<Set<MacroThreadScope>>(
@@ -49,7 +50,7 @@ export function MacroDistribution({
 
   if (timeline.length === 0 && planTimeline.length === 0) return null;
 
-  const allDays = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate, threads });
+  const allDays = buildMacroDistributionDays({ timeline, planTimeline, now, timezone, startDate, endDate, attributions });
   const selectedKinds = macroFilters.find((item) => item.key === filter)?.kinds ?? null;
   const days = allDays.map((day) => filterMacroDistributionDay(day, selectedKinds, selectedScopes));
   const toggleScope = (scope: MacroThreadScope) => {

@@ -7,12 +7,13 @@ import { SubmitButton } from "../submit-button";
 import { Cross2Icon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { saveThreadDeclarationAction, deleteThreadDeclarationAction } from "../../app/dashboard/actions";
 import { DashboardData } from "../../server/services/dashboard-service";
+import { buildThreadGroupViews } from "@/server/domain/threads";
 import { latestDeadline, sumNullable, threadIdentityKey } from "@/server/domain/thread-summary";
 import { formatDuration, formatGeneratedAt, percent, statusLabel, timeRange, kindLabel } from "../view-formatters";
 import { MetricItem } from "./metric-card";
 import { semanticTagColorClass } from "../semantic-colors";
 import { compactActivityTitle } from "./activity-title";
-import { groupThreads, threadSourceLabel, todayKey } from "./utils";
+import { threadSourceLabel, todayKey } from "./utils";
 import { ThreadLoadStrip } from "./thread-load-strip";
 import { ThreadCommitmentFields } from "./thread-commitment-fields";
 
@@ -40,9 +41,9 @@ export function ThreadPanel({
   }, [activityFilter, view.threads]);
   const activityThreadGroups = useMemo(() => {
     const fullGroupStatus = new Map(
-      groupThreads(view.threads).map((group) => [group.group, group.status] as const)
+      buildThreadGroupViews(view.threads).map((group) => [group.group, group.status] as const)
     );
-    const groups = groupThreads(activityFilteredThreads as DashboardData["view"]["threads"])
+    const groups = buildThreadGroupViews(activityFilteredThreads as DashboardData["view"]["threads"])
       .map((group) => {
         const completeStatus = fullGroupStatus.get(group.group) ?? group.status;
         return {
@@ -77,15 +78,15 @@ export function ThreadPanel({
   const inactiveItemCount = view.threads.filter(
     (thread: any) => thread.activityState === "inactive" || thread.activityState === "untracked"
   ).length;
-  const activeGroupCount = groupThreads(
+  const activeGroupCount = buildThreadGroupViews(
     view.threads.filter((thread: any) => (thread.activityState ?? "active") === "active") as DashboardData["view"]["threads"]
   ).length;
-  const inactiveGroupCount = groupThreads(
+  const inactiveGroupCount = buildThreadGroupViews(
     view.threads.filter(
       (thread: any) => thread.activityState === "inactive" || thread.activityState === "untracked"
     ) as DashboardData["view"]["threads"]
   ).length;
-  const allGroupCount = groupThreads(view.threads).length;
+  const allGroupCount = buildThreadGroupViews(view.threads).length;
   const currentFilterLabel =
     activityFilter === "active"
       ? `${activeGroupCount} GROUPS / ${activeItemCount} ITEMS`

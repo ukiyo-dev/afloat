@@ -236,7 +236,7 @@ describe("buildThreadViews", () => {
       parsedEvents,
       now
     });
-    const groups = buildThreadGroupViews(threads, now);
+    const groups = buildThreadGroupViews(threads);
 
     expect(threads.map((thread) => thread.item)).toEqual(["soon", "later", "none"]);
     expect(groups.map((group) => group.group)).toEqual(["A", "B", "C"]);
@@ -627,7 +627,7 @@ describe("buildThreadViews", () => {
       parsedEvents,
       now
     });
-    const groups = buildThreadGroupViews(threads, now);
+    const groups = buildThreadGroupViews(threads);
 
     expect(threads.find((thread) => thread.item === "---")).toMatchObject({
       activityState: "untracked",
@@ -973,7 +973,7 @@ describe("buildThreadViews", () => {
       parsedEvents,
       now
     });
-    const groups = buildThreadGroupViews(threads, now);
+    const groups = buildThreadGroupViews(threads);
 
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({
@@ -1029,7 +1029,7 @@ describe("buildThreadViews", () => {
       parsedEvents,
       now
     });
-    const groups = buildThreadGroupViews(threads, now);
+    const groups = buildThreadGroupViews(threads);
 
     expect(groups[0]).toMatchObject({
       expectedMinutes: 180,
@@ -1077,7 +1077,7 @@ describe("buildThreadViews", () => {
       parsedEvents,
       now
     });
-    const groups = buildThreadGroupViews(threads, now);
+    const groups = buildThreadGroupViews(threads);
 
     expect(groups[0]).toMatchObject({
       futureMinutes: 120,
@@ -1114,7 +1114,7 @@ describe("buildThreadViews", () => {
       parsedEvents,
       now
     });
-    const groups = buildThreadGroupViews(threads, now);
+    const groups = buildThreadGroupViews(threads);
 
     // Both the current date and deadline date are available planning days.
     expect(groups[0]?.dailyRequiredMinutes).toBe(44);
