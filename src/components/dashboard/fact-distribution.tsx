@@ -4,6 +4,21 @@ import type { DashboardData } from "@/server/services/dashboard-service";
 import type { ThreadActivityAttribution } from "@/server/views/derived-view";
 import { semanticThreadFillClass } from "./thread-activity-style";
 
+type FactDistributionStat = {
+  fulfilled: number;
+  plan: number;
+  intShift: number;
+  extShift: number;
+};
+
+export function shouldShowFactDistributionStat(
+  stat: FactDistributionStat,
+  futurePlanPreview: boolean
+): boolean {
+  const total = futurePlanPreview ? stat.plan : stat.fulfilled;
+  return total > 0 || stat.intShift > 0 || stat.extShift > 0;
+}
+
 export function threadFactMinutesByKind(
   rangeStartAt: string,
   rangeEndAt: string,
@@ -108,7 +123,7 @@ export function FactDistribution({
       intShift: shiftComp.rest?.internal ?? 0,
       extShift: shiftComp.rest?.external ?? 0
     },
-  ].filter(stat => stat.plan > 0 || stat.fulfilled > 0 || stat.intShift > 0 || stat.extShift > 0);
+  ].filter((stat) => shouldShowFactDistributionStat(stat, isFuturePlanPreview));
 
   const intShift = isFuturePlanPreview ? 0 : factTotals.internalShift ?? 0;
   const extShift = isFuturePlanPreview ? 0 : factTotals.externalShift ?? 0;

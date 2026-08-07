@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { threadFactMinutesByKind, threadPlanMinutesByKind } from "./fact-distribution";
+import {
+  shouldShowFactDistributionStat,
+  threadFactMinutesByKind,
+  threadPlanMinutesByKind
+} from "./fact-distribution";
+
+describe("shouldShowFactDistributionStat", () => {
+  const futureLeisurePlan = {
+    fulfilled: 0,
+    plan: 60,
+    intShift: 0,
+    extShift: 0
+  };
+
+  it("does not show a future-only plan in a range that displays facts", () => {
+    expect(shouldShowFactDistributionStat(futureLeisurePlan, false)).toBe(false);
+  });
+
+  it("shows the same plan in a future plan preview", () => {
+    expect(shouldShowFactDistributionStat(futureLeisurePlan, true)).toBe(true);
+  });
+});
 
 describe("threadFactMinutesByKind", () => {
   it("uses projected thread facts and excludes the remaining future plan", () => {
