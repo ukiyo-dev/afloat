@@ -576,6 +576,8 @@ export function DashboardWorkbench({
                     timezone={rangeView.timezone}
                     startDate={rangeView.startDate}
                     attributions={threadActivityAttributions}
+                    now={runtimeNow}
+                    planTimeline={view.planTimeline}
                   />
                 </section>
               )}

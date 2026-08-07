@@ -6,7 +6,7 @@ import type { ThreadActivityAttribution } from "@/server/views/derived-view";
 import { localDayKeyFromValue } from "@/server/domain/time";
 import { formatDuration, timeRange, kindLabel } from "../view-formatters";
 import { semanticColorClass } from "../semantic-colors";
-import { buildTimeTapeSlices, guestDayTypeKind, nowMarkerPositionPercent } from "./time-tape-utils";
+import { activityDisplayKind, buildTimeTapeSlices, nowMarkerPositionPercent } from "./time-tape-utils";
 import { isAttributedThreadActivity, semanticThreadFillClass } from "./thread-activity-style";
 
 export function TimeTape({ 
@@ -77,7 +77,7 @@ export function TimeTape({
               <div className="hidden group-hover/tape:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-ledger text-ledger-foreground p-2 font-mono text-xs whitespace-nowrap z-50 pointer-events-none shadow-brutal border border-paper text-center">
                 {visitorMode ? (
                    <strong className="block">
-                     {kindLabel(now ? guestDayTypeKind(slice.fact, planTimeline, now) : slice.fact.kind)}
+                     {kindLabel(now ? activityDisplayKind(slice.fact, planTimeline, now) : slice.fact.kind)}
                    </strong>
                 ) : (
                    <strong className="block">{slice.fact.title}</strong>

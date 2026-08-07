@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTimeTapeSlices, guestDayTypeKind, nowMarkerPositionPercent } from "./time-tape-utils";
+import { activityDisplayKind, buildTimeTapeSlices, nowMarkerPositionPercent } from "./time-tape-utils";
 import type { DashboardData } from "@/server/services/dashboard-service";
 
 type Timeline = DashboardData["view"]["timeline"];
@@ -88,7 +88,7 @@ describe("nowMarkerPositionPercent", () => {
   });
 });
 
-describe("guestDayTypeKind", () => {
+describe("activityDisplayKind", () => {
   const fact = {
     startAt: "2026-07-05T10:00:00.000Z",
     endAt: "2026-07-05T10:30:00.000Z",
@@ -109,11 +109,11 @@ describe("guestDayTypeKind", () => {
   };
 
   it("keeps an ongoing activity labeled as plan in guest mode", () => {
-    expect(guestDayTypeKind(fact, [plan], "2026-07-05T10:30:00.000Z")).toBe("ideal");
+    expect(activityDisplayKind(fact, [plan], "2026-07-05T10:30:00.000Z")).toBe("ideal");
   });
 
   it("labels the activity fulfilled only after now reaches its end", () => {
-    expect(guestDayTypeKind(fact, [plan], "2026-07-05T11:00:00.000Z")).toBe("idealFulfilled");
+    expect(activityDisplayKind(fact, [plan], "2026-07-05T11:00:00.000Z")).toBe("idealFulfilled");
   });
 });
 

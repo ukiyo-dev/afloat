@@ -5,22 +5,31 @@ import { isFulfilledKind, planKindByFulfilledKind } from "@/server/domain/semant
 type TimelineFact = DashboardData["view"]["timeline"][number];
 type PlanEntry = DashboardData["view"]["planTimeline"][number];
 
-export function guestDayTypeKind(
+export function activityDisplayKind(
   fact: TimelineFact,
   planTimeline: PlanEntry[],
   now: string
 ): string {
   const planKind = isFulfilledKind(fact.kind) ? planKindByFulfilledKind[fact.kind] : null;
   const nowMs = new Date(now).getTime();
-  if (!planKind || !Number.isFinite(nowMs)) return fact.kind;
+  const factStartMs = new Date(fact.startAt).getTime();
+  const factEndMs = new Date(fact.endAt).getTime();
+  if (
+    !planKind ||
+    !Number.isFinite(nowMs) ||
+    !Number.isFinite(factStartMs) ||
+    !Number.isFinite(factEndMs)
+  ) {
+    return fact.kind;
+  }
 
   const matchingPlan = planTimeline.find((plan) =>
     plan.kind === planKind &&
     plan.title === fact.title &&
     plan.group === fact.group &&
     plan.item === fact.item &&
-    new Date(plan.startAt).getTime() < new Date(fact.endAt).getTime() &&
-    new Date(plan.endAt).getTime() > new Date(fact.startAt).getTime()
+    new Date(plan.startAt).getTime() < factEndMs &&
+    new Date(plan.endAt).getTime() > factStartMs
   );
 
   return matchingPlan && nowMs < new Date(matchingPlan.endAt).getTime()

@@ -68,6 +68,8 @@ Afloat 只有一个主展示系统：镜像页。
 
 Overview 的 Work、Entertainment 与 Rest 继续使用各自固定语义色。归属于 Threads 的活动使用原色实心填充，正式 Items 与 `---` 均属于 Threads；不归属于 Threads 的活动使用相同语义色与纸色混合的低密度填充。填充密度不改变现有活动标签，也不表达该活动是否正在推进 Daily Load。
 
+Timeline 中的活动标签按当前 `now` 重新判断：只有 `now >= 活动原计划结束时间` 时才显示「兑现」；活动尚未结束时显示对应的「计划」，即使事实层已经产生了截至 `now` 的部分时间。
+
 Thread / Non-Thread 归属必须复用线程领域层已经生成的活动归因，包括由原始 `Group：Item` 汇入 `Group：---` 的历史事实和信息性 Future。Overview 不得再以原始 `Group / Item` 与派生 Item 精确匹配来重新猜测归属；偏移覆盖等部分归属按实际重叠时间范围计算。
 
 主视图不使用鼓励或责备文案。
