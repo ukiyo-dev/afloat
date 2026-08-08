@@ -209,10 +209,6 @@ export function DashboardWorkbench({
     projectedRangeView.internalFulfillmentRate === null
       ? "---"
       : percent(projectedRangeView.internalFulfillmentRate);
-  const fulfillmentValue =
-    projectedRangeView.fulfillmentRate === null ? undefined : percent(projectedRangeView.fulfillmentRate);
-  const fulfillmentSecondaryValue =
-    fulfillmentValue && fulfillmentValue !== internalFulfillmentValue ? fulfillmentValue : undefined;
   const projectedThreadView = useMemo(
     () =>
       projectThreadDerivedViewForNow(
@@ -460,7 +456,6 @@ export function DashboardWorkbench({
             <Metric
               label="兑现率"
               value={internalFulfillmentValue}
-              secondaryValue={fulfillmentSecondaryValue}
               danger={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate < 0.6}
               success={projectedRangeView.internalFulfillmentRate !== null && projectedRangeView.internalFulfillmentRate >= 1}
             />
