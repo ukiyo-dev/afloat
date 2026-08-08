@@ -27,6 +27,7 @@ import { TimeTape } from "./dashboard/time-tape";
 import { calculateRangeDailyLoadInvestment } from "./dashboard/thread-load-strip-utils";
 
 import { MacroDistribution } from "./dashboard/macro-distribution";
+import { isThreadInDateRange } from "./dashboard/thread-range-utils";
 
 import { Metric } from "./dashboard/metric-card";
 import { 
@@ -250,7 +251,10 @@ export function DashboardWorkbench({
   const showsRangeDailyLoadInvestment =
     projectedRangeView.startDate <= rangeDailyLoadEndDate && rangeDailyLoadInvestment.idealMinutes > 0;
   const canJudgeDailyLoad = !isTodayOnlyRange && rangeIncludesPast;
-  const activeThreads = projectedThreads.filter((item) => (item.activityState ?? "active") === "active");
+  const activeThreads = projectedThreads.filter((item) =>
+    (item.activityState ?? "active") === "active" &&
+    isThreadInDateRange(item, projectedRangeView.startDate, projectedRangeView.endDate)
+  );
   const redActiveThreadCount = activeThreads.filter((item) =>
     ["expired", "stale", "imbalanced"].includes(item.status)
   ).length;
