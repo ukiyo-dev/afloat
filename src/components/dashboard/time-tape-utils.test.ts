@@ -51,6 +51,45 @@ describe("buildTimeTapeSlices", () => {
       ["2026-05-07T01:30:00.000Z", "2026-05-07T02:00:00.000Z", "gap"]
     ]);
   });
+
+  it("does not place future facts on today's tape", () => {
+    const slices = buildTimeTapeSlices({
+      timeline: [
+        fact({
+          startAt: "2026-05-07T14:00:00.000Z",
+          endAt: "2026-05-07T15:00:00.000Z",
+          kind: "entertainmentFulfilled"
+        })
+      ],
+      startDate: "2026-05-07T00:00:00.000Z",
+      endDate: "2026-05-08T00:00:00.000Z",
+      observedUntil: "2026-05-07T12:00:00.000Z"
+    });
+
+    expect(slices).toHaveLength(1);
+    expect(slices[0]?.fact).toBeNull();
+  });
+
+  it("clips an in-progress fact at now while preserving the rest of the day as a gap", () => {
+    const slices = buildTimeTapeSlices({
+      timeline: [
+        fact({
+          startAt: "2026-05-07T10:00:00.000Z",
+          endAt: "2026-05-07T14:00:00.000Z",
+          kind: "entertainmentFulfilled"
+        })
+      ],
+      startDate: "2026-05-07T00:00:00.000Z",
+      endDate: "2026-05-08T00:00:00.000Z",
+      observedUntil: "2026-05-07T12:00:00.000Z"
+    });
+
+    expect(slices.map((slice) => [slice.startAt, slice.endAt, slice.fact?.kind ?? "gap"])).toEqual([
+      ["2026-05-07T00:00:00.000Z", "2026-05-07T10:00:00.000Z", "gap"],
+      ["2026-05-07T10:00:00.000Z", "2026-05-07T12:00:00.000Z", "entertainmentFulfilled"],
+      ["2026-05-07T12:00:00.000Z", "2026-05-08T00:00:00.000Z", "gap"]
+    ]);
+  });
 });
 
 describe("nowMarkerPositionPercent", () => {

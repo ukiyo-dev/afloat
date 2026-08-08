@@ -41,10 +41,19 @@ export function TimeTape({
   const isSingleLocalDay =
     localDayKeyFromValue(startDate, timezone) ===
     localDayKeyFromValue(new Date(endMs - 1).toISOString(), timezone);
-  const slices = buildTimeTapeSlices({ timeline, startDate, endDate });
+  const isTodayTape = now !== undefined &&
+    localDayKeyFromValue(startDate, timezone) === localDayKeyFromValue(now, timezone);
+  const slices = buildTimeTapeSlices({
+    timeline,
+    startDate,
+    endDate,
+    observedUntil: isTodayTape ? now : undefined
+  });
   const nowMarkerPercent = now
     ? nowMarkerPositionPercent({ startDate, endDate, now, timezone })
     : null;
+
+  if (!slices.some((slice) => slice.fact)) return null;
 
   return (
     <div>
