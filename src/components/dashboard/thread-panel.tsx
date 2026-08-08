@@ -22,16 +22,18 @@ type ThreadActivityFilter = "active" | "inactive" | "all";
 export function ThreadPanel({
   view,
   rangeView,
+  runtimeNow,
   visitorMode = false
 }: {
   view: DashboardData["view"];
   rangeView: DashboardData["rangeView"];
+  runtimeNow: string;
   visitorMode?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [activityFilter, setActivityFilter] = useState<ThreadActivityFilter>("active");
   const normalizedQuery = query.trim().toLowerCase();
-  const defaultStart = todayKey(rangeView.timezone);
+  const defaultStart = todayKey(rangeView.timezone, new Date(runtimeNow));
   const activityFilteredThreads = useMemo(() => {
     if (activityFilter === "all") return combineThreadRowsForAll(view.threads);
     return view.threads.filter((thread: any) =>

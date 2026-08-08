@@ -7,6 +7,10 @@ export function minutesBetween(startAt: Date, endAt: Date): number {
   return Math.max(0, (endAt.getTime() - startAt.getTime()) / MS_PER_MINUTE);
 }
 
+export function floorToMinute(value: Date): Date {
+  return new Date(Math.floor(value.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
+}
+
 export function minutesInRange(range: DateRange): number {
   return minutesBetween(range.startAt, range.endAt);
 }

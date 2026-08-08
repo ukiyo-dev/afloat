@@ -8,12 +8,14 @@ import { todayKey } from "./utils";
 
 export function JournalPanel({ 
   rangeView, 
+  runtimeNow,
   visitorMode = false 
 }: { 
   rangeView: DashboardData["rangeView"]; 
+  runtimeNow: string;
   visitorMode?: boolean; 
 }) {
-  const today = todayKey(rangeView.timezone);
+  const today = todayKey(rangeView.timezone, new Date(runtimeNow));
 
   return (
     <details 

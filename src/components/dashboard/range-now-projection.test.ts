@@ -476,4 +476,82 @@ describe("projectRangeViewForNow", () => {
     expect(rangeView.fulfilledPlanMinutes).toBe(90);
     expect(rangeView.internalFulfillmentRate).toBe(1);
   });
+
+  it("uses the cached view snapshot as its base and normalizes runtime now", () => {
+    const view = {
+      generatedAt: "2026-07-05T10:00:30.000Z",
+      planTimeline: [
+        {
+          startAt: "2026-07-05T10:00:00.000Z",
+          endAt: "2026-07-05T11:00:00.000Z",
+          kind: "ideal",
+          minutes: 60,
+          title: "Focused work",
+          group: "Focus",
+          item: "Work"
+        }
+      ],
+      timeline: [],
+      factTotals: {},
+      protocolErrors: [],
+      threads: [],
+      threadGroups: [],
+      notes: [],
+      observedSemantics: ["ideal"],
+      plannedMinutes: 60,
+      fulfilledPlanMinutes: 0,
+      internalFulfilledPlanMinutes: 0,
+      internalFulfillmentRate: 0,
+      fulfillmentRate: 0,
+      maintenanceRate: 1,
+      recentDailyCapacity: 0,
+      threadActivityAttributions: []
+    } as Parameters<typeof projectRangeViewForNow>[0]["view"];
+    const rangeView = {
+      key: "day",
+      quickRange: "day",
+      label: "今天",
+      timezone: "UTC",
+      runtimeNow: "2026-07-05T10:00:59.000Z",
+      startDate: "2026-07-05",
+      endDate: "2026-07-05",
+      startAt: "2026-07-05T00:00:00.000Z",
+      endAt: "2026-07-06T00:00:00.000Z",
+      plannedMinutes: 60,
+      plannedDays: 1,
+      observedPlannedMinutes: 0,
+      observedPlannedDays: 0,
+      averagePlannedMinutes: 60,
+      fulfilledPlanMinutes: 0,
+      internalFulfilledPlanMinutes: 0,
+      internalFulfillmentRate: 0,
+      fulfillmentRate: 0,
+      maintenanceRate: 1,
+      fulfilledRuleCount: 0,
+      factTotals: {},
+      planTotals: { ideal: 60 },
+      shiftComposition: {},
+      protocolErrors: [],
+      timeline: [],
+      notes: []
+    } as Parameters<typeof projectRangeViewForNow>[0]["rangeView"];
+
+    const projected = projectRangeViewForNow({
+      view,
+      rangeView,
+      runtimeNowIso: "2026-07-05T10:01:59.999Z"
+    });
+
+    expect(projected.timeline).toEqual([
+      {
+        startAt: "2026-07-05T10:00:30.000Z",
+        endAt: "2026-07-05T10:01:00.000Z",
+        kind: "idealFulfilled",
+        minutes: 0.5,
+        title: "Focused work",
+        group: "Focus",
+        item: "Work"
+      }
+    ]);
+  });
 });

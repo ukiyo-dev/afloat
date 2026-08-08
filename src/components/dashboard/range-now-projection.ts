@@ -2,6 +2,7 @@ import type { DashboardData } from "@/server/services/dashboard-service";
 import {
   addLocalDays,
   formatLocalDate,
+  floorToMinute,
   intersection,
   localDateFromKey,
   localMidnightToUtc,
@@ -26,14 +27,16 @@ const MS_PER_MINUTE = 60_000;
 export function projectRangeViewForNow({
   rangeView,
   view,
-  runtimeNowIso
+  runtimeNowIso,
+  baseNowIso
 }: {
   rangeView: RangeView;
   view: PrivateView;
   runtimeNowIso: string;
+  baseNowIso?: string;
 }): RangeView {
-  const baseNow = new Date(rangeView.runtimeNow ?? view.generatedAt);
-  const runtimeNow = new Date(runtimeNowIso);
+  const baseNow = new Date(baseNowIso ?? view.generatedAt);
+  const runtimeNow = floorToMinute(new Date(runtimeNowIso));
   const rangeStart = new Date(rangeView.startAt);
   const rangeEnd = new Date(rangeView.endAt);
 

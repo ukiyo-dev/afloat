@@ -23,15 +23,17 @@ type Rule = DashboardData["personalRules"][number];
 export function RulePanel({
   rules,
   timezone,
+  runtimeNow,
   visitorMode = false
 }: {
   rules: DashboardData["personalRules"];
   timezone: string;
+  runtimeNow: string;
   visitorMode?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RuleFilter>("active");
-  const today = todayKey(timezone);
+  const today = todayKey(timezone, new Date(runtimeNow));
   const normalizedQuery = query.trim().toLowerCase();
   const activeRules = rules.filter((rule) => rule.status === "active");
   const disactiveRules = rules.filter((rule) => rule.status === "archived");

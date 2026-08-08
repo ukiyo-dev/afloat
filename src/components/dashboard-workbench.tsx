@@ -40,6 +40,7 @@ import { projectRangeViewForNow } from "./dashboard/range-now-projection";
 import { runRecentSyncAction, runRecalibrateAction, recomputeViewsAction } from "@/app/dashboard/actions";
 import { SubmitButton } from "./submit-button";
 import { WorkbenchTabs } from "./workbench-tabs";
+import { millisecondsUntilNextMinute, minuteNowIso } from "./dashboard/runtime-clock";
 
 type ThemeMode = "system" | "light" | "dark";
 type DashboardTab = "overview" | "threads" | "rules";
@@ -98,13 +99,11 @@ function ThemeModeButton() {
 }
 
 
-function getFactLayerTitle(startDate: string, endDate: string, timezone: string) {
+function getFactLayerTitle(startDate: string, endDate: string, today: string) {
   if (startDate !== endDate) {
     return "时间分布";
   }
 
-  const today = todayKey(timezone);
-  
   if (endDate < today) return "往日重现";
   if (startDate > today) return "未雨绸缪";
   return "现在进行";
@@ -118,17 +117,31 @@ function useMinuteNow(fallback: string) {
   const [now, setNow] = useState(fallback);
 
   useEffect(() => {
-    let intervalTimer: number | undefined;
-    const tick = () => setNow(new Date().toISOString());
-    tick();
-    const timeoutTimer = window.setTimeout(() => {
-      tick();
-      intervalTimer = window.setInterval(tick, 60_000);
-    }, 60_000 - (Date.now() % 60_000));
+    let timeoutTimer: number | undefined;
+
+    const scheduleNextTick = () => {
+      timeoutTimer = window.setTimeout(() => {
+        setNow(minuteNowIso());
+        scheduleNextTick();
+      }, millisecondsUntilNextMinute());
+    };
+
+    const resync = () => {
+      if (document.visibilityState !== "visible") return;
+      setNow(minuteNowIso());
+      if (timeoutTimer !== undefined) {
+        window.clearTimeout(timeoutTimer);
+      }
+      scheduleNextTick();
+    };
+
+    resync();
+    document.addEventListener("visibilitychange", resync);
+
     return () => {
-      window.clearTimeout(timeoutTimer);
-      if (intervalTimer !== undefined) {
-        window.clearInterval(intervalTimer);
+      document.removeEventListener("visibilitychange", resync);
+      if (timeoutTimer !== undefined) {
+        window.clearTimeout(timeoutTimer);
       }
     };
   }, []);
@@ -184,7 +197,12 @@ export function DashboardWorkbench({
 
   const runtimeNow = useMinuteNow(view.generatedAt);
   const projectedRangeView = useMemo(
-    () => projectRangeViewForNow({ rangeView, view, runtimeNowIso: runtimeNow }),
+    () => projectRangeViewForNow({
+      rangeView,
+      view,
+      runtimeNowIso: runtimeNow,
+      baseNowIso: view.generatedAt
+    }),
     [rangeView, runtimeNow, view]
   );
   const internalFulfillmentValue =
@@ -218,7 +236,7 @@ export function DashboardWorkbench({
     }),
     [projectedThreads, threadGroups, view]
   );
-  const currentDay = todayKey(projectedRangeView.timezone);
+  const currentDay = todayKey(projectedRangeView.timezone, new Date(runtimeNow));
   const rangeIncludesPast = projectedRangeView.startDate < currentDay;
   const isTodayOnlyRange = projectedRangeView.startDate === currentDay && projectedRangeView.endDate === currentDay;
   const rangeDailyLoadEndDate = isTodayOnlyRange
@@ -246,7 +264,7 @@ export function DashboardWorkbench({
   const factLayerTitle = getFactLayerTitle(
     projectedRangeView.startDate,
     projectedRangeView.endDate,
-    projectedRangeView.timezone
+    currentDay
   );
 
   const daysCount = inclusiveCalendarDays(rangeView.startDate, rangeView.endDate);
@@ -400,8 +418,8 @@ export function DashboardWorkbench({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <RangeLink
-                  active={!isDefaultView && rangeView.startDate === todayKey(rangeView.timezone) && rangeView.endDate === todayKey(rangeView.timezone)}
-                  href={buildHref({ range: "day", date: todayKey(rangeView.timezone), start: null, end: null })}
+                  active={!isDefaultView && rangeView.startDate === currentDay && rangeView.endDate === currentDay}
+                  href={buildHref({ range: "day", date: currentDay, start: null, end: null })}
                   label="今天"
                 />
                 <RangeLink active={!isDefaultView && rangeView.key === "7d"} href={buildHref({ range: "7d", date: null, start: null, end: null })} label="7 天" />
@@ -572,7 +590,7 @@ export function DashboardWorkbench({
                     </div>
                   </div>
                   <Timeline
-                    timeline={rangeView.timeline}
+                    timeline={projectedRangeView.timeline}
                     timezone={rangeView.timezone}
                     startDate={rangeView.startDate}
                     attributions={threadActivityAttributions}
@@ -587,7 +605,13 @@ export function DashboardWorkbench({
             <div className="lg:col-span-4 relative min-h-[760px]">
               <div className="lg:absolute lg:inset-0 flex flex-col gap-8">
                 {/* Notes Section */}
-                {!isUltraMacro && <JournalPanel rangeView={projectedRangeView} visitorMode={visitorMode} />}
+                {!isUltraMacro && (
+                  <JournalPanel
+                    rangeView={projectedRangeView}
+                    runtimeNow={runtimeNow}
+                    visitorMode={visitorMode}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -598,12 +622,18 @@ export function DashboardWorkbench({
         <ThreadPanel
           view={projectedView}
           rangeView={rangeView}
+          runtimeNow={runtimeNow}
           visitorMode={visitorMode}
         />
       </section>
 
       <section hidden={activeDashboardTab !== "rules"}>
-        <RulePanel rules={personalRules} timezone={rangeView.timezone} visitorMode={visitorMode} />
+        <RulePanel
+          rules={personalRules}
+          timezone={rangeView.timezone}
+          runtimeNow={runtimeNow}
+          visitorMode={visitorMode}
+        />
       </section>
 
     </main>

@@ -1,5 +1,6 @@
 import type { ThreadView } from "@/server/domain/types";
 import {
+  floorToMinute,
   inclusiveCalendarDays,
   localDayKey,
   minutesBetween
@@ -28,7 +29,6 @@ type ElapsedTotals = {
   totalMinutes: number;
 };
 
-const MS_PER_MINUTE = 60_000;
 export function projectThreadsForNow(
   threads: ThreadView[],
   runtimeNowIso: string,
@@ -53,10 +53,6 @@ export function projectThreadsForNow(
     staleDays,
     recentDailyCapacity
   ));
-}
-
-function floorToMinute(value: Date): Date {
-  return new Date(Math.floor(value.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
 }
 
 export function projectThreadDerivedViewForNow(

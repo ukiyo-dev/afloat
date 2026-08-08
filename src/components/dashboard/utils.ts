@@ -44,8 +44,8 @@ export function threadSourceLabel(source: string) {
   return labels[source] ?? source;
 }
 
-export function todayKey(timezone: string) {
-  return localDayKey(new Date(), timezone);
+export function todayKey(timezone: string, now: Date) {
+  return localDayKey(now, timezone);
 }
 
 export function dayHref(basePath: string, date: string) {
