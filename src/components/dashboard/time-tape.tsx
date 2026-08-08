@@ -34,26 +34,15 @@ export function TimeTape({
     setMounted(true);
   }, []);
 
-  if (timeline.length === 0) return null;
-
   // Calculate the total duration of the current view window
   const endMs = new Date(endDate).getTime();
   const isSingleLocalDay =
     localDayKeyFromValue(startDate, timezone) ===
     localDayKeyFromValue(new Date(endMs - 1).toISOString(), timezone);
-  const isTodayTape = now !== undefined &&
-    localDayKeyFromValue(startDate, timezone) === localDayKeyFromValue(now, timezone);
-  const slices = buildTimeTapeSlices({
-    timeline,
-    startDate,
-    endDate,
-    observedUntil: isTodayTape ? now : undefined
-  });
+  const slices = buildTimeTapeSlices({ timeline, startDate, endDate });
   const nowMarkerPercent = now
     ? nowMarkerPositionPercent({ startDate, endDate, now, timezone })
     : null;
-
-  if (!slices.some((slice) => slice.fact)) return null;
 
   return (
     <div>

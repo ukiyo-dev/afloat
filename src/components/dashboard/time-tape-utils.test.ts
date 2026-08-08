@@ -52,7 +52,7 @@ describe("buildTimeTapeSlices", () => {
     ]);
   });
 
-  it("does not place future facts on today's tape", () => {
+  it("keeps future facts visible on the full-day tape", () => {
     const slices = buildTimeTapeSlices({
       timeline: [
         fact({
@@ -62,15 +62,17 @@ describe("buildTimeTapeSlices", () => {
         })
       ],
       startDate: "2026-05-07T00:00:00.000Z",
-      endDate: "2026-05-08T00:00:00.000Z",
-      observedUntil: "2026-05-07T12:00:00.000Z"
+      endDate: "2026-05-08T00:00:00.000Z"
     });
 
-    expect(slices).toHaveLength(1);
-    expect(slices[0]?.fact).toBeNull();
+    expect(slices.map((slice) => [slice.startAt, slice.endAt, slice.fact?.kind ?? "gap"])).toEqual([
+      ["2026-05-07T00:00:00.000Z", "2026-05-07T14:00:00.000Z", "gap"],
+      ["2026-05-07T14:00:00.000Z", "2026-05-07T15:00:00.000Z", "entertainmentFulfilled"],
+      ["2026-05-07T15:00:00.000Z", "2026-05-08T00:00:00.000Z", "gap"]
+    ]);
   });
 
-  it("clips an in-progress fact at now while preserving the rest of the day as a gap", () => {
+  it("keeps an in-progress fact through its scheduled end", () => {
     const slices = buildTimeTapeSlices({
       timeline: [
         fact({
@@ -80,14 +82,13 @@ describe("buildTimeTapeSlices", () => {
         })
       ],
       startDate: "2026-05-07T00:00:00.000Z",
-      endDate: "2026-05-08T00:00:00.000Z",
-      observedUntil: "2026-05-07T12:00:00.000Z"
+      endDate: "2026-05-08T00:00:00.000Z"
     });
 
     expect(slices.map((slice) => [slice.startAt, slice.endAt, slice.fact?.kind ?? "gap"])).toEqual([
       ["2026-05-07T00:00:00.000Z", "2026-05-07T10:00:00.000Z", "gap"],
-      ["2026-05-07T10:00:00.000Z", "2026-05-07T12:00:00.000Z", "entertainmentFulfilled"],
-      ["2026-05-07T12:00:00.000Z", "2026-05-08T00:00:00.000Z", "gap"]
+      ["2026-05-07T10:00:00.000Z", "2026-05-07T14:00:00.000Z", "entertainmentFulfilled"],
+      ["2026-05-07T14:00:00.000Z", "2026-05-08T00:00:00.000Z", "gap"]
     ]);
   });
 });

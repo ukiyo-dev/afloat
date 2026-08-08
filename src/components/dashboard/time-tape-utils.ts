@@ -53,18 +53,14 @@ interface ClippedFact {
 export function buildTimeTapeSlices({
   timeline,
   startDate,
-  endDate,
-  observedUntil
+  endDate
 }: {
   timeline: DashboardData["view"]["timeline"];
   startDate: string;
   endDate: string;
-  observedUntil?: string;
 }): TimeTapeSlice[] {
   const startMs = new Date(startDate).getTime();
   const endMs = new Date(endDate).getTime();
-  const observedUntilMs = observedUntil ? new Date(observedUntil).getTime() : null;
-  const hasObservedUntil = observedUntilMs !== null && Number.isFinite(observedUntilMs);
 
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
     return [];
@@ -75,11 +71,7 @@ export function buildTimeTapeSlices({
       const factStartMs = new Date(fact.startAt).getTime();
       const factEndMs = new Date(fact.endAt).getTime();
       const clippedStartMs = Math.max(startMs, factStartMs);
-      const clippedEndMs = Math.min(
-        endMs,
-        factEndMs,
-        hasObservedUntil ? observedUntilMs : endMs
-      );
+      const clippedEndMs = Math.min(endMs, factEndMs);
 
       if (
         !Number.isFinite(factStartMs) ||
