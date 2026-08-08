@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clampThreadMinutes,
   shouldShowFactDistributionStat,
   threadFactMinutesByKind,
   threadPlanMinutesByKind
 } from "./fact-distribution";
+
+describe("clampThreadMinutes", () => {
+  it("does not render attributed future minutes beyond the displayed total", () => {
+    expect(clampThreadMinutes(0, 60)).toBe(0);
+    expect(clampThreadMinutes(30, 60)).toBe(30);
+  });
+});
 
 describe("shouldShowFactDistributionStat", () => {
   const futureLeisurePlan = {

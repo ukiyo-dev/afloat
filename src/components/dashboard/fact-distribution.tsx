@@ -19,6 +19,14 @@ export function shouldShowFactDistributionStat(
   return total > 0 || stat.intShift > 0 || stat.extShift > 0;
 }
 
+export function clampThreadMinutes(total: number, threadMinutes: number): number {
+  if (!Number.isFinite(total) || !Number.isFinite(threadMinutes)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(0, total), Math.max(0, threadMinutes));
+}
+
 export function threadFactMinutesByKind(
   rangeStartAt: string,
   rangeEndAt: string,
@@ -136,9 +144,10 @@ export function FactDistribution({
         <div className="flex flex-col gap-3">
           {coreStats.map((stat) => {
             const total = isFuturePlanPreview ? stat.plan : stat.fulfilled;
-            const threadTotal = isFuturePlanPreview
+            const attributedThreadTotal = isFuturePlanPreview
               ? threadMinutesByKind[stat.key] ?? 0
               : threadMinutesByKind[`${stat.key}Fulfilled`] ?? 0;
+            const threadTotal = clampThreadMinutes(total, attributedThreadTotal);
             const outsideTotal = Math.max(0, total - threadTotal);
             const averageThread = isFuturePlanPreview
               ? plannedDayAverage(threadTotal)
@@ -216,9 +225,10 @@ export function FactDistribution({
           {/* Work */}
           {coreStats.flatMap((stat) => {
             const total = isFuturePlanPreview ? stat.plan : stat.fulfilled;
-            const threadTotal = isFuturePlanPreview
+            const attributedThreadTotal = isFuturePlanPreview
               ? threadMinutesByKind[stat.key] ?? 0
               : threadMinutesByKind[`${stat.key}Fulfilled`] ?? 0;
+            const threadTotal = clampThreadMinutes(total, attributedThreadTotal);
             const outside = Math.max(0, total - threadTotal);
             return [
               threadTotal > 0 ? <div key={`${stat.key}-thread`} className={`h-full ${stat.color} transition-all hover:opacity-80 cursor-crosshair border-r border-ink last:border-r-0`} style={{ flexGrow: threadTotal }} title={`${stat.label}: ${formatDuration(threadTotal)}`} /> : null,
